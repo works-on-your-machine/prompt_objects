@@ -10,6 +10,8 @@ require_relative "models/conversation"
 require_relative "models/input"
 require_relative "models/po_inspector"
 require_relative "models/capability_editor"
+require_relative "models/notification_panel"
+require_relative "models/request_responder"
 
 module PromptObjects
   module UI
@@ -52,21 +54,32 @@ module PromptObjects
           objects_dir: @objects_dir,
           primitives_dir: @primitives_dir
         )
-        @context = @env.context
+        # Create context with TUI mode enabled
+        @context = @env.context(tui_mode: true)
 
         # Load all prompt objects from directory
         load_all_objects
 
         # Initialize sub-models
-        @capability_bar = Models::CapabilityBar.new(registry: @env.registry)
+        @capability_bar = Models::CapabilityBar.new(
+          registry: @env.registry,
+          human_queue: @env.human_queue
+        )
         @message_log = Models::MessageLog.new(bus: @env.bus)
         @conversation = Models::Conversation.new
         @input = Models::Input.new
+        @notification_panel = Models::NotificationPanel.new(human_queue: @env.human_queue)
+        @responder = nil  # Set when responding to a request
 
         # Subscribe to message bus for real-time updates
         @env.bus.subscribe do |entry|
           # This will be called when messages are published
           # In a real async setup, we'd send a message to the update loop
+        end
+
+        # Subscribe to human queue for notification updates
+        @env.human_queue.subscribe do |event, request|
+          # Could send a message to trigger UI update
         end
 
         # Activate the first PO if available
@@ -148,6 +161,12 @@ module PromptObjects
         output = lines.join("\n")
         output = render_modal_overlay(output) if @modal
 
+        # Notification panel overlay
+        output = render_notification_overlay(output) if @notification_panel.visible
+
+        # Responder modal overlay (highest priority)
+        output = render_responder_overlay(output) if @responder
+
         output
       end
 
@@ -178,15 +197,21 @@ module PromptObjects
       end
 
       def handle_key(msg)
-        # Global keys (when no modal)
-        return handle_modal_key(msg) if @modal
-
         char = msg.char.to_s
 
         # Ctrl+C always quits
         if msg.ctrl? && char == "c"
           return [self, Bubbletea.quit]
         end
+
+        # Handle responder modal first (highest priority)
+        return handle_responder_key(msg, char) if @responder
+
+        # Handle notification panel
+        return handle_notification_key(msg, char) if @notification_panel.visible
+
+        # Handle other modals
+        return handle_modal_key(msg) if @modal
 
         # Mode-specific handling
         if @mode == MODE_INSERT
@@ -254,6 +279,11 @@ module PromptObjects
           [self, nil]
         when char == "m"
           @show_message_log = !@show_message_log
+          [self, nil]
+        when char == "n"
+          # Toggle notification panel
+          @notification_panel.set_dimensions(@width, @height)
+          @notification_panel.toggle
           [self, nil]
         when char == "I"
           # Inspect current PO
@@ -371,6 +401,105 @@ module PromptObjects
         @modal = nil
         @inspector = nil
         @editor = nil
+      end
+
+      def handle_notification_key(msg, char)
+        case
+        when msg.esc?
+          @notification_panel.hide
+          [self, nil]
+        when char == "q"
+          @notification_panel.hide
+          [self, nil]
+        when char == "j" || msg.down?
+          @notification_panel.move_down
+          [self, nil]
+        when char == "k" || msg.up?
+          @notification_panel.move_up
+          [self, nil]
+        when msg.enter?
+          # Open responder for selected request
+          request = @notification_panel.selected_request
+          if request
+            @responder = Models::RequestResponder.new(request: request)
+            @responder.set_dimensions(@width, @height)
+            @notification_panel.hide
+          end
+          [self, nil]
+        else
+          [self, nil]
+        end
+      end
+
+      def handle_responder_key(msg, char)
+        # Handle input mode for text responses
+        if @responder.input_mode?
+          return handle_responder_input_mode(msg, char)
+        end
+
+        case
+        when msg.esc?
+          @responder = nil
+          [self, nil]
+        when char == "q"
+          @responder = nil
+          [self, nil]
+        when char == "j" || msg.down?
+          @responder.move_down
+          [self, nil]
+        when char == "k" || msg.up?
+          @responder.move_up
+          [self, nil]
+        when msg.enter?
+          if @responder.has_options?
+            # Submit selected option
+            submit_response
+          else
+            # Enter input mode for text
+            @responder.enter_input_mode
+          end
+          [self, nil]
+        else
+          [self, nil]
+        end
+      end
+
+      def handle_responder_input_mode(msg, char)
+        case
+        when msg.esc?
+          @responder.exit_input_mode
+          [self, nil]
+        when msg.enter?
+          # Submit the text response
+          if @responder.can_submit?
+            submit_response
+          end
+          [self, nil]
+        when msg.backspace?
+          @responder.delete_char
+          [self, nil]
+        when msg.space?
+          @responder.insert_char(" ")
+          [self, nil]
+        when msg.runes? && !char.empty?
+          @responder.insert_char(char)
+          [self, nil]
+        else
+          [self, nil]
+        end
+      end
+
+      def submit_response
+        return unless @responder
+
+        request = @responder.request
+        value = @responder.response_value
+
+        # Submit to human queue (this will unblock the waiting thread)
+        @env.human_queue.respond(request.id, value)
+
+        # Clear responder
+        @responder = nil
       end
 
       def handle_resize(msg)
@@ -536,10 +665,14 @@ module PromptObjects
             Styles.help_key.render("Ctrl+U") + " clear"
           ]
         else
+          # Show notification count if any pending
+          pending = @env.human_queue.count
+          notif_label = pending > 0 ? "n (#{pending})" : "n"
+
           parts = [
             Styles.help_key.render("i") + " insert",
             Styles.help_key.render("h/l") + " switch PO",
-            Styles.help_key.render("m") + " messages",
+            Styles.help_key.render(notif_label) + " notifications",
             Styles.help_key.render("I") + " inspect",
             Styles.help_key.render("q") + " quit"
           ]
@@ -602,6 +735,18 @@ module PromptObjects
         end
 
         result.join("\n")
+      end
+
+      def render_notification_overlay(base)
+        @notification_panel.set_dimensions(@width, @height)
+        modal_view = @notification_panel.view
+        center_modal(base, modal_view)
+      end
+
+      def render_responder_overlay(base)
+        @responder.set_dimensions(@width, @height)
+        modal_view = @responder.view
+        center_modal(base, modal_view)
       end
     end
   end

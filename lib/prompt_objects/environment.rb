@@ -4,13 +4,15 @@ module PromptObjects
   # Context object passed to capabilities during execution.
   # Provides access to environment, message bus, and tracks execution.
   class Context
-    attr_reader :env, :bus
-    attr_accessor :current_capability
+    attr_reader :env, :bus, :human_queue
+    attr_accessor :current_capability, :tui_mode
 
-    def initialize(env:, bus:)
+    def initialize(env:, bus:, human_queue: nil)
       @env = env
       @bus = bus
+      @human_queue = human_queue
       @current_capability = nil
+      @tui_mode = false
     end
 
     # Log a message to the bus.
@@ -30,7 +32,7 @@ module PromptObjects
 
   # The runtime environment that holds all capabilities and coordinates execution.
   class Environment
-    attr_reader :llm, :registry, :objects_dir, :bus, :primitives_dir
+    attr_reader :llm, :registry, :objects_dir, :bus, :primitives_dir, :human_queue
 
     def initialize(objects_dir: "objects", primitives_dir: nil, llm: nil)
       @objects_dir = objects_dir
@@ -38,15 +40,19 @@ module PromptObjects
       @llm = llm || LLM::OpenAIAdapter.new
       @registry = Registry.new
       @bus = MessageBus.new
+      @human_queue = HumanQueue.new
 
       register_primitives
       register_universal_capabilities
     end
 
     # Create a context for capability execution.
+    # @param tui_mode [Boolean] Whether running in TUI mode
     # @return [Context]
-    def context
-      Context.new(env: self, bus: @bus)
+    def context(tui_mode: false)
+      ctx = Context.new(env: self, bus: @bus, human_queue: @human_queue)
+      ctx.tui_mode = tui_mode
+      ctx
     end
 
     # Load a prompt object from a file path.

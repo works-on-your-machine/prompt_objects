@@ -6,17 +6,18 @@ module PromptObjects
       # Horizontal bar showing all registered capabilities
       # POs are selectable, primitives are shown dimmed
       class CapabilityBar
-        attr_accessor :width
+        attr_accessor :width, :human_queue
 
         STATE_ICONS = {
-          idle: "",
-          working: "",
-          active: "",
-          waiting_for_human: ""
+          idle: "○",
+          working: "◐",
+          active: "●",
+          waiting_for_human: "⚠"
         }.freeze
 
-        def initialize(registry:)
+        def initialize(registry:, human_queue: nil)
           @registry = registry
+          @human_queue = human_queue
           @selected_index = 0
           @width = 80
         end
@@ -76,10 +77,29 @@ module PromptObjects
           name = po.name
           name = name[0, 12] + ".." if name.length > 14
 
-          content = "#{name} #{icon}"
+          # Check for pending requests
+          pending_count = pending_for(po.name)
+
+          if pending_count > 0
+            # Show warning icon and count for pending requests
+            badge = Styles.warning.render("⚠#{pending_count}")
+            content = "#{name} #{badge}"
+          else
+            content = "#{name} #{icon}"
+          end
 
           style = Styles.capability_box(active: selected, state: state)
           style.render(content)
+        end
+
+        def pending_for(capability_name)
+          return 0 unless @human_queue
+          @human_queue.pending_for(capability_name).length
+        end
+
+        def total_pending
+          return 0 unless @human_queue
+          @human_queue.count
         end
       end
     end

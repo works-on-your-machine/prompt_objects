@@ -36,6 +36,46 @@ module PromptObjects
         question = message[:question] || message["question"]
         options = message[:options] || message["options"]
 
+        # In TUI mode, use the human queue (non-blocking for UI)
+        if context.tui_mode && context.human_queue
+          return receive_tui(question, options, context)
+        end
+
+        # REPL mode - use stdin directly
+        receive_repl(question, options, context)
+      end
+
+      private
+
+      def receive_tui(question, options, context)
+        # Queue the request and wait for response
+        request = context.human_queue.enqueue(
+          capability: context.current_capability,
+          question: question,
+          options: options
+        )
+
+        # Log to message bus
+        context.bus.publish(
+          from: context.current_capability,
+          to: "human",
+          message: "[waiting] #{question}"
+        )
+
+        # Block this thread until human responds via UI
+        response = request.wait_for_response
+
+        # Log the response
+        context.bus.publish(
+          from: "human",
+          to: context.current_capability,
+          message: response
+        )
+
+        response
+      end
+
+      def receive_repl(question, options, context)
         puts
         puts "┌─ #{context.current_capability} asks ──────────────────────────────────┐"
         puts "│"
