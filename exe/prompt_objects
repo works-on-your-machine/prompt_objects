@@ -13,14 +13,17 @@ class REPL
     @po = prompt_object
     @env = env
     @context = env.context
+    @show_log = true  # Show message log by default
   end
 
   def run
     puts header
     puts "Loaded: #{@po.name}"
     puts @po.description
+    puts
+    puts "Capabilities: #{format_capabilities}"
     puts "-" * 60
-    puts "Type 'exit' or 'quit' to leave, 'history' to see conversation"
+    puts "Commands: 'exit', 'history', 'log', 'log on/off'"
     puts
 
     loop do
@@ -37,11 +40,38 @@ class REPL
       when "history"
         show_history
         next
+      when "log"
+        show_message_log
+        next
+      when "log on"
+        @show_log = true
+        puts "Message log display: ON"
+        next
+      when "log off"
+        @show_log = false
+        puts "Message log display: OFF"
+        next
       end
 
+      # Clear log before each interaction to show only relevant messages
+      log_start = @env.bus.log.length
+
       begin
+        # Log the human message
+        @env.bus.publish(from: "human", to: @po.name, message: input)
+
         @context.current_capability = @po.name
         response = @po.receive(input, context: @context)
+
+        # Log the response back to human
+        @env.bus.publish(from: @po.name, to: "human", message: response)
+
+        # Show the message log for this interaction
+        if @show_log
+          puts
+          show_interaction_log(log_start)
+        end
+
         puts
         puts "#{@po.name}: #{response}"
         puts
@@ -65,6 +95,22 @@ class REPL
     HEADER
   end
 
+  def format_capabilities
+    caps = @po.config["capabilities"] || []
+    return "(none)" if caps.empty?
+
+    caps.map do |cap_name|
+      cap = @env.registry.get(cap_name)
+      if cap.is_a?(PromptObjects::PromptObject)
+        "#{cap_name} (PO)"
+      elsif cap.is_a?(PromptObjects::Primitive)
+        "#{cap_name}"
+      else
+        "#{cap_name} (?)"
+      end
+    end.join(", ")
+  end
+
   def show_history
     puts "\n--- Conversation History ---"
     @po.history.each_with_index do |msg, i|
@@ -74,6 +120,33 @@ class REPL
       puts "#{i + 1}. [#{role}] #{content}"
     end
     puts "----------------------------\n\n"
+  end
+
+  def show_message_log
+    puts "\n--- Full Message Log ---"
+    puts @env.bus.format_log(50)
+    puts "------------------------\n\n"
+  end
+
+  def show_interaction_log(start_index)
+    entries = @env.bus.log[start_index..]
+    return if entries.nil? || entries.empty?
+
+    puts "┌─ Message Log ─────────────────────────────────────────────┐"
+    entries.each do |entry|
+      time = entry[:timestamp].strftime("%H:%M:%S")
+      from = entry[:from]
+      to = entry[:to]
+      msg = entry[:message]
+
+      # Color-code based on type (using ANSI codes)
+      line = "│ #{time}  #{from} → #{to}: #{msg}"
+      # Truncate if too long
+      line = line[0, 70] + "..." if line.length > 73
+      line = line.ljust(73) + "│"
+      puts line
+    end
+    puts "└───────────────────────────────────────────────────────────┘"
   end
 end
 
@@ -86,6 +159,10 @@ def main
 
   begin
     po = env.load_by_name(name)
+
+    # Load any prompt object dependencies
+    env.load_dependencies(po)
+
   rescue PromptObjects::Error => e
     puts "Error loading '#{name}': #{e.message}"
     puts "\nAvailable objects in '#{objects_dir}/':"

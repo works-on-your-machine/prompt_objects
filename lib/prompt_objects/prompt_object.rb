@@ -104,11 +104,27 @@ module PromptObjects
     end
 
     def execute_tool_calls(tool_calls, context)
+      # Track the caller for nested calls
+      previous_capability = context.current_capability
+
       tool_calls.map do |tc|
         capability = @env.registry&.get(tc.name)
 
         if capability
+          # Log the outgoing message
+          @env.bus.publish(from: name, to: tc.name, message: tc.arguments)
+
+          # Set context for nested calls
+          context.current_capability = tc.name
+
           result = capability.receive(tc.arguments, context: context)
+
+          # Restore context
+          context.current_capability = previous_capability
+
+          # Log the response
+          @env.bus.publish(from: tc.name, to: name, message: result)
+
           { tool_call_id: tc.id, content: result }
         else
           { tool_call_id: tc.id, content: "Unknown capability: #{tc.name}" }

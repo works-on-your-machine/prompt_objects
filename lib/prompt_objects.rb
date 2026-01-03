@@ -16,6 +16,7 @@ end
 require_relative "prompt_objects/capability"
 require_relative "prompt_objects/primitive"
 require_relative "prompt_objects/registry"
+require_relative "prompt_objects/message_bus"
 require_relative "prompt_objects/loader"
 require_relative "prompt_objects/llm/response"
 require_relative "prompt_objects/llm/openai_adapter"

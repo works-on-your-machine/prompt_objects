@@ -1,25 +1,42 @@
 # frozen_string_literal: true
 
 module PromptObjects
-  # Simple context object passed to capabilities during execution.
+  # Context object passed to capabilities during execution.
+  # Provides access to environment, message bus, and tracks execution.
   class Context
-    attr_reader :env
+    attr_reader :env, :bus
     attr_accessor :current_capability
 
-    def initialize(env:)
+    def initialize(env:, bus:)
       @env = env
+      @bus = bus
       @current_capability = nil
+    end
+
+    # Log a message to the bus.
+    # @param to [String] Destination capability
+    # @param message [String, Hash] The message
+    def log_message(to:, message:)
+      @bus.publish(from: @current_capability || "human", to: to, message: message)
+    end
+
+    # Log a response to the bus.
+    # @param from [String] Source capability
+    # @param message [String, Hash] The response
+    def log_response(from:, message:)
+      @bus.publish(from: from, to: @current_capability || "human", message: message)
     end
   end
 
   # The runtime environment that holds all capabilities and coordinates execution.
   class Environment
-    attr_reader :llm, :registry, :objects_dir
+    attr_reader :llm, :registry, :objects_dir, :bus
 
     def initialize(objects_dir: "objects", llm: nil)
       @objects_dir = objects_dir
       @llm = llm || LLM::OpenAIAdapter.new
       @registry = Registry.new
+      @bus = MessageBus.new
 
       register_primitives
     end
@@ -27,7 +44,7 @@ module PromptObjects
     # Create a context for capability execution.
     # @return [Context]
     def context
-      Context.new(env: self)
+      Context.new(env: self, bus: @bus)
     end
 
     # Load a prompt object from a file path.
@@ -53,6 +70,23 @@ module PromptObjects
     def load_by_name(name)
       path = File.join(@objects_dir, "#{name}.md")
       load_prompt_object(path)
+    end
+
+    # Load all prompt objects that a capability depends on.
+    # @param capability [PromptObject] The capability to load dependencies for
+    def load_dependencies(capability)
+      return unless capability.is_a?(PromptObject)
+
+      deps = capability.config["capabilities"] || []
+      deps.each do |dep_name|
+        next if @registry.exists?(dep_name)
+
+        # Try to load as a prompt object
+        path = File.join(@objects_dir, "#{dep_name}.md")
+        if File.exist?(path)
+          load_prompt_object(path)
+        end
+      end
     end
 
     # Get a capability by name (prompt object or primitive).
