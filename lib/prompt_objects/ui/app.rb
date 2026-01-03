@@ -165,44 +165,68 @@ module PromptObjects
 
         char = msg.char.to_s
 
+        # Always handle these regardless of input state
         case
         when msg.ctrl? && char == "c"
-          [self, Bubbletea.quit]
-        when char == "q"
-          [self, Bubbletea.quit]
-        when char == "?"
-          @show_help = !@show_help
-          [self, nil]
-        when char == "m"
-          @show_message_log = !@show_message_log
-          [self, nil]
-        when char == "i" && @active_po
-          @modal = { type: :inspector, data: @active_po }
-          [self, nil]
-        when char == "e" && @active_po
-          @modal = { type: :editor, data: @active_po }
-          [self, nil]
-        when msg.left? || char == "h"
+          return [self, Bubbletea.quit]
+        when msg.esc?
+          # Escape clears input or quits if empty
+          if @input.empty?
+            return [self, Bubbletea.quit]
+          else
+            @input.clear
+            return [self, nil]
+          end
+        end
+
+        # Arrow keys always work for navigation
+        case
+        when msg.left?
           @capability_bar.prev
           select_current_po
-          [self, nil]
-        when msg.right? || char == "l"
+          return [self, nil]
+        when msg.right?
           @capability_bar.next
           select_current_po
-          [self, nil]
-        when msg.enter? && @input.empty?
-          # Enter with empty input activates selected PO
-          select_current_po
-          [self, nil]
-        when msg.enter? && !@input.empty?
-          # Enter with text sends message
-          text = @input.submit
-          handle_input_submit(text)
-        else
-          # Delegate to input
-          @input.handle_key(msg)
-          [self, nil]
+          return [self, nil]
+        when msg.enter?
+          if @input.empty?
+            # Enter with empty input - no action
+            return [self, nil]
+          else
+            # Enter with text sends message
+            text = @input.submit
+            return handle_input_submit(text)
+          end
         end
+
+        # Single-letter shortcuts only when input is empty
+        if @input.empty?
+          case char
+          when "q"
+            return [self, Bubbletea.quit]
+          when "?"
+            @show_help = !@show_help
+            return [self, nil]
+          when "m"
+            @show_message_log = !@show_message_log
+            return [self, nil]
+          when "i"
+            if @active_po
+              @modal = { type: :inspector, data: @active_po }
+            end
+            return [self, nil]
+          when "e"
+            if @active_po
+              @modal = { type: :editor, data: @active_po }
+            end
+            return [self, nil]
+          end
+        end
+
+        # Everything else goes to input
+        @input.handle_key(msg)
+        [self, nil]
       end
 
       def handle_modal_key(msg)
@@ -333,12 +357,14 @@ module PromptObjects
 
       def render_status_bar
         parts = []
-        parts << Styles.help_key.render("q") + " quit"
-        parts << Styles.help_key.render("?") + " help"
-        parts << Styles.help_key.render("m") + " messages"
-        parts << Styles.help_key.render("i") + " inspect"
-        parts << Styles.help_key.render("e") + " edit"
+        parts << Styles.help_key.render("Esc") + " quit/clear"
+        parts << Styles.help_key.render("Enter") + " send"
         parts << Styles.help_key.render("<-/->") + " switch PO"
+
+        if @input.empty?
+          parts << Styles.help_key.render("m") + " messages"
+          parts << Styles.help_key.render("i") + " inspect"
+        end
 
         status = parts.join("  ")
 

@@ -20,6 +20,11 @@ module PromptObjects
           @text.empty?
         end
 
+        def clear
+          @text = ""
+          @cursor = 0
+        end
+
         def submit
           return nil if @text.empty?
 
@@ -56,7 +61,8 @@ module PromptObjects
           when msg.ctrl? && char == "k"
             # Kill to end of line
             @text = @text[0, @cursor]
-          when printable?(msg)
+          when msg.runes? && !char.empty?
+            # Regular character input
             insert_char(char)
           end
         end
@@ -140,16 +146,6 @@ module PromptObjects
           @cursor = @text.length
         end
 
-        def printable?(msg)
-          return false if msg.ctrl?
-          return false unless msg.runes?
-
-          char = msg.char.to_s
-          return false if char.empty?
-
-          # Check if it's a printable character
-          char.match?(/^[[:print:]]$/) || char.match?(/^[\w\s[:punct:]]$/)
-        end
       end
     end
   end
