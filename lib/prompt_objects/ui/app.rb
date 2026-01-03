@@ -99,12 +99,23 @@ module PromptObjects
         when Messages::CloseModal
           @modal = nil
           [self, nil]
+        when Messages::POResponse
+          handle_po_response(msg)
         when Messages::ErrorOccurred
           @error = msg.message
+          @conversation.clear_pending
           [self, nil]
         else
           [self, nil]
         end
+      end
+
+      def handle_po_response(msg)
+        # Clear the pending message and update conversation
+        @conversation.clear_pending
+        @conversation.set_po(@active_po)
+        @error = nil
+        [self, nil]
       end
 
       def view
@@ -327,20 +338,30 @@ module PromptObjects
         # Log to message bus
         @env.bus.publish(from: "human", to: @active_po.name, message: text)
 
-        # Call the PO
-        begin
-          @active_po.state = :working
-          response = @active_po.receive(text, context: @context)
-          @active_po.state = :idle
+        # Show the message immediately
+        @conversation.set_pending_message(text)
+        @active_po.state = :working
 
-          # Log response
-          @env.bus.publish(from: @active_po.name, to: "human", message: response)
+        # Run LLM call in background thread
+        po = @active_po
+        context = @context
+        env = @env
+        conversation = @conversation
 
-          # Update conversation view
-          @conversation.set_po(@active_po)
-        rescue StandardError => e
-          @error = e.message
-          @active_po.state = :idle
+        Thread.new do
+          begin
+            response = po.receive(text, context: context)
+            po.state = :idle
+
+            # Log response
+            env.bus.publish(from: po.name, to: "human", message: response)
+
+            # Send message to update UI (Bubbletea will pick this up)
+            Bubbletea.send_message(Messages::POResponse.new(po_name: po.name, text: response))
+          rescue StandardError => e
+            Bubbletea.send_message(Messages::ErrorOccurred.new(message: e.message))
+            po.state = :idle
+          end
         end
 
         [self, nil]
@@ -476,7 +497,7 @@ module PromptObjects
         lines << Styles.section_header.render("Capabilities")
 
         caps = po.config["capabilities"] || []
-        universal = UNIVERSAL_CAPABILITIES
+        universal = PromptObjects::UNIVERSAL_CAPABILITIES
 
         lines << "  Universal: #{universal.join(', ')}"
         lines << "  Declared:  #{caps.empty? ? '(none)' : caps.join(', ')}"

@@ -34,16 +34,19 @@ module PromptObjects
 
         def format_entry(entry, width)
           time = entry[:timestamp].strftime("%H:%M")
-          from = entry[:from].to_s[0, 8]
-          to = entry[:to].to_s[0, 8]
-          msg = truncate_message(entry[:message], width - 22)
+          from = truncate_name(entry[:from].to_s, 10)
+          to = truncate_name(entry[:to].to_s, 10)
 
           time_styled = Styles.timestamp.render(time)
           from_styled = Styles.message_from.render(from)
-          arrow = Styles.message_to.render("")
           to_styled = Styles.message_to.render(to)
 
-          "#{time_styled} #{from_styled}#{arrow}#{to_styled}"
+          "#{time_styled} #{from_styled} -> #{to_styled}"
+        end
+
+        def truncate_name(name, max)
+          return name if name.length <= max
+          name[0, max - 1] + "…"
         end
 
         def truncate_message(msg, max_length)

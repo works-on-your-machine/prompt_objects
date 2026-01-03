@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "lipgloss"
-
 module PromptObjects
   module UI
     module Models

@@ -12,11 +12,29 @@ module PromptObjects
           @width = 60
           @height = 15
           @scroll_offset = 0
+          @pending_message = nil
+          @waiting_for_response = false
         end
 
         def set_po(po)
           @po = po
           @scroll_offset = 0
+        end
+
+        # Add a message that's being sent (shows immediately before LLM returns)
+        def set_pending_message(text)
+          @pending_message = text
+          @waiting_for_response = true
+        end
+
+        # Clear pending state when response arrives
+        def clear_pending
+          @pending_message = nil
+          @waiting_for_response = false
+        end
+
+        def waiting?
+          @waiting_for_response
         end
 
         def view_lines(width = @width, height = @height)
@@ -37,8 +55,24 @@ module PromptObjects
             lines.concat(msg_lines)
           end
 
-          # If empty history
-          if @po.history.empty?
+          # Show pending message (not yet in history)
+          if @pending_message
+            prefix = Styles.user_message.render("You: ")
+            lines << "#{prefix}#{wrap_text(@pending_message, width - 5).first}"
+            wrap_text(@pending_message, width - 5)[1..].each do |line|
+              lines << "     #{line}"
+            end
+            lines << ""
+          end
+
+          # Show waiting indicator
+          if @waiting_for_response
+            lines << Styles.thinking.render("  #{@po.name} is thinking...")
+            lines << ""
+          end
+
+          # If empty history and not waiting
+          if @po.history.empty? && !@waiting_for_response && !@pending_message
             lines << ""
             lines << Styles.message_to.render("Press 'i' to enter insert mode and type a message...")
           end
