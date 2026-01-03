@@ -1,0 +1,101 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Add lib to load path
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+
+require "bundler/setup"
+require "prompt_objects"
+
+# Simple REPL for interacting with a Prompt Object
+class REPL
+  def initialize(prompt_object, env)
+    @po = prompt_object
+    @env = env
+    @context = env.context
+  end
+
+  def run
+    puts header
+    puts "Loaded: #{@po.name}"
+    puts @po.description
+    puts "-" * 60
+    puts "Type 'exit' or 'quit' to leave, 'history' to see conversation"
+    puts
+
+    loop do
+      print "You: "
+      input = $stdin.gets&.chomp
+
+      break if input.nil?
+      next if input.empty?
+
+      case input.downcase
+      when "exit", "quit"
+        puts "\nGoodbye!"
+        break
+      when "history"
+        show_history
+        next
+      end
+
+      begin
+        @context.current_capability = @po.name
+        response = @po.receive(input, context: @context)
+        puts
+        puts "#{@po.name}: #{response}"
+        puts
+      rescue StandardError => e
+        puts "\nError: #{e.message}"
+        puts e.backtrace.first(5).join("\n") if ENV["DEBUG"]
+        puts
+      end
+    end
+  end
+
+  private
+
+  def header
+    <<~HEADER
+
+      ╔══════════════════════════════════════════════════════════════╗
+      ║                    PromptObjects v0.1.0                      ║
+      ╚══════════════════════════════════════════════════════════════╝
+
+    HEADER
+  end
+
+  def show_history
+    puts "\n--- Conversation History ---"
+    @po.history.each_with_index do |msg, i|
+      role = msg[:role].to_s.capitalize
+      content = msg[:content]&.slice(0, 100)
+      content += "..." if msg[:content]&.length.to_i > 100
+      puts "#{i + 1}. [#{role}] #{content}"
+    end
+    puts "----------------------------\n\n"
+  end
+end
+
+# Main execution
+def main
+  name = ARGV[0] || "greeter"
+  objects_dir = ARGV[1] || "objects"
+
+  env = PromptObjects::Environment.new(objects_dir: objects_dir)
+
+  begin
+    po = env.load_by_name(name)
+  rescue PromptObjects::Error => e
+    puts "Error loading '#{name}': #{e.message}"
+    puts "\nAvailable objects in '#{objects_dir}/':"
+    Dir.glob(File.join(objects_dir, "*.md")).each do |path|
+      puts "  - #{File.basename(path, '.md')}"
+    end
+    exit 1
+  end
+
+  REPL.new(po, env).run
+end
+
+main
