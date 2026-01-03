@@ -163,28 +163,30 @@ module PromptObjects
         # Global keys (when no modal)
         return handle_modal_key(msg) if @modal
 
+        char = msg.char.to_s
+
         case
-        when msg.ctrl? && msg.string == "c"
+        when msg.ctrl? && char == "c"
           [self, Bubbletea.quit]
-        when msg.string == "q"
+        when char == "q"
           [self, Bubbletea.quit]
-        when msg.string == "?"
+        when char == "?"
           @show_help = !@show_help
           [self, nil]
-        when msg.string == "m"
+        when char == "m"
           @show_message_log = !@show_message_log
           [self, nil]
-        when msg.string == "i" && @active_po
+        when char == "i" && @active_po
           @modal = { type: :inspector, data: @active_po }
           [self, nil]
-        when msg.string == "e" && @active_po
+        when char == "e" && @active_po
           @modal = { type: :editor, data: @active_po }
           [self, nil]
-        when msg.left? || msg.string == "h"
+        when msg.left? || char == "h"
           @capability_bar.prev
           select_current_po
           [self, nil]
-        when msg.right? || msg.string == "l"
+        when msg.right? || char == "l"
           @capability_bar.next
           select_current_po
           [self, nil]
@@ -204,11 +206,13 @@ module PromptObjects
       end
 
       def handle_modal_key(msg)
+        char = msg.char.to_s
+
         case
         when msg.esc?
           @modal = nil
           [self, nil]
-        when msg.string == "q"
+        when char == "q"
           @modal = nil
           [self, nil]
         else

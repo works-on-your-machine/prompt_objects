@@ -32,32 +32,32 @@ module PromptObjects
         end
 
         def handle_key(msg)
+          char = msg.char.to_s
+
           case
           when msg.backspace?
             delete_char
-          when msg.delete?
-            delete_forward
-          when msg.left?
+          when msg.left? && !msg.ctrl?
             move_left
-          when msg.right?
+          when msg.right? && !msg.ctrl?
             move_right
-          when msg.home? || (msg.ctrl? && msg.string == "a")
+          when msg.ctrl? && char == "a"
             @cursor = 0
-          when msg.end? || (msg.ctrl? && msg.string == "e")
+          when msg.ctrl? && char == "e"
             @cursor = @text.length
           when msg.up?
             history_prev
           when msg.down?
             history_next
-          when msg.ctrl? && msg.string == "u"
+          when msg.ctrl? && char == "u"
             # Clear line
             @text = ""
             @cursor = 0
-          when msg.ctrl? && msg.string == "k"
+          when msg.ctrl? && char == "k"
             # Kill to end of line
             @text = @text[0, @cursor]
           when printable?(msg)
-            insert_char(msg.string)
+            insert_char(char)
           end
         end
 
@@ -141,12 +141,13 @@ module PromptObjects
         end
 
         def printable?(msg)
-          return false if msg.ctrl? || msg.alt?
-          return false if msg.string.nil? || msg.string.empty?
-          return false if msg.string.length > 1 && !msg.string.match?(/^[\w\s]+$/)
+          return false if msg.ctrl?
+          return false unless msg.runes?
+
+          char = msg.char.to_s
+          return false if char.empty?
 
           # Check if it's a printable character
-          char = msg.string
           char.match?(/^[[:print:]]$/) || char.match?(/^[\w\s[:punct:]]$/)
         end
       end

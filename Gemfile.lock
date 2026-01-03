@@ -113,8 +113,5 @@ DEPENDENCIES
   rubocop
   ruby-openai (~> 7.0)
 
-RUBY VERSION
-   ruby 3.4.5p51
-
 BUNDLED WITH
    2.7.2
