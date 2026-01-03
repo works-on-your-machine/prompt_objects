@@ -95,9 +95,10 @@ module PromptObjects
       # Get declared capabilities from config
       declared = @config["capabilities"] || []
 
-      # For Phase 1, we don't have any capabilities yet
-      # This will be expanded in Phase 2
-      declared.filter_map do |cap_name|
+      # Add universal capabilities (available to all POs)
+      all_caps = declared + UNIVERSAL_CAPABILITIES
+
+      all_caps.filter_map do |cap_name|
         cap = @env.registry&.get(cap_name)
         cap&.descriptor
       end

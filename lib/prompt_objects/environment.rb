@@ -39,6 +39,7 @@ module PromptObjects
       @bus = MessageBus.new
 
       register_primitives
+      register_universal_capabilities
     end
 
     # Create a context for capability execution.
@@ -115,6 +116,16 @@ module PromptObjects
       @registry.register(Primitives::ReadFile.new)
       @registry.register(Primitives::ListFiles.new)
       @registry.register(Primitives::WriteFile.new)
+      @registry.register(Primitives::HttpGet.new)
+    end
+
+    # Register universal capabilities (available to all prompt objects).
+    def register_universal_capabilities
+      @registry.register(Universal::AskHuman.new)
+      @registry.register(Universal::Think.new)
+      @registry.register(Universal::CreateCapability.new)
+      @registry.register(Universal::AddCapability.new)
+      @registry.register(Universal::ListCapabilities.new)
     end
   end
 end

@@ -9,8 +9,8 @@ require "json"
 module PromptObjects
   class Error < StandardError; end
 
-  # Universal capabilities available to all prompt objects
-  UNIVERSAL_CAPABILITIES = %i[ask_human think].freeze
+  # Universal capabilities available to all prompt objects (don't need to be declared)
+  UNIVERSAL_CAPABILITIES = %w[ask_human think add_capability list_capabilities].freeze
 end
 
 require_relative "prompt_objects/capability"
@@ -27,3 +27,11 @@ require_relative "prompt_objects/environment"
 require_relative "prompt_objects/primitives/read_file"
 require_relative "prompt_objects/primitives/list_files"
 require_relative "prompt_objects/primitives/write_file"
+require_relative "prompt_objects/primitives/http_get"
+
+# Universal capabilities (available to all prompt objects)
+require_relative "prompt_objects/universal/ask_human"
+require_relative "prompt_objects/universal/think"
+require_relative "prompt_objects/universal/create_capability"
+require_relative "prompt_objects/universal/add_capability"
+require_relative "prompt_objects/universal/list_capabilities"

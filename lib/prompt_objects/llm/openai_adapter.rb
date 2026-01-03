@@ -4,7 +4,7 @@ module PromptObjects
   module LLM
     # OpenAI API adapter for LLM calls.
     class OpenAIAdapter
-      DEFAULT_MODEL = "gpt-4o"
+      DEFAULT_MODEL = "gpt-5.2"
 
       def initialize(api_key: nil, model: nil)
         @api_key = api_key || ENV.fetch("OPENAI_API_KEY") do
