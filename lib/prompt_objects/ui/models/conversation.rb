@@ -60,10 +60,14 @@ module PromptObjects
 
           # Show pending message (only if not yet in history)
           if @pending_message && !message_in_history?(@pending_message)
-            prefix = Styles.user_message.render("You: ")
-            lines << "#{prefix}#{wrap_text(@pending_message, width - 5).first}"
-            wrap_text(@pending_message, width - 5)[1..].each do |line|
-              lines << "     #{line}"
+            prefix_text = "You: "
+            prefix = Styles.user_message.render(prefix_text)
+            prefix_len = prefix_text.length
+            wrapped = wrap_text(@pending_message, width - prefix_len)
+            lines << "#{prefix}#{wrapped.first}"
+            indent = " " * prefix_len
+            wrapped[1..].each do |line|
+              lines << "#{indent}#{line}"
             end
             lines << ""
           end
@@ -105,15 +109,21 @@ module PromptObjects
 
           case msg[:role]
           when :user
-            prefix = Styles.user_message.render("You: ")
+            prefix_text = "You: "
+            prefix = Styles.user_message.render(prefix_text)
+            prefix_len = prefix_text.length
             content = msg[:content].to_s
-            lines << "#{prefix}#{wrap_text(content, width - 5).first}"
-            wrap_text(content, width - 5)[1..].each do |line|
-              lines << "     #{line}"
+            wrapped = wrap_text(content, width - prefix_len)
+            lines << "#{prefix}#{wrapped.first}"
+            indent = " " * prefix_len
+            wrapped[1..].each do |line|
+              lines << "#{indent}#{line}"
             end
 
           when :assistant
-            prefix = Styles.assistant_message.render("#{@po.name}: ")
+            prefix_text = "#{@po.name}: "
+            prefix = Styles.assistant_message.render(prefix_text)
+            prefix_len = prefix_text.length
             content = msg[:content].to_s
             if content.empty? && msg[:tool_calls]
               # Show tool calls
@@ -121,9 +131,11 @@ module PromptObjects
                 lines << Styles.thinking.render("  [calling #{tc.name}...]")
               end
             else
-              lines << "#{prefix}#{wrap_text(content, width - 5).first}"
-              wrap_text(content, width - 5)[1..].each do |line|
-                lines << "     #{line}"
+              wrapped = wrap_text(content, width - prefix_len)
+              lines << "#{prefix}#{wrapped.first}"
+              indent = " " * prefix_len
+              wrapped[1..].each do |line|
+                lines << "#{indent}#{line}"
               end
             end
 

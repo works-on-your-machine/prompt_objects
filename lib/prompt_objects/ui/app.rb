@@ -607,7 +607,7 @@ module PromptObjects
           log_width = @width - conv_width - 3
 
           conv_lines = @conversation.view_lines(conv_width - 4, height - 2)
-          log_lines = @message_log.view_lines(log_width - 2, height - 2)
+          log_lines = @message_log.view_lines(log_width - 4, height - 2)
 
           # Draw conversation box
           conv_title = @active_po ? " #{@active_po.name} " : " Conversation "
