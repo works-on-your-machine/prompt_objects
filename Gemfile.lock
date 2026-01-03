@@ -1,7 +1,25 @@
+GIT
+  remote: https://github.com/marcoroth/huh-ruby.git
+  revision: 907cd5a7602021aaff360fdcdb5dd5dce677b25a
+  specs:
+    huh (0.1.0)
+      bubbles
+      bubbletea
+      glamour
+      lipgloss
+
 GEM
   remote: https://rubygems.org/
   specs:
     ast (2.4.3)
+    bubbles (0.1.0)
+      bubbletea
+      harmonica
+      lipgloss
+    bubbletea (0.1.0)
+      lipgloss (~> 0.1)
+    bubbletea (0.1.0-arm64-darwin)
+      lipgloss (~> 0.1)
     date (3.5.1)
     debug (1.11.1)
       irb (~> 1.10)
@@ -17,6 +35,9 @@ GEM
     faraday-net_http (3.4.2)
       net-http (~> 0.5)
     front_matter_parser (1.0.1)
+    glamour (0.2.1)
+    glamour (0.2.1-arm64-darwin)
+    harmonica (0.1.0)
     io-console (0.8.2)
     irb (1.16.0)
       pp (>= 0.6.0)
@@ -25,6 +46,8 @@ GEM
     json (2.18.0)
     language_server-protocol (3.17.0.5)
     lint_roller (1.1.0)
+    lipgloss (0.2.0)
+    lipgloss (0.2.0-arm64-darwin)
     logger (1.7.0)
     multipart-post (2.4.1)
     net-http (0.9.1)
@@ -80,8 +103,13 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  bubbles
+  bubbletea
   debug
   front_matter_parser
+  glamour
+  huh!
+  lipgloss
   rubocop
   ruby-openai (~> 7.0)
 

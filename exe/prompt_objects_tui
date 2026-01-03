@@ -1,0 +1,95 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Add lib to load path
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+
+require "bundler/setup"
+require "prompt_objects"
+require "prompt_objects/ui/app"
+
+# Parse command line arguments
+def parse_args
+  args = {
+    objects_dir: "objects",
+    sandbox: false
+  }
+
+  ARGV.each do |arg|
+    case arg
+    when "--sandbox", "-s"
+      args[:sandbox] = true
+    when "--help", "-h"
+      print_help
+      exit 0
+    else
+      args[:objects_dir] = arg unless arg.start_with?("-")
+    end
+  end
+
+  args
+end
+
+def print_help
+  puts <<~HELP
+    Usage: prompt_objects_tui [options] [objects_dir]
+
+    Arguments:
+      objects_dir  Directory containing .md files (default: objects)
+
+    Options:
+      --sandbox, -s   Run in sandbox mode (isolates changes)
+      --help, -h      Show this help message
+
+    Keyboard Shortcuts:
+      q, Ctrl+C     Quit
+      ?             Toggle help
+      m             Toggle message log
+      i             Inspect selected PO
+      e             Edit PO capabilities
+      <-/->         Switch between POs
+      Enter         Send message / Activate PO
+  HELP
+end
+
+def main
+  args = parse_args
+  primitives_dir = nil
+
+  if args[:sandbox]
+    require "fileutils"
+    require "tmpdir"
+
+    # Create sandbox
+    sandbox_dir = Dir.mktmpdir("prompt_objects_sandbox_")
+    objects_dir = File.join(sandbox_dir, "objects")
+    primitives_dir = File.join(sandbox_dir, "primitives")
+
+    FileUtils.mkdir_p(objects_dir)
+    FileUtils.mkdir_p(primitives_dir)
+
+    # Copy existing objects
+    original_dir = File.expand_path(args[:objects_dir])
+    if Dir.exist?(original_dir)
+      Dir.glob(File.join(original_dir, "*.md")).each do |src|
+        FileUtils.cp(src, objects_dir)
+      end
+    end
+
+    puts "Sandbox initialized at: #{sandbox_dir}"
+    args[:objects_dir] = objects_dir
+
+    # Cleanup on exit
+    at_exit do
+      FileUtils.rm_rf(sandbox_dir) if Dir.exist?(sandbox_dir)
+      puts "Sandbox cleaned up"
+    end
+  end
+
+  PromptObjects::UI::App.run(
+    objects_dir: args[:objects_dir],
+    primitives_dir: primitives_dir
+  )
+end
+
+main
