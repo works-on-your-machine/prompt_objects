@@ -165,10 +165,9 @@ module PromptObjects
           end
         RUBY
 
-        # Write to primitives directory
-        primitives_dir = File.join(File.dirname(context.env.objects_dir), "primitives")
-        FileUtils.mkdir_p(primitives_dir)
-        path = File.join(primitives_dir, "#{cap_name}.rb")
+        # Write to primitives directory (uses env.primitives_dir for sandbox support)
+        FileUtils.mkdir_p(context.env.primitives_dir)
+        path = File.join(context.env.primitives_dir, "#{cap_name}.rb")
         File.write(path, ruby_content, encoding: "UTF-8")
 
         # Load and register

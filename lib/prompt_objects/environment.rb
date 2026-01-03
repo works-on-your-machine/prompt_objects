@@ -30,10 +30,11 @@ module PromptObjects
 
   # The runtime environment that holds all capabilities and coordinates execution.
   class Environment
-    attr_reader :llm, :registry, :objects_dir, :bus
+    attr_reader :llm, :registry, :objects_dir, :bus, :primitives_dir
 
-    def initialize(objects_dir: "objects", llm: nil)
+    def initialize(objects_dir: "objects", primitives_dir: nil, llm: nil)
       @objects_dir = objects_dir
+      @primitives_dir = primitives_dir || File.join(File.dirname(objects_dir), "primitives")
       @llm = llm || LLM::OpenAIAdapter.new
       @registry = Registry.new
       @bus = MessageBus.new

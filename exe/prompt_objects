@@ -6,24 +6,113 @@ $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 
 require "bundler/setup"
 require "prompt_objects"
+require "fileutils"
+require "tmpdir"
+
+# Sandbox manages an isolated environment for testing
+class Sandbox
+  attr_reader :sandbox_dir, :objects_dir, :primitives_dir, :original_objects_dir
+
+  def initialize(original_objects_dir)
+    @original_objects_dir = File.expand_path(original_objects_dir)
+    @sandbox_dir = Dir.mktmpdir("prompt_objects_sandbox_")
+    @objects_dir = File.join(@sandbox_dir, "objects")
+    @primitives_dir = File.join(@sandbox_dir, "primitives")
+
+    setup
+  end
+
+  def setup
+    FileUtils.mkdir_p(@objects_dir)
+    FileUtils.mkdir_p(@primitives_dir)
+
+    # Copy existing objects to sandbox
+    if Dir.exist?(@original_objects_dir)
+      Dir.glob(File.join(@original_objects_dir, "*.md")).each do |src|
+        FileUtils.cp(src, @objects_dir)
+      end
+    end
+
+    puts "🧪 Sandbox initialized at: #{@sandbox_dir}"
+    puts "   Objects copied: #{Dir.glob(File.join(@objects_dir, '*.md')).count}"
+  end
+
+  def cleanup(keep_changes: false)
+    if keep_changes
+      copy_back_changes
+    end
+    FileUtils.rm_rf(@sandbox_dir)
+    puts "🧹 Sandbox cleaned up"
+  end
+
+  def copy_back_changes
+    # Find new/modified objects
+    new_objects = Dir.glob(File.join(@objects_dir, "*.md")).select do |sandbox_file|
+      original = File.join(@original_objects_dir, File.basename(sandbox_file))
+      !File.exist?(original) || File.read(sandbox_file) != File.read(original)
+    end
+
+    # Find new primitives
+    new_primitives = Dir.glob(File.join(@primitives_dir, "*.rb"))
+
+    return if new_objects.empty? && new_primitives.empty?
+
+    puts "\n📦 Changes to copy back:"
+    new_objects.each { |f| puts "   + objects/#{File.basename(f)}" }
+    new_primitives.each { |f| puts "   + primitives/#{File.basename(f)}" }
+
+    print "\nCopy these to main project? (y/n): "
+    answer = $stdin.gets&.chomp&.downcase
+    return unless answer == "y"
+
+    new_objects.each do |f|
+      FileUtils.cp(f, @original_objects_dir)
+    end
+
+    if new_primitives.any?
+      target_primitives = File.join(File.dirname(@original_objects_dir), "primitives")
+      FileUtils.mkdir_p(target_primitives)
+      new_primitives.each do |f|
+        FileUtils.cp(f, target_primitives)
+      end
+    end
+
+    puts "✅ Changes copied to main project"
+  end
+
+  def show_new_files
+    new_objects = Dir.glob(File.join(@objects_dir, "*.md")).reject do |sandbox_file|
+      original = File.join(@original_objects_dir, File.basename(sandbox_file))
+      File.exist?(original) && File.read(sandbox_file) == File.read(original)
+    end
+    new_primitives = Dir.glob(File.join(@primitives_dir, "*.rb"))
+
+    { objects: new_objects, primitives: new_primitives }
+  end
+end
 
 # Simple REPL for interacting with a Prompt Object
 class REPL
-  def initialize(prompt_object, env)
+  def initialize(prompt_object, env, sandbox: nil)
     @po = prompt_object
     @env = env
     @context = env.context
     @show_log = true  # Show message log by default
+    @sandbox = sandbox
   end
 
   def run
     puts header
+    if @sandbox
+      puts "🧪 SANDBOX MODE - changes isolated from main project"
+      puts
+    end
     puts "Loaded: #{@po.name}"
     puts @po.description
     puts
     puts "Capabilities: #{format_capabilities}"
     puts "-" * 60
-    puts "Commands: 'exit', 'history', 'log', 'log on/off'"
+    puts "Commands: 'exit', 'history', 'log', 'log on/off', 'sandbox' (if in sandbox mode)"
     puts
 
     loop do
@@ -35,7 +124,7 @@ class REPL
 
       case input.downcase
       when "exit", "quit"
-        puts "\nGoodbye!"
+        handle_exit
         break
       when "history"
         show_history
@@ -50,6 +139,9 @@ class REPL
       when "log off"
         @show_log = false
         puts "Message log display: OFF"
+        next
+      when "sandbox"
+        show_sandbox_status
         next
       end
 
@@ -111,6 +203,41 @@ class REPL
     end.join(", ")
   end
 
+  def handle_exit
+    puts "\nGoodbye!"
+    return unless @sandbox
+
+    new_files = @sandbox.show_new_files
+    if new_files[:objects].any? || new_files[:primitives].any?
+      puts "\n📝 Session created files:"
+      new_files[:objects].each { |f| puts "   - #{File.basename(f)}" }
+      new_files[:primitives].each { |f| puts "   - #{File.basename(f)}" }
+      @sandbox.cleanup(keep_changes: true)
+    else
+      puts "No new files created."
+      @sandbox.cleanup(keep_changes: false)
+    end
+  end
+
+  def show_sandbox_status
+    unless @sandbox
+      puts "Not in sandbox mode. Run with --sandbox to enable."
+      return
+    end
+
+    puts "\n🧪 Sandbox Status"
+    puts "   Location: #{@sandbox.sandbox_dir}"
+    new_files = @sandbox.show_new_files
+    if new_files[:objects].any? || new_files[:primitives].any?
+      puts "   New/modified files this session:"
+      new_files[:objects].each { |f| puts "     + #{File.basename(f)}" }
+      new_files[:primitives].each { |f| puts "     + #{File.basename(f)}" }
+    else
+      puts "   No new files created yet."
+    end
+    puts
+  end
+
   def show_history
     puts "\n--- Conversation History ---"
     @po.history.each_with_index do |msg, i|
@@ -150,29 +277,84 @@ class REPL
   end
 end
 
+# Parse command line arguments
+def parse_args
+  args = {
+    name: "greeter",
+    objects_dir: "objects",
+    sandbox: false
+  }
+
+  positional = []
+  ARGV.each do |arg|
+    case arg
+    when "--sandbox", "-s"
+      args[:sandbox] = true
+    when "--help", "-h"
+      print_help
+      exit 0
+    else
+      positional << arg
+    end
+  end
+
+  args[:name] = positional[0] if positional[0]
+  args[:objects_dir] = positional[1] if positional[1]
+  args
+end
+
+def print_help
+  puts <<~HELP
+    Usage: prompt_objects [options] [name] [objects_dir]
+
+    Arguments:
+      name         Prompt object to load (default: greeter)
+      objects_dir  Directory containing .md files (default: objects)
+
+    Options:
+      --sandbox, -s   Run in sandbox mode (isolates changes from main project)
+      --help, -h      Show this help message
+
+    Sandbox Mode:
+      When running with --sandbox, all new capabilities and prompt objects
+      created during the session are stored in a temporary directory.
+      On exit, you'll be prompted to copy changes back to the main project.
+  HELP
+end
+
 # Main execution
 def main
-  name = ARGV[0] || "greeter"
-  objects_dir = ARGV[1] || "objects"
+  args = parse_args
+  sandbox = nil
+  primitives_dir = nil
 
-  env = PromptObjects::Environment.new(objects_dir: objects_dir)
+  if args[:sandbox]
+    sandbox = Sandbox.new(args[:objects_dir])
+    objects_dir = sandbox.objects_dir
+    primitives_dir = sandbox.primitives_dir
+  else
+    objects_dir = args[:objects_dir]
+  end
+
+  env = PromptObjects::Environment.new(objects_dir: objects_dir, primitives_dir: primitives_dir)
 
   begin
-    po = env.load_by_name(name)
+    po = env.load_by_name(args[:name])
 
     # Load any prompt object dependencies
     env.load_dependencies(po)
 
   rescue PromptObjects::Error => e
-    puts "Error loading '#{name}': #{e.message}"
+    puts "Error loading '#{args[:name]}': #{e.message}"
     puts "\nAvailable objects in '#{objects_dir}/':"
     Dir.glob(File.join(objects_dir, "*.md")).each do |path|
       puts "  - #{File.basename(path, '.md')}"
     end
+    sandbox&.cleanup(keep_changes: false)
     exit 1
   end
 
-  REPL.new(po, env).run
+  REPL.new(po, env, sandbox: sandbox).run
 end
 
 main
