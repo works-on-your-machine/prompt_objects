@@ -14,8 +14,15 @@ module PromptObjects
 end
 
 require_relative "prompt_objects/capability"
+require_relative "prompt_objects/primitive"
+require_relative "prompt_objects/registry"
 require_relative "prompt_objects/loader"
 require_relative "prompt_objects/llm/response"
 require_relative "prompt_objects/llm/openai_adapter"
 require_relative "prompt_objects/prompt_object"
 require_relative "prompt_objects/environment"
+
+# Built-in primitives
+require_relative "prompt_objects/primitives/read_file"
+require_relative "prompt_objects/primitives/list_files"
+require_relative "prompt_objects/primitives/write_file"

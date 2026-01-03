@@ -13,15 +13,15 @@ module PromptObjects
   end
 
   # The runtime environment that holds all capabilities and coordinates execution.
-  # For Phase 1, this is a minimal implementation - just enough to run a single PO.
   class Environment
     attr_reader :llm, :registry, :objects_dir
 
     def initialize(objects_dir: "objects", llm: nil)
       @objects_dir = objects_dir
       @llm = llm || LLM::OpenAIAdapter.new
-      @registry = nil  # Will be added in Phase 2
-      @prompt_objects = {}
+      @registry = Registry.new
+
+      register_primitives
     end
 
     # Create a context for capability execution.
@@ -43,7 +43,7 @@ module PromptObjects
         llm: @llm
       )
 
-      @prompt_objects[po.name] = po
+      @registry.register(po)
       po
     end
 
@@ -55,17 +55,32 @@ module PromptObjects
       load_prompt_object(path)
     end
 
-    # Get a loaded prompt object by name.
-    # @param name [String] Name of the prompt object
-    # @return [PromptObject, nil]
+    # Get a capability by name (prompt object or primitive).
+    # @param name [String] The capability name
+    # @return [Capability, nil]
     def get(name)
-      @prompt_objects[name]
+      @registry.get(name)
     end
 
     # List all loaded prompt objects.
-    # @return [Array<String>] Names of loaded prompt objects
+    # @return [Array<String>]
     def loaded_objects
-      @prompt_objects.keys
+      @registry.prompt_objects.map(&:name)
+    end
+
+    # List all registered primitives.
+    # @return [Array<String>]
+    def primitives
+      @registry.primitives.map(&:name)
+    end
+
+    private
+
+    # Register built-in primitive capabilities.
+    def register_primitives
+      @registry.register(Primitives::ReadFile.new)
+      @registry.register(Primitives::ListFiles.new)
+      @registry.register(Primitives::WriteFile.new)
     end
   end
 end
