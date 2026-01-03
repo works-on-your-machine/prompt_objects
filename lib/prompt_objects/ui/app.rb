@@ -8,6 +8,7 @@ require_relative "models/capability_bar"
 require_relative "models/message_log"
 require_relative "models/conversation"
 require_relative "models/input"
+require_relative "models/po_inspector"
 
 module PromptObjects
   module UI
@@ -256,7 +257,9 @@ module PromptObjects
         when char == "I"
           # Inspect current PO
           if @active_po
-            @modal = { type: :inspector, data: @active_po }
+            @inspector = Models::POInspector.new(po: @active_po)
+            @inspector.set_dimensions(@width, @height)
+            @modal = { type: :inspector, data: @inspector }
           end
           [self, nil]
         when char == "e"
@@ -284,12 +287,28 @@ module PromptObjects
         case
         when msg.esc?
           @modal = nil
+          @inspector = nil
           [self, nil]
         when char == "q"
           @modal = nil
+          @inspector = nil
           [self, nil]
         else
-          # TODO: Delegate to modal
+          # Delegate to inspector modal
+          if @modal && @modal[:type] == :inspector && @inspector
+            case
+            when msg.tab?
+              @inspector.next_tab
+            when char == "j" || msg.down?
+              @inspector.scroll_down
+            when char == "k" || msg.up?
+              @inspector.scroll_up
+            when char == "h" || msg.left?
+              @inspector.prev_tab
+            when char == "l" || msg.right?
+              @inspector.next_tab
+            end
+          end
           [self, nil]
         end
       end
@@ -472,13 +491,15 @@ module PromptObjects
       def render_modal_overlay(base)
         return base unless @modal
 
-        # For now, just append modal info
-        # TODO: Proper overlay rendering
         case @modal[:type]
         when :inspector
-          po = @modal[:data]
-          modal_content = render_inspector_modal(po)
-          "#{base}\n\n#{modal_content}"
+          if @inspector
+            # Center the modal over the base view
+            modal_view = @inspector.view
+            center_modal(base, modal_view)
+          else
+            base
+          end
         when :editor
           po = @modal[:data]
           "#{base}\n\n[Editor for #{po.name} - Press ESC to close]"
@@ -487,24 +508,36 @@ module PromptObjects
         end
       end
 
-      def render_inspector_modal(po)
-        lines = []
-        lines << Styles.modal_title.render("INSPECT: #{po.name}")
-        lines << ""
-        lines << Styles.section_header.render("Description")
-        lines << po.description
-        lines << ""
-        lines << Styles.section_header.render("Capabilities")
+      def center_modal(base, modal)
+        base_lines = base.split("\n")
+        modal_lines = modal.split("\n")
 
-        caps = po.config["capabilities"] || []
-        universal = PromptObjects::UNIVERSAL_CAPABILITIES
+        modal_width = modal_lines.map { |l| l.gsub(/\e\[[0-9;]*m/, '').length }.max || 0
+        modal_height = modal_lines.length
 
-        lines << "  Universal: #{universal.join(', ')}"
-        lines << "  Declared:  #{caps.empty? ? '(none)' : caps.join(', ')}"
-        lines << ""
-        lines << "[ESC] Close  [p] View Prompt"
+        # Calculate offsets to center
+        start_row = [(@height - modal_height) / 2, 1].max
+        start_col = [(@width - modal_width) / 2, 0].max
 
-        lines.join("\n")
+        # Overlay modal on base
+        result = base_lines.map(&:dup)
+
+        modal_lines.each_with_index do |modal_line, i|
+          row = start_row + i
+          next if row >= result.length
+
+          # Replace part of the line with modal content
+          if start_col > 0
+            # Get visible part of base line (accounting for ANSI codes)
+            base_visible = result[row].gsub(/\e\[[0-9;]*m/, '')
+            prefix = base_visible[0, start_col] || ""
+            result[row] = "#{' ' * start_col}#{modal_line}"
+          else
+            result[row] = modal_line
+          end
+        end
+
+        result.join("\n")
       end
     end
   end
