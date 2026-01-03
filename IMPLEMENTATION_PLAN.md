@@ -174,6 +174,50 @@ Create the greeter from the design doc to test with.
 
 ---
 
+## Conceptual Model: The PromptObject Hierarchy
+
+PromptObjects follow an object-oriented capability model inspired by Smalltalk/Ruby:
+
+### Universal Capabilities = "BasicObject/Kernel"
+
+The absolute minimum every PO inherits to function in the environment:
+
+| Capability | Purpose |
+|------------|---------|
+| `ask_human` | Communicate with the human operator |
+| `think` | Internal reasoning (chain-of-thought) |
+| `create_capability` | Self-modification - create new POs or primitives |
+| `add_capability` | Extend self with new capabilities at runtime |
+| `list_capabilities` | Introspection - discover available tools |
+
+These are **always available** - POs don't need to declare them.
+
+### Stdlib Primitives = "Standard Library"
+
+Opt-in deterministic Ruby capabilities, organized by category:
+
+| Category | Primitives |
+|----------|------------|
+| **File System** | `read_file`, `write_file`, `list_files`, `delete_file`, `move_file`, `file_exists` |
+| **Network** | `http_get`, `http_post`, `http_request`, `download_file` |
+| **Process** | `run_command`, `spawn_process` |
+| **Data** | `json_parse`, `json_stringify`, `yaml_parse`, `yaml_stringify`, `csv_parse` |
+| **Environment** | `get_env`, `current_time`, `sleep` |
+| **Text** | `regex_match`, `regex_replace`, `string_split` |
+| **Crypto** | `hash_string`, `random_uuid`, `random_string` |
+
+POs declare which stdlib primitives they need in their frontmatter.
+
+### Custom Primitives = "User-Defined Functions"
+
+Runtime-generated primitives created via `create_capability`. These are project-specific tools.
+
+### Delegate POs = "Collaborators"
+
+Other prompt objects this PO can call for help. Listed in `capabilities` frontmatter.
+
+---
+
 ## Phase 2: Primitives & Binding
 
 **Goal**: Add primitive capabilities that PromptObjects can call. Reader uses `read_file` and `list_files`.
@@ -800,13 +844,17 @@ Reference: https://marcoroth.dev/posts/glamorous-christmas
 #### po_inspector.rb
 - [ ] Modal/panel that appears when inspecting a selected PO
 - [ ] Shows the PO's full prompt (markdown body rendered via glamour)
-- [ ] Shows capabilities section with categorized tools:
-  - **Base Primitives**: read_file, list_files, write_file, http_get
-  - **Custom Primitives**: Any dynamically created primitives
-  - **Universal Capabilities**: ask_human, think, create_capability, add_capability, list_capabilities
-  - **Other POs**: List of POs this one can delegate to (from capabilities array)
+- [ ] Shows capabilities with the "object model" framing:
+  - **Universal (inherited)**: The "BasicObject" - always available
+  - **Stdlib Primitives**: Opt-in standard library capabilities
+  - **Custom Primitives**: Runtime-generated primitives
+  - **Delegates (POs)**: Other prompt objects this one can call
 - [ ] Each tool shows: name, description, parameters schema
 - [ ] Keyboard shortcut to toggle (e.g., `i` for inspect)
+- [ ] **Edit mode** to modify the PO's capabilities:
+  - Browse & add stdlib primitives
+  - Generate new primitive (PO describes need, we create it)
+  - Add/remove PO delegates
 - [ ] Maybe show conversation history / message log filtered to this PO
 
 ```
@@ -819,12 +867,47 @@ Reference: https://marcoroth.dev/posts/glamorous-christmas
 │                                                                     │
 │  CAPABILITIES                                                       │
 │  ────────────────────────────────────────────────────────────────   │
-│  Base Primitives:     list_files, read_file, write_file, http_get  │
-│  Custom Primitives:   (none)                                        │
-│  Universal:           ask_human, think, create_capability, ...      │
-│  Delegates to POs:    greeter, reader                               │
+│  Universal (inherited): ask_human, think, create_capability, ...    │
+│  Stdlib:                list_files, read_file, write_file, http_get │
+│  Custom:                (none)                                      │
+│  Delegates:             greeter, reader                             │
 │                                                                     │
-│  [Enter] View Details  [Esc] Close  [p] View Prompt  [c] Caps       │
+│  [e] Edit Capabilities  [Esc] Close  [p] Prompt  [h] History        │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### capability_editor.rb
+- [ ] Sub-modal for editing a PO's capabilities
+- [ ] Three tabs/sections:
+  1. **Add from Stdlib**: Browse categorized primitives, toggle on/off
+  2. **Generate New**: Describe what you need, system creates primitive
+  3. **Manage Delegates**: Add/remove other POs as delegates
+- [ ] Changes update PO config in real-time
+- [ ] Option to persist changes back to .md file
+
+```
+┌─ EDIT CAPABILITIES: coordinator ───────────────────────────────────┐
+│                                                                     │
+│  [Stdlib]  [Generate]  [Delegates]                                  │
+│  ─────────────────────────────────────────────────────────────────  │
+│                                                                     │
+│  FILE SYSTEM                         NETWORK                        │
+│  ─────────────                       ───────                        │
+│  [✓] read_file                       [✓] http_get                   │
+│  [✓] write_file                      [ ] http_post                  │
+│  [✓] list_files                      [ ] http_request               │
+│  [ ] delete_file                                                    │
+│  [ ] move_file                       PROCESS                        │
+│                                      ───────                        │
+│  DATA                                [ ] run_command                │
+│  ────                                [ ] spawn_process              │
+│  [ ] json_parse                                                     │
+│  [ ] yaml_parse                      ENVIRONMENT                    │
+│  [ ] csv_parse                       ───────────                    │
+│                                      [ ] get_env                    │
+│                                      [ ] current_time               │
+│                                                                     │
+│  [Enter] Toggle  [Tab] Next Section  [Esc] Done                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -952,6 +1035,7 @@ prompt_objects/
 │       └── ui/
 │           ├── app.rb
 │           ├── capability_bar.rb
+│           ├── capability_editor.rb
 │           ├── conversation.rb
 │           ├── input.rb
 │           ├── message_log.rb
