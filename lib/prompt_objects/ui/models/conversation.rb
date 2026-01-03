@@ -20,15 +20,16 @@ module PromptObjects
         end
 
         def view_lines(width = @width, height = @height)
-          return ["  Select a prompt object to start chatting"] unless @po
+          return ["Select a prompt object to start chatting"] unless @po
 
           lines = []
 
-          # Header
-          header = Styles.section_header.render(@po.name)
-          lines << header
-          lines << @po.description[0, width] if @po.description
-          lines << ""
+          # Description (dimmed)
+          if @po.description
+            desc = @po.description[0, width]
+            lines << Styles.thinking.render(desc)
+            lines << ""
+          end
 
           # Conversation history
           @po.history.each do |msg|
@@ -38,7 +39,8 @@ module PromptObjects
 
           # If empty history
           if @po.history.empty?
-            lines << Styles.message_to.render("  Type a message to start...")
+            lines << ""
+            lines << Styles.message_to.render("Press 'i' to enter insert mode and type a message...")
           end
 
           # Ensure we have enough lines

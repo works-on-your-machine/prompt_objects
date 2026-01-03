@@ -17,6 +17,10 @@ module PromptObjects
 
       attr_reader :env, :active_po, :width, :height
 
+      # Vim-like modes
+      MODE_NORMAL = :normal
+      MODE_INSERT = :insert
+
       def initialize(objects_dir: "objects", primitives_dir: nil)
         @objects_dir = objects_dir
         @primitives_dir = primitives_dir
@@ -37,6 +41,7 @@ module PromptObjects
         @show_help = false
         @modal = nil
         @error = nil
+        @mode = MODE_NORMAL
       end
 
       def init
@@ -121,7 +126,7 @@ module PromptObjects
 
         # Input
         lines << ""
-        lines << @input.view(@width)
+        lines << @input.view(@width, mode: @mode)
 
         # Status bar
         lines << render_status_bar
@@ -165,68 +170,101 @@ module PromptObjects
 
         char = msg.char.to_s
 
-        # Always handle these regardless of input state
-        case
-        when msg.ctrl? && char == "c"
+        # Ctrl+C always quits
+        if msg.ctrl? && char == "c"
           return [self, Bubbletea.quit]
-        when msg.esc?
-          # Escape clears input or quits if empty
-          if @input.empty?
-            return [self, Bubbletea.quit]
-          else
-            @input.clear
-            return [self, nil]
-          end
         end
 
-        # Arrow keys always work for navigation
+        # Mode-specific handling
+        if @mode == MODE_INSERT
+          handle_insert_mode(msg, char)
+        else
+          handle_normal_mode(msg, char)
+        end
+      end
+
+      def handle_insert_mode(msg, char)
         case
+        when msg.esc?
+          # Escape returns to normal mode
+          @mode = MODE_NORMAL
+          [self, nil]
+        when msg.enter?
+          # Send message and return to normal mode
+          text = @input.submit
+          @mode = MODE_NORMAL
+          handle_input_submit(text)
+        when msg.ctrl? && char == "a"
+          @input.cursor_home
+          [self, nil]
+        when msg.ctrl? && char == "e"
+          @input.cursor_end
+          [self, nil]
+        when msg.ctrl? && char == "u"
+          @input.clear
+          [self, nil]
+        when msg.ctrl? && char == "k"
+          @input.kill_to_end
+          [self, nil]
+        when msg.backspace?
+          @input.delete_char
+          [self, nil]
         when msg.left?
+          @input.move_left
+          [self, nil]
+        when msg.right?
+          @input.move_right
+          [self, nil]
+        when msg.space?
+          @input.insert(" ")
+          [self, nil]
+        when msg.runes? && !char.empty?
+          @input.insert(char)
+          [self, nil]
+        else
+          [self, nil]
+        end
+      end
+
+      def handle_normal_mode(msg, char)
+        case
+        when msg.esc?
+          [self, Bubbletea.quit]
+        when char == "i" || msg.enter?
+          # Enter insert mode
+          @mode = MODE_INSERT
+          [self, nil]
+        when char == "q"
+          [self, Bubbletea.quit]
+        when char == "?"
+          @show_help = !@show_help
+          [self, nil]
+        when char == "m"
+          @show_message_log = !@show_message_log
+          [self, nil]
+        when char == "I"
+          # Inspect current PO
+          if @active_po
+            @modal = { type: :inspector, data: @active_po }
+          end
+          [self, nil]
+        when char == "e"
+          # Edit current PO
+          if @active_po
+            @modal = { type: :editor, data: @active_po }
+          end
+          [self, nil]
+        when msg.left? || char == "h"
           @capability_bar.prev
           select_current_po
-          return [self, nil]
-        when msg.right?
+          [self, nil]
+        when msg.right? || char == "l"
           @capability_bar.next
           select_current_po
-          return [self, nil]
-        when msg.enter?
-          if @input.empty?
-            # Enter with empty input - no action
-            return [self, nil]
-          else
-            # Enter with text sends message
-            text = @input.submit
-            return handle_input_submit(text)
-          end
+          [self, nil]
+        else
+          [self, nil]
         end
-
-        # Single-letter shortcuts only when input is empty
-        if @input.empty?
-          case char
-          when "q"
-            return [self, Bubbletea.quit]
-          when "?"
-            @show_help = !@show_help
-            return [self, nil]
-          when "m"
-            @show_message_log = !@show_message_log
-            return [self, nil]
-          when "i"
-            if @active_po
-              @modal = { type: :inspector, data: @active_po }
-            end
-            return [self, nil]
-          when "e"
-            if @active_po
-              @modal = { type: :editor, data: @active_po }
-            end
-            return [self, nil]
-          end
-        end
-
-        # Everything else goes to input
-        @input.handle_key(msg)
-        [self, nil]
       end
 
       def handle_modal_key(msg)
@@ -336,43 +374,78 @@ module PromptObjects
 
         if @show_message_log
           # Split: conversation (60%) | message log (40%)
-          conv_width = (@width * 0.6).to_i - 2
+          conv_width = (@width * 0.6).to_i - 1
           log_width = @width - conv_width - 3
 
-          conv_lines = @conversation.view_lines(conv_width, height)
-          log_lines = @message_log.view_lines(log_width, height)
+          conv_lines = @conversation.view_lines(conv_width - 4, height - 2)
+          log_lines = @message_log.view_lines(log_width - 2, height - 2)
 
-          height.times do |i|
+          # Draw conversation box
+          conv_title = @active_po ? " #{@active_po.name} " : " Conversation "
+          conv_top = Styles.panel_title.render("┌#{conv_title}#{'─' * (conv_width - conv_title.length - 2)}┐")
+          log_top = " ┌─ Messages #{'─' * (log_width - 13)}┐"
+
+          lines << "#{conv_top}#{log_top}"
+
+          (height - 2).times do |i|
             conv = conv_lines[i] || ""
             log = log_lines[i] || ""
-            lines << "#{conv.ljust(conv_width)} | #{log}"
+            # Strip ANSI codes for length calculation
+            conv_plain_len = conv.gsub(/\e\[[0-9;]*m/, '').length
+            log_plain_len = log.gsub(/\e\[[0-9;]*m/, '').length
+
+            conv_padded = conv + (' ' * [0, conv_width - 4 - conv_plain_len].max)
+            log_padded = log + (' ' * [0, log_width - 4 - log_plain_len].max)
+
+            lines << "│ #{conv_padded} │ │ #{log_padded} │"
           end
+
+          conv_bottom = "└#{'─' * (conv_width - 2)}┘"
+          log_bottom = " └#{'─' * (log_width - 2)}┘"
+          lines << "#{conv_bottom}#{log_bottom}"
         else
-          # Full width conversation
-          lines = @conversation.view_lines(@width - 2, height)
+          # Full width conversation with box
+          conv_width = @width - 2
+          conv_lines = @conversation.view_lines(conv_width - 4, height - 2)
+
+          conv_title = @active_po ? " #{@active_po.name} " : " Conversation "
+          lines << Styles.panel_title.render("┌#{conv_title}#{'─' * (conv_width - conv_title.length - 2)}┐")
+
+          (height - 2).times do |i|
+            conv = conv_lines[i] || ""
+            conv_plain_len = conv.gsub(/\e\[[0-9;]*m/, '').length
+            conv_padded = conv + (' ' * [0, conv_width - 4 - conv_plain_len].max)
+            lines << "│ #{conv_padded} │"
+          end
+
+          lines << "└#{'─' * (conv_width - 2)}┘"
         end
 
         lines
       end
 
       def render_status_bar
-        parts = []
-        parts << Styles.help_key.render("Esc") + " quit/clear"
-        parts << Styles.help_key.render("Enter") + " send"
-        parts << Styles.help_key.render("<-/->") + " switch PO"
-
-        if @input.empty?
-          parts << Styles.help_key.render("m") + " messages"
-          parts << Styles.help_key.render("i") + " inspect"
-        end
-
-        status = parts.join("  ")
-
         if @error
-          status = Styles.error.render("Error: #{@error}")
+          return Styles.error.render("Error: #{@error}")
         end
 
-        Styles.status_bar.render(status)
+        if @mode == MODE_INSERT
+          parts = [
+            Styles.help_key.render("Esc") + " normal mode",
+            Styles.help_key.render("Enter") + " send",
+            Styles.help_key.render("Ctrl+U") + " clear"
+          ]
+        else
+          parts = [
+            Styles.help_key.render("i") + " insert",
+            Styles.help_key.render("h/l") + " switch PO",
+            Styles.help_key.render("m") + " messages",
+            Styles.help_key.render("I") + " inspect",
+            Styles.help_key.render("q") + " quit"
+          ]
+        end
+
+        Styles.status_bar.render(parts.join("  "))
       end
 
       def render_modal_overlay(base)

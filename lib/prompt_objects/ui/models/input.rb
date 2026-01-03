@@ -36,80 +36,17 @@ module PromptObjects
           submitted
         end
 
-        def handle_key(msg)
-          char = msg.char.to_s
-
-          case
-          when msg.backspace?
-            delete_char
-          when msg.left? && !msg.ctrl?
-            move_left
-          when msg.right? && !msg.ctrl?
-            move_right
-          when msg.ctrl? && char == "a"
-            @cursor = 0
-          when msg.ctrl? && char == "e"
-            @cursor = @text.length
-          when msg.up?
-            history_prev
-          when msg.down?
-            history_next
-          when msg.ctrl? && char == "u"
-            # Clear line
-            @text = ""
-            @cursor = 0
-          when msg.ctrl? && char == "k"
-            # Kill to end of line
-            @text = @text[0, @cursor]
-          when msg.runes? && !char.empty?
-            # Regular character input
-            insert_char(char)
-          end
-        end
-
-        def view(width = @width)
-          prompt = Styles.input_prompt.render("You: ")
-          input_width = width - 5
-
-          # Show text with cursor
-          display_text = @text
-          if display_text.length > input_width - 1
-            # Scroll to show cursor
-            start = [@cursor - input_width + 10, 0].max
-            display_text = display_text[start, input_width - 1]
-          end
-
-          # Add cursor indicator
-          cursor_pos = [@cursor, display_text.length].min
-          before = display_text[0, cursor_pos] || ""
-          after = display_text[cursor_pos..] || ""
-          cursor_char = ""
-
-          text_styled = Styles.input_text.render("#{before}#{cursor_char}#{after}")
-
-          "#{prompt}#{text_styled}"
-        end
-
-        private
-
-        def insert_char(char)
+        # Insert text at cursor
+        def insert(char)
           return if char.nil? || char.empty?
-
           @text = @text[0, @cursor].to_s + char + @text[@cursor..].to_s
           @cursor += char.length
         end
 
         def delete_char
           return if @cursor == 0
-
           @text = @text[0, @cursor - 1].to_s + @text[@cursor..].to_s
           @cursor -= 1
-        end
-
-        def delete_forward
-          return if @cursor >= @text.length
-
-          @text = @text[0, @cursor].to_s + @text[@cursor + 1..].to_s
         end
 
         def move_left
@@ -120,32 +57,51 @@ module PromptObjects
           @cursor = [@cursor + 1, @text.length].min
         end
 
-        def history_prev
-          return if @history.empty?
+        def cursor_home
+          @cursor = 0
+        end
 
-          if @history_index == -1
-            @history_index = @history.length - 1
-          elsif @history_index > 0
-            @history_index -= 1
-          end
-
-          @text = @history[@history_index] || ""
+        def cursor_end
           @cursor = @text.length
         end
 
-        def history_next
-          return if @history_index == -1
+        def kill_to_end
+          @text = @text[0, @cursor]
+        end
 
-          @history_index += 1
-          if @history_index >= @history.length
-            @history_index = -1
-            @text = ""
+        def view(width = @width, mode: :normal)
+          # Mode indicator
+          if mode == :insert
+            mode_indicator = Styles.success.render("-- INSERT --")
+            prompt = "#{mode_indicator} "
           else
-            @text = @history[@history_index] || ""
+            prompt = Styles.input_prompt.render("[i]nsert ")
           end
-          @cursor = @text.length
-        end
 
+          # Show text with cursor
+          display_text = @text
+          input_width = width - prompt.gsub(/\e\[[0-9;]*m/, '').length - 2
+
+          if display_text.length > input_width - 1
+            # Scroll to show cursor
+            start = [@cursor - input_width + 10, 0].max
+            display_text = display_text[start, input_width - 1]
+          end
+
+          # Add cursor indicator (block in insert mode)
+          if mode == :insert
+            cursor_pos = [@cursor, display_text.length].min
+            before = display_text[0, cursor_pos] || ""
+            after = display_text[cursor_pos..] || ""
+            cursor_char = "\e[7m \e[0m"  # Inverted space as cursor
+            text_part = "#{before}#{cursor_char}#{after}"
+          else
+            text_part = display_text
+          end
+
+          text_styled = Styles.input_text.render(text_part)
+          "#{prompt}#{text_styled}"
+        end
       end
     end
   end

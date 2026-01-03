@@ -15,7 +15,7 @@ module PromptObjects
 
         def view_lines(width = @width, height = 10)
           entries = @bus.recent(height)
-          return ["  (no messages)"] if entries.empty?
+          return ["(no messages yet)"] if entries.empty?
 
           entries.map do |entry|
             format_entry(entry, width)
@@ -33,23 +33,24 @@ module PromptObjects
         private
 
         def format_entry(entry, width)
-          time = entry[:timestamp].strftime("%H:%M:%S")
-          from = entry[:from]
-          to = entry[:to]
-          msg = truncate_message(entry[:message], width - 25)
+          time = entry[:timestamp].strftime("%H:%M")
+          from = entry[:from].to_s[0, 8]
+          to = entry[:to].to_s[0, 8]
+          msg = truncate_message(entry[:message], width - 22)
 
           time_styled = Styles.timestamp.render(time)
           from_styled = Styles.message_from.render(from)
+          arrow = Styles.message_to.render("")
           to_styled = Styles.message_to.render(to)
 
-          "#{time_styled} #{from_styled}#{to_styled}: #{msg}"
+          "#{time_styled} #{from_styled}#{arrow}#{to_styled}"
         end
 
         def truncate_message(msg, max_length)
+          return "" if max_length <= 0
           str = msg.to_s.gsub(/\s+/, " ").strip
           return str if str.length <= max_length
-
-          str[0, max_length - 3] + "..."
+          str[0, max_length - 1] + "…"
         end
       end
     end
