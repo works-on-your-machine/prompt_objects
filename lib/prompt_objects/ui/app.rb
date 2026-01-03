@@ -9,6 +9,7 @@ require_relative "models/message_log"
 require_relative "models/conversation"
 require_relative "models/input"
 require_relative "models/po_inspector"
+require_relative "models/capability_editor"
 
 module PromptObjects
   module UI
@@ -263,9 +264,11 @@ module PromptObjects
           end
           [self, nil]
         when char == "e"
-          # Edit current PO
+          # Edit current PO capabilities
           if @active_po
-            @modal = { type: :editor, data: @active_po }
+            @editor = Models::CapabilityEditor.new(po: @active_po, registry: @env.registry)
+            @editor.set_dimensions(@width, @height)
+            @modal = { type: :editor, data: @editor }
           end
           [self, nil]
         when msg.left? || char == "h"
@@ -284,33 +287,90 @@ module PromptObjects
       def handle_modal_key(msg)
         char = msg.char.to_s
 
+        # Handle editor input mode specially
+        if @modal && @modal[:type] == :editor && @editor&.input_mode?
+          return handle_editor_input_mode(msg, char)
+        end
+
         case
         when msg.esc?
-          @modal = nil
-          @inspector = nil
+          close_modal
           [self, nil]
         when char == "q"
-          @modal = nil
-          @inspector = nil
+          close_modal
           [self, nil]
         else
-          # Delegate to inspector modal
           if @modal && @modal[:type] == :inspector && @inspector
-            case
-            when msg.tab?
-              @inspector.next_tab
-            when char == "j" || msg.down?
-              @inspector.scroll_down
-            when char == "k" || msg.up?
-              @inspector.scroll_up
-            when char == "h" || msg.left?
-              @inspector.prev_tab
-            when char == "l" || msg.right?
-              @inspector.next_tab
-            end
+            handle_inspector_key(msg, char)
+          elsif @modal && @modal[:type] == :editor && @editor
+            handle_editor_key(msg, char)
           end
           [self, nil]
         end
+      end
+
+      def handle_inspector_key(msg, char)
+        case
+        when msg.tab?
+          @inspector.next_tab
+        when char == "j" || msg.down?
+          @inspector.scroll_down
+        when char == "k" || msg.up?
+          @inspector.scroll_up
+        when char == "h" || msg.left?
+          @inspector.prev_tab
+        when char == "l" || msg.right?
+          @inspector.next_tab
+        end
+      end
+
+      def handle_editor_key(msg, char)
+        case
+        when msg.tab?
+          @editor.next_tab
+        when char == "j" || msg.down?
+          @editor.move_down
+        when char == "k" || msg.up?
+          @editor.move_up
+        when char == "h" || msg.left?
+          @editor.prev_tab
+        when char == "l" || msg.right?
+          @editor.next_tab
+        when msg.space?
+          @editor.toggle_selected
+        when msg.enter?
+          @editor.toggle_selected
+        when char == "s"
+          @editor.save_changes
+        end
+      end
+
+      def handle_editor_input_mode(msg, char)
+        case
+        when msg.esc?
+          @editor.exit_input_mode
+          [self, nil]
+        when msg.enter?
+          @editor.exit_input_mode
+          [self, nil]
+        when msg.backspace?
+          @editor.delete_char
+          [self, nil]
+        when msg.space?
+          @editor.insert_char(" ")
+          [self, nil]
+        when msg.runes? && !char.empty?
+          @editor.insert_char(char)
+          [self, nil]
+        else
+          [self, nil]
+        end
+      end
+
+      def close_modal
+        @modal = nil
+        @inspector = nil
+        @editor = nil
       end
 
       def handle_resize(msg)
@@ -501,8 +561,12 @@ module PromptObjects
             base
           end
         when :editor
-          po = @modal[:data]
-          "#{base}\n\n[Editor for #{po.name} - Press ESC to close]"
+          if @editor
+            modal_view = @editor.view
+            center_modal(base, modal_view)
+          else
+            base
+          end
         else
           base
         end
