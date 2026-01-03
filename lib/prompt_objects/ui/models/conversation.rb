@@ -19,6 +19,9 @@ module PromptObjects
         def set_po(po)
           @po = po
           @scroll_offset = 0
+          # Clear pending state when switching POs
+          @pending_message = nil
+          @waiting_for_response = false
         end
 
         # Add a message that's being sent (shows immediately before LLM returns)
@@ -55,8 +58,8 @@ module PromptObjects
             lines.concat(msg_lines)
           end
 
-          # Show pending message (not yet in history)
-          if @pending_message
+          # Show pending message (only if not yet in history)
+          if @pending_message && !message_in_history?(@pending_message)
             prefix = Styles.user_message.render("You: ")
             lines << "#{prefix}#{wrap_text(@pending_message, width - 5).first}"
             wrap_text(@pending_message, width - 5)[1..].each do |line|
@@ -83,7 +86,8 @@ module PromptObjects
           end
 
           # Return last `height` lines (auto-scroll to bottom)
-          lines.last(height)
+          # Truncate each line to fit within width
+          lines.last(height).map { |line| truncate_line(line, width) }
         end
 
         def scroll_up
@@ -135,14 +139,31 @@ module PromptObjects
           lines
         end
 
+        def message_in_history?(text)
+          return false unless @po
+          @po.history.any? { |msg| msg[:role] == :user && msg[:content] == text }
+        end
+
         def wrap_text(text, width)
           return [""] if text.nil? || text.empty?
+          return [""] if width <= 0
 
           words = text.split(/\s+/)
           lines = []
           current_line = ""
 
           words.each do |word|
+            # Handle words longer than width by splitting them
+            while word.length > width
+              if current_line.empty?
+                lines << word[0, width]
+                word = word[width..]
+              else
+                lines << current_line
+                current_line = ""
+              end
+            end
+
             if current_line.empty?
               current_line = word
             elsif (current_line.length + word.length + 1) <= width
@@ -155,6 +176,40 @@ module PromptObjects
 
           lines << current_line unless current_line.empty?
           lines.empty? ? [""] : lines
+        end
+
+        # Truncate a line to fit within width (accounting for ANSI codes)
+        def truncate_line(line, width)
+          return line if width <= 0
+
+          # Strip ANSI codes to get visible length
+          visible = line.gsub(/\e\[[0-9;]*m/, '')
+          return line if visible.length <= width
+
+          # Need to truncate - this is tricky with ANSI codes
+          # Simple approach: rebuild string char by char
+          result = ""
+          visible_count = 0
+          i = 0
+
+          while i < line.length && visible_count < width
+            if line[i] == "\e"
+              # ANSI escape sequence - copy it all
+              end_idx = line.index('m', i)
+              if end_idx
+                result += line[i..end_idx]
+                i = end_idx + 1
+              else
+                i += 1
+              end
+            else
+              result += line[i]
+              visible_count += 1
+              i += 1
+            end
+          end
+
+          result + "\e[0m"  # Reset at end
         end
       end
     end
