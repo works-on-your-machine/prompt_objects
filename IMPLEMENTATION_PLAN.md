@@ -685,6 +685,19 @@ Future universal capabilities can use the same queue:
 
 Add `create_capability` to coordinator's capabilities list.
 
+### 4.8 Known Issues to Address in Phase 5
+
+During Phase 4 testing, several issues were identified with capability creation:
+- [ ] LLM sometimes creates POs when primitives would be more appropriate
+- [ ] Dynamically created capabilities may not be immediately available to existing POs
+- [ ] Need better visibility into what capabilities each PO has access to
+- [ ] Modifying existing PO capabilities at runtime needs cleaner UX
+
+These will be addressed in Phase 5 with:
+- **PO Inspector** showing exactly what tools each PO has
+- Better prompting/guidance for the LLM on when to create POs vs primitives
+- Visual feedback when capabilities are added/modified
+
 ### Phase 4 Deliverable
 
 - Run `./exe/prompt_objects coordinator`
@@ -783,6 +796,37 @@ Reference: https://marcoroth.dev/posts/glamorous-christmas
 - [ ] Uses **Huh** components for input (select, text input, confirm)
 - [ ] On submit: calls `human_queue.respond(request_id, value)`
 - [ ] PO resumes execution automatically
+
+#### po_inspector.rb
+- [ ] Modal/panel that appears when inspecting a selected PO
+- [ ] Shows the PO's full prompt (markdown body rendered via glamour)
+- [ ] Shows capabilities section with categorized tools:
+  - **Base Primitives**: read_file, list_files, write_file, http_get
+  - **Custom Primitives**: Any dynamically created primitives
+  - **Universal Capabilities**: ask_human, think, create_capability, add_capability, list_capabilities
+  - **Other POs**: List of POs this one can delegate to (from capabilities array)
+- [ ] Each tool shows: name, description, parameters schema
+- [ ] Keyboard shortcut to toggle (e.g., `i` for inspect)
+- [ ] Maybe show conversation history / message log filtered to this PO
+
+```
+┌─ INSPECT: coordinator ─────────────────────────────────────────────┐
+│                                                                     │
+│  PROMPT                                                             │
+│  ────────────────────────────────────────────────────────────────   │
+│  # Coordinator                                                      │
+│  You orchestrate work by delegating to specialists...               │
+│                                                                     │
+│  CAPABILITIES                                                       │
+│  ────────────────────────────────────────────────────────────────   │
+│  Base Primitives:     list_files, read_file, write_file, http_get  │
+│  Custom Primitives:   (none)                                        │
+│  Universal:           ask_human, think, create_capability, ...      │
+│  Delegates to POs:    greeter, reader                               │
+│                                                                     │
+│  [Enter] View Details  [Esc] Close  [p] View Prompt  [c] Caps       │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
 ### 5.3 Streaming Support
 
@@ -912,6 +956,7 @@ prompt_objects/
 │           ├── input.rb
 │           ├── message_log.rb
 │           ├── notification_panel.rb
+│           ├── po_inspector.rb
 │           └── request_responder.rb
 │
 ├── objects/
