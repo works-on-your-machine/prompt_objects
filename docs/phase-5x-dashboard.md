@@ -1,17 +1,69 @@
-# Phase 5.x: Dashboard View & Mouse Support
+# Phase 5.x: Extended TUI Features
 
 ## Overview
 
-Transform the TUI from a single-PO focus to a dashboard view showing all POs in a grid layout with full mouse interaction. Click to select, double-click to chat, hover for details.
+This document covers TUI extensions beyond the core Phase 5 implementation. It includes:
+- **Unfinished items from original Phase 5**: Notification panel, request responder
+- **New features**: Mouse support, dashboard grid view
 
-## Goals
+See `IMPLEMENTATION_PLAN.md` for the original Phase 5.1 (Charm Gems) and 5.2 (UI Components) specifications.
 
-1. **Mouse support**: Click, hover, scroll wheel throughout the UI
-2. **Dashboard view**: Grid of PO cards showing status at a glance
-3. **Scalability**: Handle 10, 20, 50+ POs gracefully
-4. **Quick navigation**: Click to select, keyboard still works
+---
 
-## Phase 5.1: Mouse Support Foundation
+## Phase 5.3: Notification Panel & Request Responder
+
+*From original IMPLEMENTATION_PLAN.md - not yet implemented*
+
+### Notification Panel
+
+List all pending `HumanRequest`s across all POs. This enables non-blocking human interaction where multiple POs can be waiting simultaneously.
+
+```
+┌─ PENDING REQUESTS (3) ────────────────────────────────────┐
+│                                                           │
+│  ▸ coordinator  "Create Ruby debugging specialist?"  2m   │
+│    debugger     "Which bug should I focus on?"       45s  │
+│    reader       "Delete all files in spec/?"         10s  │
+│                                                           │
+│  [Enter] Respond  [Esc] Close  [↑↓] Navigate              │
+└───────────────────────────────────────────────────────────┘
+```
+
+**File**: `lib/prompt_objects/ui/models/notification_panel.rb`
+
+Features:
+- Subscribe to `human_queue` for real-time updates
+- Show: PO name, request type icon, question preview, age
+- Keyboard navigation to select a request
+- Enter to engage (opens request responder)
+- Toggle visibility with `n` hotkey
+- Badge count shown in capability bar: `│ coord ⚠ 2 │`
+
+### Request Responder
+
+Modal that appears when engaging with a HumanRequest. Uses **Huh** gem for interactive forms.
+
+**File**: `lib/prompt_objects/ui/models/request_responder.rb`
+
+Features:
+- Render full question with context
+- Use Huh components based on request type:
+  - `ask_human` with options → Select component
+  - `ask_human` without options → Text input
+  - `confirm_action` → Yes/No buttons
+- On submit: call `human_queue.respond(request_id, value)`
+- PO resumes execution automatically
+
+### Integration Points
+
+1. **Capability Bar**: Show notification badges per PO
+2. **Status Bar**: Show total pending count
+3. **Human Queue**: Connect UI to existing queue system
+4. **Executor**: Resume fibers when requests are answered
+
+---
+
+## Phase 5.4: Mouse Support Foundation
 
 ### Enable Mouse Tracking
 
@@ -84,7 +136,7 @@ end
 4. **Modals**: Click buttons, scroll content
 5. **Input**: Click to position cursor
 
-## Phase 5.2: Dashboard Grid View
+## Phase 5.5: Dashboard Grid View
 
 ### Layout Modes
 
@@ -289,7 +341,7 @@ class Dashboard
 end
 ```
 
-## Phase 5.3: Transitions & Polish
+## Phase 5.6: Transitions & Polish
 
 ### View Transitions
 
@@ -382,29 +434,42 @@ end
 
 ## Implementation Order
 
-1. **5.1a**: Enable mouse tracking, basic click handling
-2. **5.1b**: Clickable capability bar
-3. **5.1c**: Scroll wheel in conversation/message log
-4. **5.2a**: Dashboard model with grid layout
-5. **5.2b**: PO card component
-6. **5.2c**: Mode switching (Tab key)
-7. **5.2d**: Mouse click on cards
-8. **5.3a**: Hover effects
-9. **5.3b**: Search/filter
-10. **5.3c**: Polish and transitions
+### Phase 5.3 (Notifications)
+1. **5.3a**: Notification panel model
+2. **5.3b**: Request responder with Huh integration
+3. **5.3c**: Capability bar badges
+4. **5.3d**: Human queue UI integration
+
+### Phase 5.4 (Mouse)
+5. **5.4a**: Enable mouse tracking, basic click handling
+6. **5.4b**: Clickable capability bar
+7. **5.4c**: Scroll wheel in conversation/message log
+
+### Phase 5.5 (Dashboard)
+8. **5.5a**: Dashboard model with grid layout
+9. **5.5b**: PO card component
+10. **5.5c**: Mode switching (Tab key)
+11. **5.5d**: Mouse click on cards
+
+### Phase 5.6 (Polish)
+12. **5.6a**: Hover effects
+13. **5.6b**: Search/filter
+14. **5.6c**: View transitions
 
 ## File Changes
 
 ```
 lib/prompt_objects/ui/
 ├── app.rb                    # Add mouse handling, mode switching
-├── click_region.rb           # NEW: Hit testing
+├── click_region.rb           # NEW: Hit testing (5.4)
 ├── models/
-│   ├── dashboard.rb          # NEW: Dashboard grid view
-│   ├── po_card.rb            # NEW: Individual PO card
-│   ├── grid_layout.rb        # NEW: Grid positioning
-│   └── search_overlay.rb     # NEW: Search modal
-└── styles.rb                 # Add card styles
+│   ├── notification_panel.rb # NEW: Pending requests list (5.3)
+│   ├── request_responder.rb  # NEW: Huh-based response modal (5.3)
+│   ├── dashboard.rb          # NEW: Dashboard grid view (5.5)
+│   ├── po_card.rb            # NEW: Individual PO card (5.5)
+│   ├── grid_layout.rb        # NEW: Grid positioning (5.5)
+│   └── search_overlay.rb     # NEW: Search modal (5.6)
+└── styles.rb                 # Add card styles, hover states
 ```
 
 ## Future Ideas
