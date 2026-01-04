@@ -66,7 +66,7 @@ module PromptObjects
         cap_name = message[:name] || message["name"]
 
         # Validate name
-        unless cap_name.match?(/\A[a-z][a-z0-9_]*\z/)
+        unless cap_name && cap_name.match?(/\A[a-z][a-z0-9_]*\z/)
           return "Error: Name must be lowercase letters, numbers, and underscores, starting with a letter."
         end
 
@@ -75,17 +75,44 @@ module PromptObjects
           return "Error: A capability named '#{cap_name}' already exists."
         end
 
-        case type
+        result = case type
         when "prompt_object"
           create_prompt_object(message, context)
         when "primitive"
           create_primitive(message, context)
         else
-          "Error: type must be 'prompt_object' or 'primitive'"
+          return "Error: type must be 'prompt_object' or 'primitive'"
         end
+
+        # If creation succeeded, add the new capability to the creating PO
+        if result && !result.start_with?("Error:")
+          added_msg = add_to_creator(cap_name, context)
+          result = "#{result} #{added_msg}" if added_msg
+        end
+
+        result
       end
 
       private
+
+      # Add the newly created capability to the PO that created it
+      # Returns a message if added, nil otherwise
+      def add_to_creator(cap_name, context)
+        creator_name = context.current_capability
+        return nil unless creator_name
+
+        creator_po = context.env.registry.get(creator_name)
+        return nil unless creator_po.is_a?(PromptObject)
+
+        # Add to the creator's capabilities if not already present
+        creator_po.config["capabilities"] ||= []
+        unless creator_po.config["capabilities"].include?(cap_name)
+          creator_po.config["capabilities"] << cap_name
+          return "Also added '#{cap_name}' to #{creator_name}'s capabilities."
+        end
+
+        nil
+      end
 
       def create_prompt_object(message, context)
         cap_name = message[:name] || message["name"]
