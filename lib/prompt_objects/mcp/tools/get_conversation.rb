@@ -38,6 +38,7 @@ module PromptObjects
             {
               role: msg[:role].to_s,
               content: msg[:content],
+              from: msg[:from],
               tool_calls: msg[:tool_calls]&.map { |tc| { name: tc.name, arguments: tc.arguments } }
             }.compact
           end

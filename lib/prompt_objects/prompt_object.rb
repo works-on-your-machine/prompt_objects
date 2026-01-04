@@ -49,7 +49,11 @@ module PromptObjects
       # Normalize message to string
       content = normalize_message(message)
 
-      @history << { role: :user, content: content }
+      # Track who sent this message - another PO or a human?
+      sender = context.current_capability
+      from = (sender && sender != name) ? sender : "human"
+
+      @history << { role: :user, content: content, from: from }
       @state = :working
 
       # Conversation loop - keep going until LLM responds without tool calls
@@ -65,7 +69,10 @@ module PromptObjects
           results = execute_tool_calls(response.tool_calls, context)
           @history << {
             role: :assistant,
-            content: response.content,
+            # Don't include content when there are tool calls - force LLM to
+            # wait for tool results before generating a response. This prevents
+            # the model from "hedging" by generating both a response AND a tool call.
+            content: nil,
             tool_calls: response.tool_calls
           }
           @history << { role: :tool, results: results }
