@@ -44,7 +44,37 @@ PromptObjects is a unified Ruby project with:
 - [x] Track message sender (human vs delegated)
 - [ ] Charm gem FFI stability (ongoing)
 
-## Planned
+## Planned (In Order)
+
+### Phase 8: Environments (Next)
+Smalltalk-like "images" - isolated, versioned runtime environments.
+
+See [phase-8-environments.md](./phase-8-environments.md)
+
+**Key Features:**
+- Environments are git repos (built-in versioning)
+- Sessions in SQLite (gitignored, private)
+- Templates for first-run setup
+- Sandbox for imported custom primitives
+- Archive-first deletion
+
+**Sub-phases:**
+- 8.1: Core structure + git integration
+- 8.2: Templates + first-run wizard
+- 8.3: SQLite session storage
+- 8.4: Export/import bundles
+- 8.5: Archive + rich metadata
+- 8.6: Dev mode (--dev flag)
+
+### Phase 6: Multiple Sessions
+Named conversation sessions per PO (builds on Phase 8 storage).
+
+See [phase-6-sessions.md](./phase-6-sessions.md)
+
+**Features:**
+- Session picker modal (`S` key)
+- Session switching and management
+- Per-environment session storage
 
 ### Phase 5.4: Markdown Rendering
 Render LLM markdown output with proper formatting.
@@ -54,45 +84,25 @@ See [phase-5.4-markdown.md](./phase-5.4-markdown.md)
 **Options:**
 - Pure Ruby ANSI renderer (no FFI)
 - TTY-Markdown gem
-- Wait for Glamour FFI fixes
+- Wait for Glamour FFI fixes (working with charm-ruby team)
 
-### Phase 5.5: Mouse Support
-Enable mouse interaction in the TUI.
-
-**Features:**
-- Click to select PO
-- Scroll wheel in conversation/message log
-- Clickable buttons in modals
+### Phase 5.5-5.6: Mouse Support & Dashboard
+Mouse interaction and grid view for POs.
 
 See [phase-5.5-dashboard.md](./phase-5.5-dashboard.md)
 
-### Phase 5.6: Dashboard Grid View
-Grid layout showing multiple POs at once.
-
 **Features:**
-- PO cards with status and message count
-- Click to open chat or inspector
+- Click to select PO, scroll wheel support
+- Dashboard grid view with PO cards
 - Search/filter POs
-
-See [phase-5.5-dashboard.md](./phase-5.5-dashboard.md)
-
-### Phase 6: Multiple Sessions
-Named conversation sessions per PO.
-
-**Features:**
-- Session storage (file-based)
-- Session picker modal (`S` key)
-- Session switching and management
-
-See [phase-6-sessions.md](./phase-6-sessions.md)
 
 ### Future Ideas
 
 - **Streaming responses**: Token-by-token LLM output
 - **PO creation from TUI**: Create new POs without editing files
 - **Themes**: Dark/light mode, custom color schemes
-- **Session branching**: Fork conversations
-- **Collaborative sessions**: Multiple users
+- **Environment marketplace**: Share environments publicly
+- **Team environments**: Access control and collaboration
 
 ## File Structure
 

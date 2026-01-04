@@ -1,0 +1,17 @@
+name: writer
+description: A writing-focused environment with editing and research specialists
+icon: "✍️"
+color: "#8B5CF6"
+
+# Objects included in this template
+objects:
+  - coordinator
+  - editor
+  - researcher
+
+# Suggested stdlib objects to add
+suggestions:
+  - reader
+
+# Default PO to open
+default_po: coordinator

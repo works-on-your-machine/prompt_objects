@@ -1,0 +1,13 @@
+name: empty
+description: Start from scratch - no objects, full control
+icon: "📦"
+color: "#9CA3AF"
+
+# No objects included
+objects: []
+
+# Suggested stdlib objects to add
+suggestions:
+  - greeter
+  - coordinator
+  - reader

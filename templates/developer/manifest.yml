@@ -1,0 +1,17 @@
+name: developer
+description: A coding-focused environment with code review and debugging specialists
+icon: "💻"
+color: "#10B981"
+
+# Objects included in this template
+objects:
+  - coordinator
+  - code_reviewer
+  - debugger
+
+# Suggested stdlib objects to add
+suggestions:
+  - reader
+
+# Default PO to open
+default_po: coordinator

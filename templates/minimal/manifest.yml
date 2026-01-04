@@ -1,0 +1,13 @@
+name: minimal
+description: A basic starting point with just a coordinator
+icon: "🎯"
+color: "#6B7280"
+
+# Objects included in this template
+objects:
+  - assistant
+
+# Suggested stdlib objects to add
+suggestions:
+  - greeter
+  - reader
