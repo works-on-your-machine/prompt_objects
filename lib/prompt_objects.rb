@@ -22,6 +22,11 @@ require_relative "prompt_objects/loader"
 require_relative "prompt_objects/llm/response"
 require_relative "prompt_objects/llm/openai_adapter"
 require_relative "prompt_objects/prompt_object"
+
+# Environment module (must be loaded before environment.rb which uses them)
+require_relative "prompt_objects/environment/manifest"
+require_relative "prompt_objects/environment/manager"
+require_relative "prompt_objects/environment/git"
 require_relative "prompt_objects/environment"
 
 # Built-in primitives

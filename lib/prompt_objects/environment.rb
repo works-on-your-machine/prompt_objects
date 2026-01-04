@@ -31,12 +31,38 @@ module PromptObjects
   end
 
   # The runtime environment that holds all capabilities and coordinates execution.
-  class Environment
-    attr_reader :llm, :registry, :objects_dir, :bus, :primitives_dir, :human_queue
+  # Can be initialized either from:
+  # - A user environment directory (with manifest.yml, git integration)
+  # - A simple objects directory (legacy/development mode)
+  class Runtime
+    attr_reader :llm, :registry, :objects_dir, :bus, :primitives_dir, :human_queue,
+                :manifest, :env_path, :auto_commit
 
-    def initialize(objects_dir: "objects", primitives_dir: nil, llm: nil)
-      @objects_dir = objects_dir
-      @primitives_dir = primitives_dir || File.join(File.dirname(objects_dir), "primitives")
+    # Initialize from an environment path (with manifest) or objects directory.
+    # @param env_path [String, nil] Path to environment directory (preferred)
+    # @param objects_dir [String, nil] Legacy: path to objects directory
+    # @param primitives_dir [String, nil] Path to primitives directory
+    # @param llm [LLM::OpenAIAdapter, nil] LLM adapter
+    # @param auto_commit [Boolean] Auto-commit changes to git (default: true for env_path)
+    def initialize(env_path: nil, objects_dir: nil, primitives_dir: nil, llm: nil, auto_commit: nil)
+      if env_path
+        # Environment-based initialization
+        @env_path = env_path
+        @objects_dir = File.join(env_path, "objects")
+        @primitives_dir = primitives_dir || File.join(env_path, "primitives")
+        @manifest = Env::Manifest.load_from_dir(env_path)
+        @auto_commit = auto_commit.nil? ? true : auto_commit
+        @manifest.touch_opened!
+        @manifest.save_to_dir(env_path)
+      else
+        # Legacy objects_dir initialization
+        @env_path = nil
+        @objects_dir = objects_dir || "objects"
+        @primitives_dir = primitives_dir || File.join(File.dirname(@objects_dir), "primitives")
+        @manifest = nil
+        @auto_commit = auto_commit || false
+      end
+
       @llm = llm || LLM::OpenAIAdapter.new
       @registry = Registry.new
       @bus = MessageBus.new
@@ -44,6 +70,55 @@ module PromptObjects
 
       register_primitives
       register_universal_capabilities
+    end
+
+    # Create runtime from a user environment by name.
+    # @param name [String] Environment name
+    # @param manager [Env::Manager, nil] Manager instance
+    # @return [Runtime]
+    def self.from_environment(name, manager: nil)
+      manager ||= Env::Manager.new
+      raise Error, "Environment '#{name}' not found" unless manager.environment_exists?(name)
+
+      new(env_path: manager.environment_path(name))
+    end
+
+    # Name of the environment (from manifest or directory name).
+    # @return [String]
+    def name
+      @manifest&.name || File.basename(@objects_dir)
+    end
+
+    # Check if this is an environment-based runtime (vs legacy objects_dir).
+    # @return [Boolean]
+    def environment?
+      !@env_path.nil?
+    end
+
+    # Save a commit with all current changes.
+    # @param message [String]
+    # @return [Boolean] True if committed
+    def save(message = "Save changes")
+      return false unless environment? && @auto_commit
+
+      Env::Git.auto_commit(@env_path, message)
+    end
+
+    # Check if there are unsaved changes.
+    # @return [Boolean]
+    def dirty?
+      return false unless environment?
+
+      Env::Git.dirty?(@env_path)
+    end
+
+    # Update manifest stats from current state.
+    def update_manifest_stats!
+      return unless @manifest
+
+      po_count = @registry.prompt_objects.size
+      @manifest.update_stats(po_count: po_count)
+      @manifest.save_to_dir(@env_path)
     end
 
     # Create a context for capability execution.
@@ -135,4 +210,8 @@ module PromptObjects
       @registry.register(Universal::ListCapabilities.new)
     end
   end
+
+  # Backwards compatibility alias (Environment was renamed to Runtime).
+  # Use Runtime for new code; Environment is preserved for existing callers.
+  Environment = Runtime
 end

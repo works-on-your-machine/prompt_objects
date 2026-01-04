@@ -8,6 +8,18 @@ GIT
       glamour
       lipgloss
 
+PATH
+  remote: .
+  specs:
+    prompt_objects (0.1.0)
+      bubbles
+      bubbletea
+      front_matter_parser
+      glamour
+      lipgloss
+      mcp
+      ruby-openai (~> 7.0)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -114,16 +126,10 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  bubbles
-  bubbletea
   debug
-  front_matter_parser
-  glamour
   huh!
-  lipgloss
-  mcp
+  prompt_objects!
   rubocop
-  ruby-openai (~> 7.0)
 
 BUNDLED WITH
    2.7.2

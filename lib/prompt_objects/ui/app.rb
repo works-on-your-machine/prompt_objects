@@ -25,7 +25,8 @@ module PromptObjects
       MODE_NORMAL = :normal
       MODE_INSERT = :insert
 
-      def initialize(objects_dir: "objects", primitives_dir: nil)
+      def initialize(objects_dir: nil, primitives_dir: nil, env_path: nil)
+        @env_path = env_path
         @objects_dir = objects_dir
         @primitives_dir = primitives_dir
         @env = nil
@@ -50,10 +51,16 @@ module PromptObjects
 
       def init
         # Initialize the environment
-        @env = Environment.new(
-          objects_dir: @objects_dir,
-          primitives_dir: @primitives_dir
-        )
+        if @env_path
+          @env = Runtime.new(env_path: @env_path)
+          @objects_dir = @env.objects_dir
+        else
+          @env = Runtime.new(
+            objects_dir: @objects_dir || "objects",
+            primitives_dir: @primitives_dir
+          )
+          @objects_dir = @env.objects_dir
+        end
         # Create context with TUI mode enabled
         @context = @env.context(tui_mode: true)
 
@@ -171,8 +178,8 @@ module PromptObjects
       end
 
       # Class method to run the app
-      def self.run(objects_dir: "objects", primitives_dir: nil)
-        app = new(objects_dir: objects_dir, primitives_dir: primitives_dir)
+      def self.run(objects_dir: nil, primitives_dir: nil, env_path: nil)
+        app = new(objects_dir: objects_dir, primitives_dir: primitives_dir, env_path: env_path)
         Bubbletea.run(app, alt_screen: true)
       end
 
@@ -594,8 +601,14 @@ module PromptObjects
 
       def render_header
         title = Styles.panel_title.render("PromptObjects")
-        sandbox = @primitives_dir ? " [SANDBOX]" : ""
-        "#{title}#{sandbox}"
+        env_info = if @env_path
+                     " [#{@env.name}]"
+                   elsif @primitives_dir
+                     " [SANDBOX]"
+                   else
+                     ""
+                   end
+        "#{title}#{env_info}"
       end
 
       def render_main_content(height)

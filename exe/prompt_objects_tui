@@ -6,40 +6,47 @@ $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 
 require "bundler/setup"
 require "prompt_objects"
+require "prompt_objects/cli"
 require "prompt_objects/ui/app"
 
 # Parse command line arguments
 def parse_args
-  args = {
-    objects_dir: "objects",
-    sandbox: false
-  }
+  options = PromptObjects::CLI.parse(ARGV)
 
-  ARGV.each do |arg|
-    case arg
-    when "--sandbox", "-s"
-      args[:sandbox] = true
-    when "--help", "-h"
-      print_help
-      exit 0
-    else
-      args[:objects_dir] = arg unless arg.start_with?("-")
-    end
+  # Handle env subcommand
+  if options[:command] == :env
+    PromptObjects::CLI::EnvCommand.new.run(options[:env_args] || [])
+    exit 0
   end
 
-  args
+  # Handle help
+  if options[:command] == :help
+    print_help
+    exit 0
+  end
+
+  options
 end
 
 def print_help
   puts <<~HELP
-    Usage: prompt_objects_tui [options] [objects_dir]
+    Usage: prompt_objects_tui [options] [env_name]
+
+    Run the TUI interface for PromptObjects.
 
     Arguments:
-      objects_dir  Directory containing .md files (default: objects)
+      env_name         Environment to open (or uses default)
 
     Options:
-      --sandbox, -s   Run in sandbox mode (isolates changes)
-      --help, -h      Show this help message
+      --env, -e <name> Open specific environment
+      --dev            Use development environment (isolated)
+      --sandbox, -s    Run in sandbox mode (legacy)
+      --help, -h       Show this help message
+
+    Environment Commands:
+      prompt_objects_tui env list       List all environments
+      prompt_objects_tui env create     Create new environment
+      prompt_objects_tui env info       Show environment details
 
     Keyboard Shortcuts:
       q, Ctrl+C     Quit
@@ -49,37 +56,133 @@ def print_help
       e             Edit PO capabilities
       <-/->         Switch between POs
       Enter         Send message / Activate PO
+
+    First Run:
+      On first run with no environments, you'll be prompted to create one.
   HELP
+end
+
+def run_first_time_setup(manager)
+  puts
+  puts "Welcome to PromptObjects!"
+  puts "========================="
+  puts
+  puts "Let's create your first environment."
+  puts
+
+  # Get name
+  print "Environment name (default: default): "
+  name = $stdin.gets&.chomp
+  name = "default" if name.nil? || name.empty?
+
+  # Show templates
+  templates = PromptObjects::CLI.list_templates
+  puts
+  puts "Choose a template:"
+  templates.each_with_index do |t, i|
+    puts "  #{i + 1}. #{t[:icon]} #{t[:name]} - #{t[:description]}"
+  end
+  puts
+
+  print "Template number (default: 1): "
+  choice = $stdin.gets&.chomp&.to_i || 1
+  choice = 1 if choice < 1 || choice > templates.size
+  template = templates[choice - 1][:name]
+
+  puts
+  puts "Creating '#{name}' from '#{template}' template..."
+  path = manager.create(name: name, template: template)
+  manager.set_default_environment(name)
+
+  puts "Environment created at: #{path}"
+  puts
+  puts "Press Enter to continue..."
+  $stdin.gets
+
+  name
 end
 
 def main
   args = parse_args
+  manager = PromptObjects::Env::Manager.new
+  manager.setup!
+
+  # Determine which environment to use
+  env_path = nil
+  env_name = nil
+
+  if args[:dev_mode] || ENV["PROMPT_OBJECTS_DEV"]
+    # Development mode
+    env_path = manager.dev_environment_path
+    env_name = "_development"
+    puts "Development mode: #{env_path}"
+  elsif args[:env_name]
+    # Specific environment requested
+    unless manager.environment_exists?(args[:env_name])
+      puts "Environment '#{args[:env_name]}' not found."
+      puts
+      puts "Available environments:"
+      manager.list.each { |name| puts "  - #{name}" }
+      exit 1
+    end
+    env_path = manager.environment_path(args[:env_name])
+    env_name = args[:env_name]
+  elsif args[:legacy_args]&.any? && !manager.environment_exists?(args[:legacy_args].first)
+    # Legacy: treat argument as objects_dir
+    objects_dir = args[:legacy_args].first
+    if Dir.exist?(objects_dir)
+      # Run in legacy mode with objects_dir
+      run_legacy_mode(objects_dir, args)
+      return
+    end
+    # Try as environment name
+    env_name = args[:legacy_args].first
+    if manager.environment_exists?(env_name)
+      env_path = manager.environment_path(env_name)
+    end
+  elsif manager.first_run?
+    # First run - guide user through setup
+    env_name = run_first_time_setup(manager)
+    env_path = manager.environment_path(env_name)
+  else
+    # Use default environment
+    env_name = manager.default_environment || manager.list.first
+    unless env_name
+      puts "No environments found. Create one with:"
+      puts "  prompt_objects_tui env create <name>"
+      exit 1
+    end
+    env_path = manager.environment_path(env_name)
+  end
+
+  # Run TUI with environment
+  PromptObjects::UI::App.run(env_path: env_path)
+end
+
+def run_legacy_mode(objects_dir, args)
   primitives_dir = nil
 
   if args[:sandbox]
     require "fileutils"
     require "tmpdir"
 
-    # Create sandbox
     sandbox_dir = Dir.mktmpdir("prompt_objects_sandbox_")
-    objects_dir = File.join(sandbox_dir, "objects")
+    objects_dir_sandbox = File.join(sandbox_dir, "objects")
     primitives_dir = File.join(sandbox_dir, "primitives")
 
-    FileUtils.mkdir_p(objects_dir)
+    FileUtils.mkdir_p(objects_dir_sandbox)
     FileUtils.mkdir_p(primitives_dir)
 
-    # Copy existing objects
-    original_dir = File.expand_path(args[:objects_dir])
+    original_dir = File.expand_path(objects_dir)
     if Dir.exist?(original_dir)
       Dir.glob(File.join(original_dir, "*.md")).each do |src|
-        FileUtils.cp(src, objects_dir)
+        FileUtils.cp(src, objects_dir_sandbox)
       end
     end
 
     puts "Sandbox initialized at: #{sandbox_dir}"
-    args[:objects_dir] = objects_dir
+    objects_dir = objects_dir_sandbox
 
-    # Cleanup on exit
     at_exit do
       FileUtils.rm_rf(sandbox_dir) if Dir.exist?(sandbox_dir)
       puts "Sandbox cleaned up"
@@ -87,7 +190,7 @@ def main
   end
 
   PromptObjects::UI::App.run(
-    objects_dir: args[:objects_dir],
+    objects_dir: objects_dir,
     primitives_dir: primitives_dir
   )
 end
