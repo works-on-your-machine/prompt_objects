@@ -1,6 +1,6 @@
 # MCP Server Tools Reference
 
-The PromptObjects MCP server exposes these tools for clients (Go TUI, Claude Desktop, etc.).
+The PromptObjects MCP server exposes these tools for external clients (Claude Desktop, custom integrations, etc.).
 
 ## Tools
 
