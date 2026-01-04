@@ -11,7 +11,10 @@ GIT
 GEM
   remote: https://rubygems.org/
   specs:
+    addressable (2.8.8)
+      public_suffix (>= 2.0.2, < 8.0)
     ast (2.4.3)
+    bigdecimal (4.0.1)
     bubbles (0.1.0)
       bubbletea
       harmonica
@@ -44,11 +47,18 @@ GEM
       rdoc (>= 4.0.0)
       reline (>= 0.4.2)
     json (2.18.0)
+    json-schema (6.1.0)
+      addressable (~> 2.8)
+      bigdecimal (>= 3.1, < 5)
+    json_rpc_handler (0.1.1)
     language_server-protocol (3.17.0.5)
     lint_roller (1.1.0)
     lipgloss (0.2.0)
     lipgloss (0.2.0-arm64-darwin)
     logger (1.7.0)
+    mcp (0.4.0)
+      json-schema (>= 4.1)
+      json_rpc_handler (~> 0.1)
     multipart-post (2.4.1)
     net-http (0.9.1)
       uri (>= 0.11.1)
@@ -63,6 +73,7 @@ GEM
     psych (5.3.1)
       date
       stringio
+    public_suffix (7.0.1)
     racc (1.8.1)
     rainbow (3.1.1)
     rdoc (7.0.3)
@@ -110,6 +121,7 @@ DEPENDENCIES
   glamour
   huh!
   lipgloss
+  mcp
   rubocop
   ruby-openai (~> 7.0)
 

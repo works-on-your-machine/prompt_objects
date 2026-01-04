@@ -1,0 +1,34 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "bundler/setup"
+require_relative "../lib/prompt_objects"
+require_relative "../lib/prompt_objects/mcp/server"
+
+# Parse command line options
+objects_dir = ENV["PROMPT_OBJECTS_DIR"] || "objects"
+primitives_dir = ENV["PROMPT_OBJECTS_PRIMITIVES_DIR"]
+
+# Allow overriding via command line
+ARGV.each_with_index do |arg, i|
+  case arg
+  when "--objects-dir"
+    objects_dir = ARGV[i + 1]
+  when "--primitives-dir"
+    primitives_dir = ARGV[i + 1]
+  end
+end
+
+# Redirect stderr to a log file to avoid polluting MCP stdio
+if ENV["PROMPT_OBJECTS_LOG"]
+  $stderr.reopen(ENV["PROMPT_OBJECTS_LOG"], "a")
+  $stderr.sync = true
+end
+
+# Start the MCP server
+server = PromptObjects::MCP::Server.new(
+  objects_dir: objects_dir,
+  primitives_dir: primitives_dir
+)
+
+server.start
