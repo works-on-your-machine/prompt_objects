@@ -140,7 +140,8 @@ module PromptObjects
           #{behavior}
         MARKDOWN
 
-        content = "---\n#{frontmatter.to_yaml}---\n\n#{body}"
+        # to_yaml already includes leading "---\n", so we just need the closing ---
+        content = "#{frontmatter.to_yaml}---\n\n#{body}"
 
         # Write to file
         path = File.join(context.env.objects_dir, "#{cap_name}.md")
