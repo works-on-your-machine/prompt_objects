@@ -8,6 +8,7 @@ require "bundler/setup"
 require "prompt_objects"
 require "prompt_objects/cli"
 require "prompt_objects/ui/app"
+require "prompt_objects/ui/models/setup_wizard"
 
 # Parse command line arguments
 def parse_args
@@ -63,43 +64,18 @@ def print_help
 end
 
 def run_first_time_setup(manager)
-  puts
-  puts "Welcome to PromptObjects!"
-  puts "========================="
-  puts
-  puts "Let's create your first environment."
-  puts
-
-  # Get name
-  print "Environment name (default: default): "
-  name = $stdin.gets&.chomp
-  name = "default" if name.nil? || name.empty?
-
-  # Show templates
   templates = PromptObjects::CLI.list_templates
-  puts
-  puts "Choose a template:"
-  templates.each_with_index do |t, i|
-    puts "  #{i + 1}. #{t[:icon]} #{t[:name]} - #{t[:description]}"
-  end
-  puts
 
-  print "Template number (default: 1): "
-  choice = $stdin.gets&.chomp&.to_i || 1
-  choice = 1 if choice < 1 || choice > templates.size
-  template = templates[choice - 1][:name]
+  wizard = PromptObjects::UI::Models::SetupWizard.new(
+    manager: manager,
+    templates: templates
+  )
 
-  puts
-  puts "Creating '#{name}' from '#{template}' template..."
-  path = manager.create(name: name, template: template)
-  manager.set_default_environment(name)
+  # Run the wizard in alt screen mode
+  Bubbletea.run(wizard, alt_screen: true)
 
-  puts "Environment created at: #{path}"
-  puts
-  puts "Press Enter to continue..."
-  $stdin.gets
-
-  name
+  # Return the created environment name (or nil if cancelled)
+  wizard.done? ? wizard.env_name : nil
 end
 
 def main
@@ -141,8 +117,12 @@ def main
       env_path = manager.environment_path(env_name)
     end
   elsif manager.first_run?
-    # First run - guide user through setup
+    # First run - guide user through TUI setup wizard
     env_name = run_first_time_setup(manager)
+    unless env_name
+      puts "Setup cancelled."
+      exit 0
+    end
     env_path = manager.environment_path(env_name)
   else
     # Use default environment
