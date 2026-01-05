@@ -10,9 +10,11 @@ module PromptObjects
     # UI customization, and stats.
     class Manifest
       FILENAME = "manifest.yml"
+      FORMAT_VERSION = 1  # Increment when manifest schema changes
 
       attr_accessor :name, :description, :created_at, :updated_at, :last_opened,
-                    :icon, :color, :tags, :default_po, :stats
+                    :icon, :color, :tags, :default_po, :stats, :version,
+                    :archived_at, :imported_from, :imported_at
 
       def initialize(
         name:,
@@ -24,7 +26,11 @@ module PromptObjects
         color: nil,
         tags: nil,
         default_po: nil,
-        stats: nil
+        stats: nil,
+        version: nil,
+        archived_at: nil,
+        imported_from: nil,
+        imported_at: nil
       )
         @name = name
         @description = description
@@ -36,6 +42,10 @@ module PromptObjects
         @tags = tags || []
         @default_po = default_po
         @stats = stats || { "total_messages" => 0, "total_sessions" => 0, "po_count" => 0 }
+        @version = version || FORMAT_VERSION
+        @archived_at = archived_at
+        @imported_from = imported_from
+        @imported_at = imported_at
       end
 
       # Load manifest from a file path.
@@ -69,7 +79,11 @@ module PromptObjects
           color: data["color"],
           tags: data["tags"],
           default_po: data["default_po"],
-          stats: data["stats"]
+          stats: data["stats"],
+          version: data["version"],
+          archived_at: parse_time(data["archived_at"]),
+          imported_from: data["imported_from"],
+          imported_at: parse_time(data["imported_at"])
         )
       end
 
@@ -89,14 +103,18 @@ module PromptObjects
       # @return [Hash]
       def to_hash
         {
+          "version" => @version,
           "name" => @name,
           "description" => @description,
           "created_at" => @created_at&.iso8601,
           "updated_at" => @updated_at&.iso8601,
           "last_opened" => @last_opened&.iso8601,
+          "archived_at" => @archived_at&.iso8601,
+          "imported_from" => @imported_from,
+          "imported_at" => @imported_at&.iso8601,
           "icon" => @icon,
           "color" => @color,
-          "tags" => @tags,
+          "tags" => @tags.any? ? @tags : nil,
           "default_po" => @default_po,
           "stats" => @stats
         }.compact
@@ -137,6 +155,24 @@ module PromptObjects
         @stats["total_messages"] = (@stats["total_messages"] || 0) + 1
       end
 
+      # Mark as archived with timestamp.
+      def mark_archived!
+        @archived_at = Time.now
+        @updated_at = Time.now
+      end
+
+      # Check if this environment was imported.
+      # @return [Boolean]
+      def imported?
+        !@imported_from.nil?
+      end
+
+      # Check if this environment was archived.
+      # @return [Boolean]
+      def archived?
+        !@archived_at.nil?
+      end
+
       # Display string.
       # @return [String]
       def to_s
@@ -149,10 +185,32 @@ module PromptObjects
         lines = []
         lines << "#{@icon} #{@name}"
         lines << "  #{@description}" if @description
-        lines << "  Created: #{@created_at&.strftime('%Y-%m-%d')}"
+        lines << ""
+        lines << "  Created: #{@created_at&.strftime('%Y-%m-%d %H:%M')}"
         lines << "  Last opened: #{@last_opened&.strftime('%Y-%m-%d %H:%M')}" if @last_opened
-        lines << "  Objects: #{@stats['po_count']}" if @stats["po_count"]&.positive?
+        lines << "  Updated: #{@updated_at&.strftime('%Y-%m-%d %H:%M')}" if @updated_at
+
+        if imported?
+          lines << ""
+          lines << "  Imported from: #{@imported_from}"
+          lines << "  Imported at: #{@imported_at&.strftime('%Y-%m-%d %H:%M')}"
+        end
+
+        if archived?
+          lines << ""
+          lines << "  Archived at: #{@archived_at&.strftime('%Y-%m-%d %H:%M')}"
+        end
+
+        lines << ""
+        lines << "  Stats:"
+        lines << "    Objects: #{@stats['po_count'] || 0}"
+        lines << "    Sessions: #{@stats['total_sessions'] || 0}"
+        lines << "    Messages: #{@stats['total_messages'] || 0}"
+
+        lines << ""
         lines << "  Tags: #{@tags.join(', ')}" if @tags&.any?
+        lines << "  Format version: #{@version}"
+
         lines.join("\n")
       end
     end

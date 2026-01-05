@@ -184,11 +184,21 @@ module PromptObjects
 
       # Archive (soft delete) an environment.
       # @param name [String]
+      # @return [String] Path to archived environment
       def archive(name)
         raise Error, "Environment '#{name}' not found" unless environment_exists?(name)
         raise Error, "Cannot archive development environment" if name == DEV_ENV_NAME
 
         src = environment_path(name)
+
+        # Mark as archived in manifest before moving
+        manifest = Manifest.load_from_dir(src)
+        manifest.mark_archived!
+        manifest.save_to_dir(src)
+
+        # Commit the archive marker
+        Git.commit(src, "Archived environment")
+
         timestamp = Time.now.strftime("%Y%m%d_%H%M%S")
         dest = File.join(archive_dir, "#{name}_#{timestamp}")
 
@@ -207,6 +217,7 @@ module PromptObjects
       # Restore an archived environment.
       # @param archived_name [String] Name with timestamp suffix
       # @param restore_as [String, nil] New name (defaults to original name)
+      # @return [String] Path to restored environment
       def restore(archived_name, restore_as: nil)
         src = File.join(archive_dir, archived_name)
         raise Error, "Archived environment not found: #{archived_name}" unless Dir.exist?(src)
@@ -220,12 +231,14 @@ module PromptObjects
         dest = environment_path(new_name)
         FileUtils.mv(src, dest)
 
-        # Update manifest name if restored under different name
-        if new_name != original_name
-          manifest = Manifest.load_from_dir(dest)
-          manifest.name = new_name
-          manifest.save_to_dir(dest)
-        end
+        # Update manifest: clear archived_at, update name if needed
+        manifest = Manifest.load_from_dir(dest)
+        manifest.archived_at = nil
+        manifest.name = new_name if new_name != original_name
+        manifest.save_to_dir(dest)
+
+        # Commit the restore
+        Git.commit(dest, "Restored environment#{new_name != original_name ? " as '#{new_name}'" : ""}")
 
         dest
       end
