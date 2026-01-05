@@ -21,6 +21,10 @@ module PromptObjects
           create(args)
         when "info"
           info(args)
+        when "export"
+          export(args)
+        when "import"
+          import(args)
         when "archive"
           archive(args)
         when "restore"
@@ -117,6 +121,130 @@ module PromptObjects
           commits = Env::Git.commit_count(path)
           dirty = Env::Git.dirty?(path)
           puts "  Git: #{commits} commits#{dirty ? ' (uncommitted changes)' : ''}"
+        end
+      end
+
+      def export(args)
+        @manager.setup!
+
+        # Parse arguments
+        name = nil
+        output = nil
+
+        i = 0
+        while i < args.length
+          case args[i]
+          when "-o", "--output"
+            output = args[i + 1]
+            i += 1
+          else
+            name ||= args[i]
+          end
+          i += 1
+        end
+
+        # Default to current directory name if no output specified
+        name ||= @manager.default_environment
+        unless name
+          puts "Usage: prompt_objects env export <name> [-o output.poenv]"
+          exit 1
+        end
+
+        unless @manager.environment_exists?(name)
+          puts "Environment '#{name}' not found."
+          exit 1
+        end
+
+        output ||= "#{name}.poenv"
+        env_path = @manager.environment_path(name)
+
+        exporter = Env::Exporter.new(env_path)
+        result = exporter.export(output)
+
+        if result[:success]
+          puts "Exported '#{name}' to: #{result[:path]}"
+          puts
+          puts "Stats:"
+          puts "  Commits: #{result[:stats][:commits]}"
+          puts "  Objects: #{result[:stats][:objects]}"
+          puts "  Primitives: #{result[:stats][:primitives]}"
+        else
+          puts "Export failed: #{result[:error]}"
+          exit 1
+        end
+      end
+
+      def import(args)
+        @manager.setup!
+
+        # Parse arguments
+        bundle_path = nil
+        import_as = nil
+        trust = false
+
+        i = 0
+        while i < args.length
+          case args[i]
+          when "--as"
+            import_as = args[i + 1]
+            i += 1
+          when "--trust"
+            trust = true
+          else
+            bundle_path ||= args[i]
+          end
+          i += 1
+        end
+
+        unless bundle_path
+          puts "Usage: prompt_objects env import <bundle.poenv> [--as <name>] [--trust]"
+          puts
+          puts "Options:"
+          puts "  --as <name>   Import with a different name"
+          puts "  --trust       Trust custom primitives (skip sandbox warnings)"
+          exit 1
+        end
+
+        importer = Env::Importer.new(bundle_path)
+
+        # First, inspect and show what's in the bundle
+        info = importer.inspect_bundle
+        unless info.valid
+          puts "Invalid bundle: #{info.error}"
+          exit 1
+        end
+
+        puts "Bundle contents:"
+        puts "  Name: #{info.name}"
+        puts "  Description: #{info.description}" if info.description
+        puts "  Objects: #{info.objects.join(', ')}" if info.objects.any?
+        puts "  Primitives: #{info.primitives.join(', ')}" if info.primitives.any?
+        puts "  Commits: #{info.commits}"
+        puts
+
+        # Warn about primitives
+        if info.primitives.any? && !trust
+          puts "⚠️  WARNING: This bundle contains custom primitives."
+          puts "Custom primitives can execute arbitrary Ruby code."
+          puts "Review the code before running, or use --trust to skip this warning."
+          puts
+        end
+
+        # Import
+        import_name = import_as || info.name
+        result = importer.import(manager: @manager, name: import_name, trust_primitives: trust)
+
+        if result[:success]
+          puts "Imported as '#{result[:name]}'"
+          puts "Location: #{result[:path]}"
+
+          if result[:warnings].any?
+            puts
+            result[:warnings].each { |w| puts w }
+          end
+        else
+          puts "Import failed: #{result[:error]}"
+          exit 1
         end
       end
 
@@ -219,6 +347,11 @@ module PromptObjects
             prompt_objects env create <name>    Create new environment
               --template, -t <template>         Use template (minimal, developer, writer, empty)
             prompt_objects env info <name>      Show environment details
+            prompt_objects env export <name>    Export environment as .poenv bundle
+              -o, --output <file>               Output file path
+            prompt_objects env import <file>    Import environment from .poenv bundle
+              --as <name>                       Import with different name
+              --trust                           Trust custom primitives
             prompt_objects env archive <name>   Archive (soft delete) environment
             prompt_objects env restore <name>   Restore archived environment
               --as <new_name>                   Restore with different name

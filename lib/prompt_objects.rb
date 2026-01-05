@@ -27,6 +27,8 @@ require_relative "prompt_objects/prompt_object"
 require_relative "prompt_objects/environment/manifest"
 require_relative "prompt_objects/environment/manager"
 require_relative "prompt_objects/environment/git"
+require_relative "prompt_objects/environment/exporter"
+require_relative "prompt_objects/environment/importer"
 require_relative "prompt_objects/environment"
 
 # Session storage
