@@ -12,28 +12,49 @@ require_relative "models/po_inspector"
 require_relative "models/capability_editor"
 require_relative "models/notification_panel"
 require_relative "models/request_responder"
+require_relative "models/setup_wizard"
+require_relative "models/env_picker"
 
 module PromptObjects
   module UI
     # Main TUI application using Bubble Tea
+    #
+    # IMPORTANT: This app uses a single-program architecture with internal screen states.
+    # Bubble Tea best practice is to avoid running multiple sequential programs, as this
+    # causes terminal state issues. Instead, we manage picker/wizard/main as screens
+    # within one program. See: https://github.com/charmbracelet/bubbletea/discussions/484
     class App
       include Bubbletea::Model
 
       attr_reader :env, :active_po, :width, :height
 
-      # Vim-like modes
+      # Screen states - single program manages all screens
+      SCREEN_PICKER = :picker
+      SCREEN_WIZARD = :wizard
+      SCREEN_MAIN = :main
+
+      # Vim-like modes (for main screen)
       MODE_NORMAL = :normal
       MODE_INSERT = :insert
 
-      def initialize(objects_dir: nil, primitives_dir: nil, env_path: nil)
+      def initialize(objects_dir: nil, primitives_dir: nil, env_path: nil, manager: nil, dev_mode: false)
         @env_path = env_path
         @objects_dir = objects_dir
         @primitives_dir = primitives_dir
+        @manager = manager
+        @dev_mode = dev_mode
         @env = nil
         @active_po = nil
         @context = nil
 
-        # Sub-models
+        # Screen state
+        @screen = nil  # Set in init based on context
+
+        # Sub-models for picker/wizard
+        @picker = nil
+        @wizard = nil
+
+        # Sub-models for main screen
         @capability_bar = nil
         @message_log = nil
         @conversation = nil
@@ -50,9 +71,59 @@ module PromptObjects
       end
 
       def init
+        # Determine initial screen based on context
+        @screen = determine_initial_screen
+
+        case @screen
+        when SCREEN_PICKER
+          init_picker
+        when SCREEN_WIZARD
+          init_wizard
+        when SCREEN_MAIN
+          init_main
+        end
+
+        [self, nil]
+      end
+
+      private def determine_initial_screen
+        # If env_path is provided, go directly to main
+        return SCREEN_MAIN if @env_path
+
+        # If dev mode, go directly to main
+        return SCREEN_MAIN if @dev_mode
+
+        # If no manager, we're in legacy mode - go to main
+        return SCREEN_MAIN unless @manager
+
+        # First run (no environments) - show wizard
+        return SCREEN_WIZARD if @manager.first_run?
+
+        # Otherwise show picker
+        SCREEN_PICKER
+      end
+
+      private def init_picker
+        environments = @manager.list_with_manifests
+        @picker = Models::EnvPicker.new(environments: environments)
+      end
+
+      private def init_wizard
+        templates = PromptObjects::CLI.list_templates
+        @wizard = Models::SetupWizard.new(
+          manager: @manager,
+          templates: templates
+        )
+      end
+
+      private def init_main
         # Initialize the environment
         if @env_path
           @env = Runtime.new(env_path: @env_path)
+          @objects_dir = @env.objects_dir
+        elsif @dev_mode && @manager
+          env_path = @manager.dev_environment_path
+          @env = Runtime.new(env_path: env_path)
           @objects_dir = @env.objects_dir
         else
           @env = Runtime.new(
@@ -97,11 +168,80 @@ module PromptObjects
           @conversation.set_po(@active_po)
           @context.current_capability = @active_po.name
         end
+      end
+
+      def update(msg)
+        # Handle window size for all screens
+        if msg.is_a?(Bubbletea::WindowSizeMessage)
+          @width = msg.width
+          @height = msg.height
+          # Also pass to picker/wizard if active
+          @picker&.instance_variable_set(:@width, @width)
+          @picker&.instance_variable_set(:@height, @height)
+          @wizard&.instance_variable_set(:@width, @width)
+          @wizard&.instance_variable_set(:@height, @height)
+        end
+
+        # Route based on current screen
+        case @screen
+        when SCREEN_PICKER
+          update_picker(msg)
+        when SCREEN_WIZARD
+          update_wizard(msg)
+        when SCREEN_MAIN
+          update_main(msg)
+        else
+          [self, nil]
+        end
+      end
+
+      private def update_picker(msg)
+        return [self, nil] unless @picker
+
+        # Let picker handle the message
+        @picker.update(msg)
+
+        # Check if picker is done
+        if @picker.cancelled?
+          return [self, Bubbletea.quit]
+        elsif @picker.wants_new_env?
+          # Transition to wizard
+          @screen = SCREEN_WIZARD
+          init_wizard
+          return [self, nil]
+        elsif @picker.done?
+          # Transition to main with selected environment
+          @env_path = @manager.environment_path(@picker.selected_env)
+          @screen = SCREEN_MAIN
+          init_main
+          return [self, nil]
+        end
 
         [self, nil]
       end
 
-      def update(msg)
+      private def update_wizard(msg)
+        return [self, nil] unless @wizard
+
+        # Let wizard handle the message
+        @wizard.update(msg)
+
+        # Check if wizard is done
+        if @wizard.done?
+          # Transition to main with created environment
+          @env_path = @wizard.env_path
+          @screen = SCREEN_MAIN
+          init_main
+          return [self, nil]
+        end
+
+        # Check for cancellation (Ctrl+C handled in wizard, Esc on welcome)
+        # The wizard itself returns quit command on cancel
+
+        [self, nil]
+      end
+
+      private def update_main(msg)
         case msg
         when Bubbletea::KeyMessage
           handle_key(msg)
@@ -143,6 +283,20 @@ module PromptObjects
       def view
         return "" if @width == 0 || @height == 0
 
+        # Route view based on current screen
+        case @screen
+        when SCREEN_PICKER
+          @picker&.view || ""
+        when SCREEN_WIZARD
+          @wizard&.view || ""
+        when SCREEN_MAIN
+          view_main
+        else
+          ""
+        end
+      end
+
+      private def view_main
         lines = []
 
         # Header
@@ -178,8 +332,21 @@ module PromptObjects
       end
 
       # Class method to run the app
-      def self.run(objects_dir: nil, primitives_dir: nil, env_path: nil)
-        app = new(objects_dir: objects_dir, primitives_dir: primitives_dir, env_path: env_path)
+      #
+      # Parameters:
+      # - objects_dir: Legacy mode - directory containing PO markdown files
+      # - primitives_dir: Legacy mode - directory for custom primitives
+      # - env_path: Direct path to environment (skips picker/wizard)
+      # - manager: Environment manager (enables picker/wizard flow)
+      # - dev_mode: Use development environment (skips picker/wizard)
+      def self.run(objects_dir: nil, primitives_dir: nil, env_path: nil, manager: nil, dev_mode: false)
+        app = new(
+          objects_dir: objects_dir,
+          primitives_dir: primitives_dir,
+          env_path: env_path,
+          manager: manager,
+          dev_mode: dev_mode
+        )
         Bubbletea.run(app, alt_screen: true)
       end
 

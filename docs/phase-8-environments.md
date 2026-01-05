@@ -395,6 +395,73 @@ lib/prompt_objects/
 | First-run experience? | Guided setup wizard |
 | Deletion model? | Archive first (soft delete) |
 
+## TUI Architecture Notes
+
+### Single-Program Pattern (Critical)
+
+**Bubble Tea best practice**: Use a single `Bubbletea.run` call with internal screen states, NOT multiple sequential programs.
+
+Running multiple `tea.Program` instances sequentially (e.g., picker → wizard → main app) causes terminal state corruption. The recommended pattern is:
+
+```ruby
+class App
+  SCREEN_PICKER = :picker
+  SCREEN_WIZARD = :wizard
+  SCREEN_MAIN = :main
+
+  def init
+    @screen = determine_initial_screen
+    # Initialize appropriate sub-model
+  end
+
+  def update(msg)
+    case @screen
+    when SCREEN_PICKER
+      # Route to picker, check if done, transition
+    when SCREEN_WIZARD
+      # Route to wizard, check if done, transition
+    when SCREEN_MAIN
+      # Handle main app logic
+    end
+  end
+
+  def view
+    case @screen
+    when SCREEN_PICKER then @picker.view
+    when SCREEN_WIZARD then @wizard.view
+    when SCREEN_MAIN then view_main
+    end
+  end
+end
+```
+
+**Key points:**
+- The top-level model acts as a "message router and screen compositor"
+- Child models (picker, wizard) handle their own state but report completion
+- Screen transitions happen by changing `@screen` and initializing new sub-models
+- All sub-models share the same window dimensions (broadcast `WindowSizeMessage`)
+
+**References:**
+- [GitHub Discussion #484: Transitioning between programs](https://github.com/charmbracelet/bubbletea/discussions/484)
+- [Building Bubble Tea Programs](https://leg100.github.io/en/posts/building-bubbletea-programs/)
+
+### Message Routing
+
+For complex apps, route messages through three paths:
+1. **Global**: Handle quit, help, window resize at top level
+2. **Current screen**: Route user input to active sub-model
+3. **Broadcast**: Pass structural messages to all sub-models
+
+### Async Operations
+
+Run expensive operations (LLM calls) in background threads:
+```ruby
+Thread.new do
+  response = po.receive(text, context: context)
+  Bubbletea.send_message(Messages::POResponse.new(...))
+end
+```
+
 ## Future Considerations
 
 - Environment marketplace/registry for sharing

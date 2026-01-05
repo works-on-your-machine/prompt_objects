@@ -62,6 +62,10 @@ Available to all Prompt-Objects automatically (no frontmatter declaration needed
 - **Charm** - Terminal UI (Bubble Tea for interaction, Lipgloss for styling, Glamour for markdown)
 - **MCP** - Model Context Protocol integration
 
+### TUI Architecture Note
+
+The TUI uses a **single Bubble Tea program** with internal screen states (picker, wizard, main). Do NOT run multiple sequential `Bubbletea.run` calls—this causes terminal state corruption. See `docs/phase-8-environments.md` for details.
+
 ## Planned File Structure
 
 ```

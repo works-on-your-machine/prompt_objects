@@ -8,8 +8,6 @@ require "bundler/setup"
 require "prompt_objects"
 require "prompt_objects/cli"
 require "prompt_objects/ui/app"
-require "prompt_objects/ui/models/setup_wizard"
-require "prompt_objects/ui/models/env_picker"
 
 # Parse command line arguments
 def parse_args
@@ -64,64 +62,15 @@ def print_help
   HELP
 end
 
-def run_first_time_setup(manager)
-  templates = PromptObjects::CLI.list_templates
-
-  wizard = PromptObjects::UI::Models::SetupWizard.new(
-    manager: manager,
-    templates: templates
-  )
-
-  # Don't use alt_screen - let the main app handle that
-  # Clear screen manually instead
-  print "\e[2J\e[H"  # Clear screen and move cursor to top
-  Bubbletea.run(wizard, alt_screen: false)
-
-  # Clear screen before main app takes over
-  print "\e[2J\e[H"
-
-  # Return the created environment name (or nil if cancelled)
-  wizard.done? ? wizard.env_name : nil
-end
-
-def run_env_picker(manager)
-  environments = manager.list_with_manifests
-
-  picker = PromptObjects::UI::Models::EnvPicker.new(
-    environments: environments
-  )
-
-  # Don't use alt_screen - let the main app handle that
-  print "\e[2J\e[H"  # Clear screen and move cursor to top
-  Bubbletea.run(picker, alt_screen: false)
-
-  # Clear screen before main app takes over
-  print "\e[2J\e[H"
-
-  if picker.cancelled?
-    nil
-  elsif picker.wants_new_env?
-    # User wants to create a new environment
-    run_first_time_setup(manager)
-  else
-    picker.selected_env
-  end
-end
-
 def main
   args = parse_args
   manager = PromptObjects::Env::Manager.new
   manager.setup!
 
-  # Determine which environment to use
-  env_path = nil
-  env_name = nil
-
+  # Determine how to run based on args
   if args[:dev_mode] || ENV["PROMPT_OBJECTS_DEV"]
-    # Development mode
-    env_path = manager.dev_environment_path
-    env_name = "_development"
-    puts "Development mode: #{env_path}"
+    # Development mode - skip picker, use dev environment
+    PromptObjects::UI::App.run(manager: manager, dev_mode: true)
   elsif args[:env_name]
     # Specific environment requested
     unless manager.environment_exists?(args[:env_name])
@@ -132,41 +81,24 @@ def main
       exit 1
     end
     env_path = manager.environment_path(args[:env_name])
-    env_name = args[:env_name]
-  elsif args[:legacy_args]&.any? && !manager.environment_exists?(args[:legacy_args].first)
-    # Legacy: treat argument as objects_dir
-    objects_dir = args[:legacy_args].first
-    if Dir.exist?(objects_dir)
-      # Run in legacy mode with objects_dir
-      run_legacy_mode(objects_dir, args)
-      return
+    PromptObjects::UI::App.run(env_path: env_path)
+  elsif args[:legacy_args]&.any?
+    # Legacy: treat argument as objects_dir or environment name
+    arg = args[:legacy_args].first
+    if manager.environment_exists?(arg)
+      env_path = manager.environment_path(arg)
+      PromptObjects::UI::App.run(env_path: env_path)
+    elsif Dir.exist?(arg)
+      # Legacy mode with objects_dir
+      run_legacy_mode(arg, args)
+    else
+      puts "Not found: '#{arg}' (neither environment nor directory)"
+      exit 1
     end
-    # Try as environment name
-    env_name = args[:legacy_args].first
-    if manager.environment_exists?(env_name)
-      env_path = manager.environment_path(env_name)
-    end
-  elsif manager.first_run?
-    # First run - no environments exist, show setup wizard
-    env_name = run_first_time_setup(manager)
-    unless env_name
-      puts "Setup cancelled."
-      exit 0
-    end
-    env_path = manager.environment_path(env_name)
   else
-    # Show environment picker (even if only one exists)
-    # User can select existing or create new with 'n'
-    env_name = run_env_picker(manager)
-    unless env_name
-      puts "Cancelled."
-      exit 0
-    end
-    env_path = manager.environment_path(env_name)
+    # Normal mode - let App handle picker/wizard flow
+    PromptObjects::UI::App.run(manager: manager)
   end
-
-  # Run TUI with environment
-  PromptObjects::UI::App.run(env_path: env_path)
 end
 
 def run_legacy_mode(objects_dir, args)
