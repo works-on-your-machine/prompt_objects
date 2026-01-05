@@ -1,10 +1,11 @@
 name: empty
-description: Start from scratch - no objects, full control
+description: Start from scratch with just a bootstrap assistant
 icon: "📦"
 color: "#9CA3AF"
 
-# No objects included
-objects: []
+# Minimal bootstrap object only
+objects:
+  - assistant
 
 # Suggested stdlib objects to add
 suggestions:

@@ -150,6 +150,7 @@ module PromptObjects
       end
 
       # Create the development environment (for --dev flag).
+      # Uses minimal template to ensure at least one PO exists for bootstrapping.
       # @return [String] Path to dev environment
       def create_dev_environment
         return environment_path(DEV_ENV_NAME) if environment_exists?(DEV_ENV_NAME)
@@ -158,6 +159,9 @@ module PromptObjects
         FileUtils.mkdir_p(env_path)
         FileUtils.mkdir_p(File.join(env_path, "objects"))
         FileUtils.mkdir_p(File.join(env_path, "primitives"))
+
+        # Copy minimal template objects for bootstrapping
+        copy_template(env_path, "minimal")
 
         manifest = Manifest.new(
           name: DEV_ENV_NAME,
