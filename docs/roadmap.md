@@ -67,15 +67,15 @@ See [phase-8-environments.md](./phase-8-environments.md)
 - 8.6: Dev mode (--dev flag) ✓
 - 8.7: Onboarding UI polish (non-blocking)
 
-### Phase 6: Multiple Sessions
+### Phase 6: Multiple Sessions ✓
 Named conversation sessions per PO (builds on Phase 8 storage).
 
 See [phase-6-sessions.md](./phase-6-sessions.md)
 
 **Features:**
-- Session picker modal (`S` key)
-- Session switching and management
-- Per-environment session storage
+- Session picker modal (`S` key) ✓
+- Session switching and management ✓
+- Per-environment session storage ✓
 
 ### Phase 5.4: Markdown Rendering
 Render LLM markdown output with proper formatting.

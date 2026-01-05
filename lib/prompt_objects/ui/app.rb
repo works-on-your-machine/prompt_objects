@@ -14,6 +14,7 @@ require_relative "models/notification_panel"
 require_relative "models/request_responder"
 require_relative "models/setup_wizard"
 require_relative "models/env_picker"
+require_relative "models/session_picker"
 
 module PromptObjects
   module UI
@@ -475,6 +476,15 @@ module PromptObjects
             @modal = { type: :editor, data: @editor }
           end
           [self, nil]
+        when char == "S"
+          # Open session picker
+          if @active_po && @env.session_store
+            @session_picker = Models::SessionPicker.new(po: @active_po, session_store: @env.session_store)
+            @session_picker.set_dimensions(@width, @height)
+            @session_picker.show
+            @modal = { type: :session_picker, data: @session_picker }
+          end
+          [self, nil]
         when msg.left? || char == "h"
           @capability_bar.prev
           select_current_po
@@ -494,6 +504,11 @@ module PromptObjects
         # Handle editor input mode specially
         if @modal && @modal[:type] == :editor && @editor&.input_mode?
           return handle_editor_input_mode(msg, char)
+        end
+
+        # Handle session picker specially
+        if @modal && @modal[:type] == :session_picker && @session_picker
+          return handle_session_picker_key(msg, char)
         end
 
         case
@@ -571,10 +586,77 @@ module PromptObjects
         end
       end
 
+      def handle_session_picker_key(msg, char)
+        # Handle input mode (rename/new)
+        if @session_picker.input_mode?
+          case
+          when msg.esc?
+            @session_picker.cancel_action
+          when msg.enter?
+            @session_picker.confirm_action
+            check_session_picker_done
+          when msg.backspace?
+            @session_picker.delete_char
+          when msg.space?
+            @session_picker.insert_char(" ")
+          when msg.runes? && !char.empty?
+            @session_picker.insert_char(char)
+          end
+          return [self, nil]
+        end
+
+        # Handle confirm delete mode
+        if @session_picker.confirm_mode?
+          case char
+          when "y", "Y"
+            @session_picker.confirm_action
+          when "n", "N"
+            @session_picker.cancel_action
+          end
+          return [self, nil]
+        end
+
+        # Normal navigation mode
+        case
+        when msg.esc?
+          close_modal
+        when char == "q"
+          close_modal
+        when char == "j" || msg.down?
+          @session_picker.move_down
+        when char == "k" || msg.up?
+          @session_picker.move_up
+        when msg.enter?
+          @session_picker.select_current
+          check_session_picker_done
+        when char == "n"
+          @session_picker.start_new_session
+        when char == "r"
+          @session_picker.start_rename
+        when char == "d"
+          @session_picker.start_delete
+        end
+
+        [self, nil]
+      end
+
+      def check_session_picker_done
+        return unless @session_picker&.done
+
+        session_id = @session_picker.selected_session_id
+        if session_id && @active_po
+          @active_po.switch_session(session_id)
+          @conversation.set_po(@active_po)
+        end
+
+        close_modal
+      end
+
       def close_modal
         @modal = nil
         @inspector = nil
         @editor = nil
+        @session_picker = nil
       end
 
       def handle_notification_key(msg, char)
@@ -778,6 +860,24 @@ module PromptObjects
         "#{title}#{env_info}"
       end
 
+      def conversation_title
+        return " Conversation " unless @active_po
+
+        # Get current session name
+        session_name = nil
+        if @env&.session_store && @active_po.instance_variable_get(:@session_id)
+          session_id = @active_po.instance_variable_get(:@session_id)
+          session = @env.session_store.get_session(session_id)
+          session_name = session[:name] if session && session[:name]
+        end
+
+        if session_name
+          " #{@active_po.name}: #{session_name} "
+        else
+          " #{@active_po.name} "
+        end
+      end
+
       def render_main_content(height)
         lines = []
 
@@ -790,7 +890,7 @@ module PromptObjects
           log_lines = @message_log.view_lines(log_width - 4, height - 2)
 
           # Draw conversation box
-          conv_title = @active_po ? " #{@active_po.name} " : " Conversation "
+          conv_title = conversation_title
           conv_top = Styles.panel_title.render("┌#{conv_title}#{'─' * (conv_width - conv_title.length - 2)}┐")
           log_top = " ┌─ Messages #{'─' * (log_width - 13)}┐"
 
@@ -817,7 +917,7 @@ module PromptObjects
           conv_width = @width - 2
           conv_lines = @conversation.view_lines(conv_width - 4, height - 2)
 
-          conv_title = @active_po ? " #{@active_po.name} " : " Conversation "
+          conv_title = conversation_title
           lines << Styles.panel_title.render("┌#{conv_title}#{'─' * (conv_width - conv_title.length - 2)}┐")
 
           (height - 2).times do |i|
@@ -852,6 +952,7 @@ module PromptObjects
           parts = [
             Styles.help_key.render("i") + " insert",
             Styles.help_key.render("h/l") + " switch PO",
+            Styles.help_key.render("S") + " sessions",
             Styles.help_key.render(notif_label) + " notifications",
             Styles.help_key.render("I") + " inspect",
             Styles.help_key.render("q") + " quit"
@@ -876,6 +977,13 @@ module PromptObjects
         when :editor
           if @editor
             modal_view = @editor.view
+            center_modal(base, modal_view)
+          else
+            base
+          end
+        when :session_picker
+          if @session_picker
+            modal_view = @session_picker.view
             center_modal(base, modal_view)
           else
             base
