@@ -361,6 +361,19 @@ For existing users (us):
 - --dev flag implementation
 - Development environment isolation
 
+### Phase 8.7: Onboarding UI Polish (Non-Blocking)
+Visual refinements for picker/wizard screens. Does not block feature development.
+
+**Items to address:**
+- [ ] Center alignment consistency across screens
+- [ ] Box drawing alignment (visible length vs ANSI-escaped length)
+- [ ] Consistent spacing/padding
+- [ ] Template descriptions in picker
+- [ ] Visual feedback during environment creation
+- [ ] Error message styling
+- [ ] Loading states/spinners
+- [ ] Keyboard shortcut hints consistency
+
 ## File Changes
 
 ```

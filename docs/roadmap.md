@@ -59,12 +59,13 @@ See [phase-8-environments.md](./phase-8-environments.md)
 - Archive-first deletion
 
 **Sub-phases:**
-- 8.1: Core structure + git integration
-- 8.2: Templates + first-run wizard
+- 8.1: Core structure + git integration ✓
+- 8.2: Templates + first-run wizard ✓
 - 8.3: SQLite session storage
 - 8.4: Export/import bundles
 - 8.5: Archive + rich metadata
 - 8.6: Dev mode (--dev flag)
+- 8.7: Onboarding UI polish (non-blocking)
 
 ### Phase 6: Multiple Sessions
 Named conversation sessions per PO (builds on Phase 8 storage).
