@@ -4,7 +4,7 @@ module PromptObjects
   # A Prompt Object is a capability backed by an LLM.
   # It interprets messages semantically using its markdown "soul" as the system prompt.
   class PromptObject < Capability
-    attr_reader :config, :body, :history
+    attr_reader :config, :body, :history, :session_id
 
     # @param config [Hash] Parsed frontmatter (name, description, capabilities)
     # @param body [String] Markdown body (the "soul" - becomes system prompt)
@@ -17,6 +17,16 @@ module PromptObjects
       @env = env
       @llm = llm
       @history = []
+      @session_id = nil
+
+      # Load existing session if session store is available
+      load_or_create_session if session_store
+    end
+
+    # Get the session store from the environment.
+    # @return [Session::Store, nil]
+    def session_store
+      @env.session_store
     end
 
     def name
@@ -53,7 +63,9 @@ module PromptObjects
       sender = context.current_capability
       from = (sender && sender != name) ? sender : "human"
 
-      @history << { role: :user, content: content, from: from }
+      user_msg = { role: :user, content: content, from: from }
+      @history << user_msg
+      persist_message(user_msg)
       @state = :working
 
       # Conversation loop - keep going until LLM responds without tool calls
@@ -67,7 +79,7 @@ module PromptObjects
         if response.tool_calls?
           # Execute tools and continue the loop
           results = execute_tool_calls(response.tool_calls, context)
-          @history << {
+          assistant_msg = {
             role: :assistant,
             # Don't include content when there are tool calls - force LLM to
             # wait for tool results before generating a response. This prevents
@@ -75,14 +87,62 @@ module PromptObjects
             content: nil,
             tool_calls: response.tool_calls
           }
-          @history << { role: :tool, results: results }
+          @history << assistant_msg
+          persist_message(assistant_msg)
+
+          tool_msg = { role: :tool, results: results }
+          @history << tool_msg
+          persist_message(tool_msg)
         else
           # No tool calls - we have our final response
-          @history << { role: :assistant, content: response.content }
+          assistant_msg = { role: :assistant, content: response.content }
+          @history << assistant_msg
+          persist_message(assistant_msg)
           @state = :idle
           return response.content
         end
       end
+    end
+
+    # --- Session Management ---
+
+    # List all sessions for this PO.
+    # @return [Array<Hash>] Session data
+    def list_sessions
+      return [] unless session_store
+
+      session_store.list_sessions(po_name: name)
+    end
+
+    # Switch to a different session.
+    # @param session_id [String] Session ID to switch to
+    # @return [Boolean] True if switch was successful
+    def switch_session(session_id)
+      return false unless session_store
+
+      session = session_store.get_session(session_id)
+      return false unless session && session[:po_name] == name
+
+      @session_id = session_id
+      reload_history_from_session
+      true
+    end
+
+    # Create a new session and switch to it.
+    # @param name [String, nil] Optional session name
+    # @return [String] New session ID
+    def new_session(name: nil)
+      return nil unless session_store
+
+      @session_id = session_store.create_session(po_name: self.name, name: name)
+      @history = []
+      @session_id
+    end
+
+    # Clear the current session's history.
+    def clear_history
+      @history = []
+      session_store&.clear_messages(@session_id) if @session_id
     end
 
     private
@@ -159,6 +219,77 @@ module PromptObjects
         else
           { tool_call_id: tc.id, content: "Unknown capability: #{tc.name}" }
         end
+      end
+    end
+
+    # --- Session Persistence Helpers ---
+
+    # Load existing session or create a new one.
+    def load_or_create_session
+      session = session_store.get_or_create_session(po_name: name)
+      @session_id = session[:id]
+      reload_history_from_session
+    end
+
+    # Reload history from the current session.
+    def reload_history_from_session
+      return unless session_store && @session_id
+
+      messages = session_store.get_messages(@session_id)
+      @history = messages.map { |msg| convert_db_message_to_history(msg) }
+    end
+
+    # Persist a message to the session store.
+    def persist_message(msg)
+      return unless session_store && @session_id
+
+      case msg[:role]
+      when :user
+        session_store.add_message(
+          session_id: @session_id,
+          role: :user,
+          content: msg[:content],
+          from_po: msg[:from]
+        )
+      when :assistant
+        # Serialize tool_calls if present
+        tool_calls_data = msg[:tool_calls]&.map do |tc|
+          { id: tc.id, name: tc.name, arguments: tc.arguments }
+        end
+
+        session_store.add_message(
+          session_id: @session_id,
+          role: :assistant,
+          content: msg[:content],
+          tool_calls: tool_calls_data
+        )
+      when :tool
+        session_store.add_message(
+          session_id: @session_id,
+          role: :tool,
+          tool_results: msg[:results]
+        )
+      end
+    end
+
+    # Convert a database message row to history format.
+    def convert_db_message_to_history(db_msg)
+      case db_msg[:role]
+      when :user
+        { role: :user, content: db_msg[:content], from: db_msg[:from_po] || "human" }
+      when :assistant
+        msg = { role: :assistant, content: db_msg[:content] }
+        if db_msg[:tool_calls]
+          # Reconstruct tool call objects
+          msg[:tool_calls] = db_msg[:tool_calls].map do |tc|
+            LLM::ToolCall.new(id: tc[:id], name: tc[:name], arguments: tc[:arguments])
+          end
+        end
+        msg
+      when :tool
+        { role: :tool, results: db_msg[:tool_results] || [] }
+      else
+        { role: db_msg[:role], content: db_msg[:content] }
       end
     end
   end

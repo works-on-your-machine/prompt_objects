@@ -37,7 +37,7 @@ module PromptObjects
   # - A simple objects directory (legacy/development mode)
   class Runtime
     attr_reader :llm, :registry, :objects_dir, :bus, :primitives_dir, :human_queue,
-                :manifest, :env_path, :auto_commit
+                :manifest, :env_path, :auto_commit, :session_store
 
     # Initialize from an environment path (with manifest) or objects directory.
     # @param env_path [String, nil] Path to environment directory (preferred)
@@ -55,6 +55,10 @@ module PromptObjects
         @auto_commit = auto_commit.nil? ? true : auto_commit
         @manifest.touch_opened!
         @manifest.save_to_dir(env_path)
+
+        # Initialize session store
+        db_path = File.join(env_path, "sessions.db")
+        @session_store = Session::Store.new(db_path)
       else
         # Legacy objects_dir initialization
         @env_path = nil
@@ -62,6 +66,7 @@ module PromptObjects
         @primitives_dir = primitives_dir || File.join(File.dirname(@objects_dir), "primitives")
         @manifest = nil
         @auto_commit = auto_commit || false
+        @session_store = nil  # No persistent sessions in legacy mode
       end
 
       @llm = llm || LLM::OpenAIAdapter.new
@@ -117,8 +122,15 @@ module PromptObjects
     def update_manifest_stats!
       return unless @manifest
 
-      po_count = @registry.prompt_objects.size
-      @manifest.update_stats(po_count: po_count)
+      stats = { po_count: @registry.prompt_objects.size }
+
+      # Add session stats if available
+      if @session_store
+        stats[:total_sessions] = @session_store.total_sessions
+        stats[:total_messages] = @session_store.total_messages
+      end
+
+      @manifest.update_stats(**stats)
       @manifest.save_to_dir(@env_path)
     end
 

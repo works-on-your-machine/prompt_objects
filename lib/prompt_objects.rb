@@ -29,6 +29,9 @@ require_relative "prompt_objects/environment/manager"
 require_relative "prompt_objects/environment/git"
 require_relative "prompt_objects/environment"
 
+# Session storage
+require_relative "prompt_objects/session/store"
+
 # Built-in primitives
 require_relative "prompt_objects/primitives/read_file"
 require_relative "prompt_objects/primitives/list_files"

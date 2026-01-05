@@ -1,0 +1,5 @@
+# Session database (contains private conversation history)
+sessions.db
+sessions.db-journal
+sessions.db-wal
+sessions.db-shm
