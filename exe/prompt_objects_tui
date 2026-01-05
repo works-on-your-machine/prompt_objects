@@ -9,6 +9,7 @@ require "prompt_objects"
 require "prompt_objects/cli"
 require "prompt_objects/ui/app"
 require "prompt_objects/ui/models/setup_wizard"
+require "prompt_objects/ui/models/env_picker"
 
 # Parse command line arguments
 def parse_args
@@ -74,8 +75,31 @@ def run_first_time_setup(manager)
   # Run the wizard in alt screen mode
   Bubbletea.run(wizard, alt_screen: true)
 
+  # Small delay to let terminal state settle before starting main app
+  sleep 0.1
+
   # Return the created environment name (or nil if cancelled)
   wizard.done? ? wizard.env_name : nil
+end
+
+def run_env_picker(manager)
+  environments = manager.list_with_manifests
+
+  picker = PromptObjects::UI::Models::EnvPicker.new(
+    environments: environments
+  )
+
+  Bubbletea.run(picker, alt_screen: true)
+  sleep 0.1
+
+  if picker.cancelled?
+    nil
+  elsif picker.wants_new_env?
+    # User wants to create a new environment
+    run_first_time_setup(manager)
+  else
+    picker.selected_env
+  end
 end
 
 def main
@@ -117,7 +141,7 @@ def main
       env_path = manager.environment_path(env_name)
     end
   elsif manager.first_run?
-    # First run - guide user through TUI setup wizard
+    # First run - no environments exist, show setup wizard
     env_name = run_first_time_setup(manager)
     unless env_name
       puts "Setup cancelled."
@@ -125,12 +149,12 @@ def main
     end
     env_path = manager.environment_path(env_name)
   else
-    # Use default environment
-    env_name = manager.default_environment || manager.list.first
+    # Show environment picker (even if only one exists)
+    # User can select existing or create new with 'n'
+    env_name = run_env_picker(manager)
     unless env_name
-      puts "No environments found. Create one with:"
-      puts "  prompt_objects_tui env create <name>"
-      exit 1
+      puts "Cancelled."
+      exit 0
     end
     env_path = manager.environment_path(env_name)
   end
