@@ -3,12 +3,12 @@
 Gem::Specification.new do |spec|
   spec.name          = "prompt_objects"
   spec.version       = "0.1.0"
-  spec.authors       = ["Your Name"]
-  spec.email         = ["your@email.com"]
+  spec.authors       = ["Scott Werner"]
+  spec.email         = ["scott@sublayer.com"]
 
   spec.summary       = "LLM-backed entities as first-class autonomous objects"
   spec.description   = "A framework where markdown files with LLM-backed behavior act as first-class autonomous entities. Features a TUI interface, inter-object communication, and environment management."
-  spec.homepage      = "https://github.com/yourusername/prompt_objects"
+  spec.homepage      = "https://github.com/sublayerapp/prompt_objects"
   spec.license       = "MIT"
   spec.required_ruby_version = ">= 3.1.0"
 
