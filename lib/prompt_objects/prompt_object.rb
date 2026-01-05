@@ -59,7 +59,7 @@ module PromptObjects
       # Conversation loop - keep going until LLM responds without tool calls
       loop do
         response = @llm.chat(
-          system: @body,
+          system: build_system_prompt,
           messages: @history,
           tools: available_tool_descriptors
         )
@@ -109,6 +109,24 @@ module PromptObjects
         cap = @env.registry&.get(cap_name)
         cap&.descriptor
       end
+    end
+
+    def build_system_prompt
+      # Build context about this PO's identity
+      declared_caps = @config["capabilities"] || []
+      all_caps = declared_caps + UNIVERSAL_CAPABILITIES
+
+      context_block = <<~CONTEXT
+        ## System Context
+
+        You are a prompt object named "#{name}".
+        When using tools that target a PO (like add_capability), you can use "self" or "#{name}" to target yourself.
+
+        Your declared capabilities: #{declared_caps.empty? ? '(none)' : declared_caps.join(', ')}
+        Universal capabilities (always available): #{UNIVERSAL_CAPABILITIES.join(', ')}
+      CONTEXT
+
+      "#{@body}\n\n#{context_block}"
     end
 
     def execute_tool_calls(tool_calls, context)
