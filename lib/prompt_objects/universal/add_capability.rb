@@ -34,8 +34,8 @@ module PromptObjects
         target = message[:target] || message["target"]
         capability = message[:capability] || message["capability"]
 
-        # Resolve 'self' to current capability
-        target = context.current_capability if target == "self"
+        # Resolve 'self' to the calling PO (not current_capability which is this tool)
+        target = context.calling_po if target == "self"
 
         # Find the target PO
         target_po = context.env.registry.get(target)

@@ -5,13 +5,14 @@ module PromptObjects
   # Provides access to environment, message bus, and tracks execution.
   class Context
     attr_reader :env, :bus, :human_queue
-    attr_accessor :current_capability, :tui_mode
+    attr_accessor :current_capability, :calling_po, :tui_mode
 
     def initialize(env:, bus:, human_queue: nil)
       @env = env
       @bus = bus
       @human_queue = human_queue
       @current_capability = nil
+      @calling_po = nil  # The PO that initiated the tool call (for resolving "self")
       @tui_mode = false
     end
 

@@ -132,6 +132,7 @@ module PromptObjects
     def execute_tool_calls(tool_calls, context)
       # Track the caller for nested calls
       previous_capability = context.current_capability
+      previous_calling_po = context.calling_po
 
       tool_calls.map do |tc|
         capability = @env.registry&.get(tc.name)
@@ -140,13 +141,16 @@ module PromptObjects
           # Log the outgoing message
           @env.bus.publish(from: name, to: tc.name, message: tc.arguments)
 
-          # Set context for nested calls
+          # Set context for the tool call
+          # calling_po tracks which PO is making the call (for "self" resolution)
+          context.calling_po = name
           context.current_capability = tc.name
 
           result = capability.receive(tc.arguments, context: context)
 
           # Restore context
           context.current_capability = previous_capability
+          context.calling_po = previous_calling_po
 
           # Log the response
           @env.bus.publish(from: tc.name, to: name, message: result)

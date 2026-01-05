@@ -98,7 +98,7 @@ module PromptObjects
       # Add the newly created capability to the PO that created it
       # Returns a message if added, nil otherwise
       def add_to_creator(cap_name, context)
-        creator_name = context.current_capability
+        creator_name = context.calling_po
         return nil unless creator_name
 
         creator_po = context.env.registry.get(creator_name)
