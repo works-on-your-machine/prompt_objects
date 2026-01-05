@@ -1,8 +1,7 @@
 ---
 name: assistant
-description: A helpful assistant that can create new capabilities
+description: A helpful assistant that can read files and create specialists
 capabilities:
-  - create_capability
   - list_files
   - read_file
 ---

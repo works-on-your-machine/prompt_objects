@@ -10,7 +10,7 @@ module PromptObjects
   class Error < StandardError; end
 
   # Universal capabilities available to all prompt objects (don't need to be declared)
-  UNIVERSAL_CAPABILITIES = %w[ask_human think add_capability list_capabilities].freeze
+  UNIVERSAL_CAPABILITIES = %w[ask_human think create_capability add_capability list_capabilities].freeze
 end
 
 require_relative "prompt_objects/capability"
