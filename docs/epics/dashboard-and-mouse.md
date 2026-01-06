@@ -1,10 +1,10 @@
-# Phase 5.5-5.6: Mouse Support & Dashboard Grid View
+# Dashboard & Mouse Support
 
 ## Overview
 
-Extended TUI features building on the core Phase 5 implementation:
-- **Phase 5.5**: Mouse support foundation
-- **Phase 5.6**: Dashboard grid view with PO cards
+Extended TUI features:
+- **Mouse Support**: Click-to-select, scroll wheel, hover states
+- **Dashboard View**: Grid layout with PO cards, search/filter
 
 ---
 

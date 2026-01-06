@@ -1,4 +1,4 @@
-# Phase 5.4: Markdown Rendering for PO Output
+# Markdown Rendering
 
 ## Problem
 

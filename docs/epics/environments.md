@@ -1,4 +1,4 @@
-# Phase 8: Environments (Images)
+# Environments
 
 ## Overview
 

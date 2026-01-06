@@ -1,4 +1,4 @@
-# Phase 7: MCP Server for External Clients
+# MCP Server
 
 ## Overview
 

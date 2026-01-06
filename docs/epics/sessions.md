@@ -1,4 +1,4 @@
-# Phase 6: Multiple Named Sessions
+# Multiple Named Sessions
 
 ## Overview
 
