@@ -82,11 +82,12 @@ Visual refinements for picker/wizard screens. Non-blocking.
 
 ## Ready
 
-### Charm-Native Migration
-Replace FFI-based Charm gems with native CGO extensions for stability.
-- Migrate from bubbletea/lipgloss/glamour to charm-native
-- Single unified library
-- Better FFI stability
+### Charm-Native (Upstream Fix)
+Track upstream fix for FFI stability in Charm gems.
+- Root cause: Multiple Go runtimes conflict
+- Solution: charm-native consolidates Go code
+- **Status**: Wait for Marco's gems to integrate it
+- No code changes needed on our side when it lands
 - See: [epics/charm-native-migration.md](epics/charm-native-migration.md)
 
 ### Primitive Management

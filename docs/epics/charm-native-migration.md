@@ -2,14 +2,41 @@
 
 ## Overview
 
-Migrate from Marco Roth's FFI-based Charm Ruby gems (bubbletea, lipgloss, bubbles, glamour) to esmarkowski's charm-native gem, which uses native CGO extensions for better stability.
+Track the upstream fix for FFI stability issues in Marco Roth's Charm Ruby gems. The root cause is multiple Go runtimes conflicting when separate gems are loaded. The solution (charm-native) consolidates all Go code into a single native extension.
 
-## Motivation
+## Status: WAIT FOR UPSTREAM
 
-- **FFI Stability Issues**: Current gems have intermittent FFI-related crashes
-- **Native Performance**: CGO extensions are more reliable than FFI bridges
-- **Unified Library**: Single gem instead of multiple separate gems
-- **Active Development**: charm-native is actively maintained
+**Recommendation:** Wait for Marco's gems to integrate charm-native internally. This gives us the fix with zero code changes on our side.
+
+## The Problem
+
+- **Root Cause**: Multiple Go runtimes conflict when loading bubbletea + lipgloss + glamour
+- **Error**: `runtime: g 17: unexpected return pc for _cgoexp_...`
+- **Discussion**: https://github.com/marcoroth/bubbletea-ruby/issues/1
+
+## The Solution (charm-native)
+
+esmarkowski created charm-native as a proof-of-concept:
+- Consolidates all Charm Go extensions into single native library
+- Gems would depend on charm-native instead of bundling their own Go code
+- Ruby API stays the same - only the native layer changes
+
+## Why Wait vs Migrate Now
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| **Wait for upstream** | No code changes, automatic fix | Dependent on Marco's timeline |
+| **Use charm-native directly** | Fix now | Low-level API only, need to reimplement Ruby layer |
+| **Fork & integrate ourselves** | Control timeline | Maintenance burden |
+
+**Verdict**: charm-native provides low-level Go bindings, not the high-level Ruby API (Model, Runner, Commands). We'd have to reimplement all of that ourselves. Not worth it when the upstream fix is in progress.
+
+## Workaround (Current)
+
+The FFI issues are intermittent. Current mitigations:
+- Restart app if crash occurs
+- The crashes seem less frequent in recent gem versions
+- Single Bubble Tea program architecture helps (we already do this)
 
 ## Current Dependencies
 
