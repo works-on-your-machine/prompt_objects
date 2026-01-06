@@ -82,12 +82,12 @@ Visual refinements for picker/wizard screens. Non-blocking.
 
 ## Ready
 
-### Charm-Native (Upstream Fix)
-Track upstream fix for FFI stability in Charm gems.
+### Charm-Native (FFI Stability Fix)
+Fix FFI crashes by using consolidated native extension.
 - Root cause: Multiple Go runtimes conflict
-- Solution: charm-native consolidates Go code
-- **Status**: Wait for Marco's gems to integrate it
-- No code changes needed on our side when it lands
+- Solution: Spencer's forked gems using charm-native
+- **Status**: Waiting for Spencer to share his forks
+- Minimal code changes expected (just Gemfile)
 - See: [epics/charm-native-migration.md](epics/charm-native-migration.md)
 
 ### Primitive Management

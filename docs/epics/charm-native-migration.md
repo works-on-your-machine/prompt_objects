@@ -4,9 +4,15 @@
 
 Track the upstream fix for FFI stability issues in Marco Roth's Charm Ruby gems. The root cause is multiple Go runtimes conflicting when separate gems are loaded. The solution (charm-native) consolidates all Go code into a single native extension.
 
-## Status: WAIT FOR UPSTREAM
+## Status: PENDING SPENCER'S FORKS
 
-**Recommendation:** Wait for Marco's gems to integrate charm-native internally. This gives us the fix with zero code changes on our side.
+**Plan:** Use Spencer (esmarkowski)'s forked gems that integrate charm-native. He has working demos with all gems consolidated.
+
+**Next steps:**
+1. Get Spencer's forked gem repos (asked in GitHub comments)
+2. Update Gemfile to point to his forks
+3. Test our TUI with the new gems
+4. Switch back to Marco's official gems when he integrates charm-native
 
 ## The Problem
 
