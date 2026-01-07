@@ -122,6 +122,24 @@ Grid view and mouse interaction.
 - Search/filter POs
 - See: [epics/dashboard-and-mouse.md](epics/dashboard-and-mouse.md)
 
+### Session Management (Enhanced)
+Environment-wide session exploration beyond per-PO picker.
+- Session explorer modal (all POs, all sessions)
+- Session source tracking (tui, mcp, api, web)
+- Full-text search across sessions
+- Export/import sessions (JSON, Markdown)
+- Session commands (/session new, /session export)
+- See: [epics/session-management.md](epics/session-management.md)
+
+### Connectors: Multi-Interface Runtime
+Run environments as MCP servers, APIs, web UIs, and more.
+- `prompt_objects serve --mcp <env>` for Claude Desktop
+- `prompt_objects serve --api <env>` for REST API
+- Web UI for end-user friendly interface
+- All interfaces share same sessions and state
+- Future: Slack, Discord, email, webhooks
+- See: [epics/connectors.md](epics/connectors.md)
+
 ---
 
 ## Backlog
@@ -195,3 +213,5 @@ Speech interaction.
 | Environment Data | [epics/environment-data.md](epics/environment-data.md) | Ready |
 | Markdown Rendering | [epics/markdown-rendering.md](epics/markdown-rendering.md) | Ready |
 | Dashboard & Mouse | [epics/dashboard-and-mouse.md](epics/dashboard-and-mouse.md) | Ready |
+| Session Management | [epics/session-management.md](epics/session-management.md) | Ready |
+| Connectors | [epics/connectors.md](epics/connectors.md) | Ready |
