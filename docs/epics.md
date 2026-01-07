@@ -66,6 +66,16 @@ Multiple named conversation sessions per PO.
 - Session name in panel title
 - See: [epics/sessions.md](epics/sessions.md)
 
+### Primitive Management
+Enable POs to create and request their own primitives.
+- `list_primitives`: List stdlib/custom/active primitives
+- `add_primitive`: Add stdlib primitives to PO
+- `create_primitive`: Write new Ruby code as primitive
+- `verify_primitive`: Test primitives with sample inputs
+- `modify_primitive`: Update existing primitive code
+- `request_primitive`: Ask human to create/approve primitives
+- See: [epics/primitive-management.md](epics/primitive-management.md)
+
 ---
 
 ## In Progress
@@ -89,14 +99,6 @@ Fix FFI crashes by using consolidated native extension.
 - **Status**: Waiting for Spencer to share his forks
 - Minimal code changes expected (just Gemfile)
 - See: [epics/charm-native-migration.md](epics/charm-native-migration.md)
-
-### Primitive Management
-Enable POs to create and request their own primitives.
-- `add_primitive`: Add stdlib primitives to PO
-- `create_primitive`: Write new Ruby code as primitive
-- `request_primitive`: Ask human to create/approve primitives
-- Human approval workflow (approve/suggest as PO/reject)
-- See: [epics/primitive-management.md](epics/primitive-management.md)
 
 ### Environment Data (Stigmergy)
 Shared data space for loose-coupled PO coordination.
@@ -189,7 +191,7 @@ Speech interaction.
 | MCP Server | [epics/mcp-server.md](epics/mcp-server.md) | Done |
 | MCP Tools Reference | [epics/mcp-tools.md](epics/mcp-tools.md) | Done |
 | Charm-Native Migration | [epics/charm-native-migration.md](epics/charm-native-migration.md) | Ready |
-| Primitive Management | [epics/primitive-management.md](epics/primitive-management.md) | Ready |
+| Primitive Management | [epics/primitive-management.md](epics/primitive-management.md) | Done |
 | Environment Data | [epics/environment-data.md](epics/environment-data.md) | Ready |
 | Markdown Rendering | [epics/markdown-rendering.md](epics/markdown-rendering.md) | Ready |
 | Dashboard & Mouse | [epics/dashboard-and-mouse.md](epics/dashboard-and-mouse.md) | Ready |

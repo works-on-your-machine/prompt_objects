@@ -21,6 +21,8 @@ These would be available to all POs (like `ask_human`, `think`):
 |------------|-------------|
 | `add_primitive` | Add an existing stdlib primitive to this PO |
 | `create_primitive` | Write new Ruby code as a primitive for this PO |
+| `modify_primitive` | Update/fix an existing primitive's code |
+| `verify_primitive` | Test a primitive with sample inputs before using |
 | `request_primitive` | Ask human to create/approve a primitive |
 | `list_primitives` | List available and active primitives |
 
@@ -136,6 +138,64 @@ request_primitive(
 - Shows in notification panel like `ask_human` requests
 - Special UI for reviewing/editing code
 - Option to run in sandbox before approving
+
+### modify_primitive
+
+Update or fix an existing primitive's code.
+
+```ruby
+# PO calls:
+modify_primitive(
+  name: "parse_json",
+  code: <<~RUBY
+    def call(json_string:, symbolize: true)
+      JSON.parse(json_string, symbolize_names: symbolize)
+    rescue JSON::ParserError => e
+      { error: e.message, input: json_string[0..100] }
+    end
+  RUBY,
+  reason: "Added symbolize option and better error reporting"
+)
+```
+
+**Behavior:**
+- Updates the primitive file in `environment/primitives/`
+- Keeps history of changes (git commit)
+- Re-runs verification if tests exist
+- Human notification for untrusted primitives
+
+### verify_primitive
+
+Test a primitive with sample inputs before using it in real tasks.
+
+```ruby
+# PO calls:
+verify_primitive(
+  name: "parse_json",
+  tests: [
+    { input: { json_string: '{"a": 1}' }, expected: { a: 1 } },
+    { input: { json_string: 'invalid' }, expected_error: true },
+    { input: { json_string: '[]' }, expected: [] }
+  ]
+)
+
+# Returns:
+{
+  passed: 2,
+  failed: 1,
+  results: [
+    { input: {...}, output: {...}, passed: true },
+    { input: {...}, output: {...}, passed: true },
+    { input: {...}, error: "...", passed: false, expected_error: true }
+  ]
+}
+```
+
+**Use cases:**
+- PO tests primitive before relying on it
+- Verify after `create_primitive` or `modify_primitive`
+- Human can request verification before trusting
+- Can be run in sandbox even for trusted primitives
 
 ### list_primitives
 

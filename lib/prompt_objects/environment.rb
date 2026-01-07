@@ -221,6 +221,12 @@ module PromptObjects
       @registry.register(Universal::CreateCapability.new)
       @registry.register(Universal::AddCapability.new)
       @registry.register(Universal::ListCapabilities.new)
+      @registry.register(Universal::ListPrimitives.new)
+      @registry.register(Universal::AddPrimitive.new)
+      @registry.register(Universal::CreatePrimitive.new)
+      @registry.register(Universal::VerifyPrimitive.new)
+      @registry.register(Universal::ModifyPrimitive.new)
+      @registry.register(Universal::RequestPrimitive.new)
     end
   end
 
