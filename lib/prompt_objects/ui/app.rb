@@ -15,6 +15,7 @@ require_relative "models/request_responder"
 require_relative "models/setup_wizard"
 require_relative "models/env_picker"
 require_relative "models/session_picker"
+require_relative "models/session_explorer"
 
 module PromptObjects
   module UI
@@ -477,12 +478,21 @@ module PromptObjects
           end
           [self, nil]
         when char == "S"
-          # Open session picker
+          # Open session picker (per-PO)
           if @active_po && @env.session_store
             @session_picker = Models::SessionPicker.new(po: @active_po, session_store: @env.session_store)
             @session_picker.set_dimensions(@width, @height)
             @session_picker.show
             @modal = { type: :session_picker, data: @session_picker }
+          end
+          [self, nil]
+        when char == "E"
+          # Open session explorer (all sessions across all POs)
+          if @env.session_store
+            @session_explorer = Models::SessionExplorer.new(session_store: @env.session_store)
+            @session_explorer.set_dimensions(@width, @height)
+            @session_explorer.show
+            @modal = { type: :session_explorer, data: @session_explorer }
           end
           [self, nil]
         when msg.left? || char == "h"
@@ -509,6 +519,11 @@ module PromptObjects
         # Handle session picker specially
         if @modal && @modal[:type] == :session_picker && @session_picker
           return handle_session_picker_key(msg, char)
+        end
+
+        # Handle session explorer specially
+        if @modal && @modal[:type] == :session_explorer && @session_explorer
+          return handle_session_explorer_key(msg, char)
         end
 
         case
@@ -652,11 +667,107 @@ module PromptObjects
         close_modal
       end
 
+      def handle_session_explorer_key(msg, char)
+        # Clear export result on any key
+        @session_explorer.clear_export_result if @session_explorer.has_export_result?
+
+        # Handle search mode
+        if @session_explorer.search_mode?
+          case
+          when msg.esc?
+            @session_explorer.cancel_search
+          when msg.enter?
+            @session_explorer.confirm_search
+          when msg.backspace?
+            @session_explorer.delete_char
+          when msg.space?
+            @session_explorer.insert_char(" ")
+          when msg.runes? && !char.empty?
+            @session_explorer.insert_char(char)
+          end
+          return [self, nil]
+        end
+
+        # Handle confirm delete mode
+        if @session_explorer.confirm_mode?
+          case char
+          when "y", "Y"
+            @session_explorer.confirm_delete
+          when "n", "N"
+            @session_explorer.cancel_delete
+          end
+          return [self, nil]
+        end
+
+        # Handle export mode
+        if @session_explorer.export_mode?
+          case char
+          when "j", "J"
+            @session_explorer.export_json
+          when "m", "M"
+            @session_explorer.export_markdown
+          end
+          if msg.esc?
+            @session_explorer.cancel_export
+          end
+          return [self, nil]
+        end
+
+        # Normal navigation mode
+        case
+        when msg.esc?
+          if @session_explorer.search_query && !@session_explorer.search_query.empty?
+            @session_explorer.clear_search
+          else
+            close_modal
+          end
+        when char == "q"
+          close_modal
+        when char == "j" || msg.down?
+          @session_explorer.move_down
+        when char == "k" || msg.up?
+          @session_explorer.move_up
+        when msg.tab?
+          @session_explorer.cycle_filter
+        when char == "/"
+          @session_explorer.start_search
+        when char == "x"
+          @session_explorer.start_export
+        when char == "d"
+          @session_explorer.start_delete
+        when msg.enter?
+          @session_explorer.select_current
+          check_session_explorer_done
+        end
+
+        [self, nil]
+      end
+
+      def check_session_explorer_done
+        return unless @session_explorer&.done
+
+        session = @session_explorer.selected_session
+        if session
+          # Find the PO for this session
+          po = @env.registry.get(session[:po_name])
+          if po.is_a?(PromptObject)
+            @active_po = po
+            @capability_bar.select(po.name)
+            @active_po.switch_session(session[:id])
+            @conversation.set_po(@active_po)
+            @context.current_capability = po.name
+          end
+        end
+
+        close_modal
+      end
+
       def close_modal
         @modal = nil
         @inspector = nil
         @editor = nil
         @session_picker = nil
+        @session_explorer = nil
       end
 
       def handle_notification_key(msg, char)
@@ -953,6 +1064,7 @@ module PromptObjects
             Styles.help_key.render("i") + " insert",
             Styles.help_key.render("h/l") + " switch PO",
             Styles.help_key.render("S") + " sessions",
+            Styles.help_key.render("E") + " explorer",
             Styles.help_key.render(notif_label) + " notifications",
             Styles.help_key.render("I") + " inspect",
             Styles.help_key.render("q") + " quit"
@@ -984,6 +1096,13 @@ module PromptObjects
         when :session_picker
           if @session_picker
             modal_view = @session_picker.view
+            center_modal(base, modal_view)
+          else
+            base
+          end
+        when :session_explorer
+          if @session_explorer
+            modal_view = @session_explorer.view
             center_modal(base, modal_view)
           else
             base

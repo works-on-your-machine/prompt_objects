@@ -9,7 +9,10 @@ module PromptObjects
     # SQLite-based session storage for conversation history.
     # Each environment has its own sessions.db file (gitignored for privacy).
     class Store
-      SCHEMA_VERSION = 1
+      SCHEMA_VERSION = 2
+
+      # Valid source values for session tracking
+      SOURCES = %w[tui mcp api web cli].freeze
 
       # @param db_path [String] Path to the SQLite database file
       def initialize(db_path)
@@ -29,15 +32,17 @@ module PromptObjects
       # Create a new session for a PO.
       # @param po_name [String] Name of the prompt object
       # @param name [String, nil] Optional session name
+      # @param source [String] Source interface (tui, mcp, api, web, cli)
+      # @param source_client [String, nil] Client identifier (e.g., "claude-desktop", "cursor")
       # @param metadata [Hash] Optional metadata
       # @return [String] Session ID
-      def create_session(po_name:, name: nil, metadata: {})
+      def create_session(po_name:, name: nil, source: "tui", source_client: nil, metadata: {})
         id = SecureRandom.uuid
         now = Time.now.utc.iso8601
 
-        @db.execute(<<~SQL, [id, po_name, name, now, now, metadata.to_json])
-          INSERT INTO sessions (id, po_name, name, created_at, updated_at, metadata)
-          VALUES (?, ?, ?, ?, ?, ?)
+        @db.execute(<<~SQL, [id, po_name, name, source, source_client, source, now, now, metadata.to_json])
+          INSERT INTO sessions (id, po_name, name, source, source_client, last_message_source, created_at, updated_at, metadata)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         SQL
 
         id
@@ -55,12 +60,14 @@ module PromptObjects
 
       # Get the most recent session for a PO, or create one if none exists.
       # @param po_name [String] Name of the prompt object
+      # @param source [String] Source interface for new session
+      # @param source_client [String, nil] Client identifier for new session
       # @return [Hash] Session data
-      def get_or_create_session(po_name:)
+      def get_or_create_session(po_name:, source: "tui", source_client: nil)
         session = get_latest_session(po_name: po_name)
         return session if session
 
-        id = create_session(po_name: po_name)
+        id = create_session(po_name: po_name, source: source, source_client: source_client)
         get_session(id)
       end
 
@@ -91,6 +98,34 @@ module PromptObjects
         SQL
 
         rows.map { |row| parse_session_row(row) }
+      end
+
+      # List all sessions across all POs.
+      # @param source [String, nil] Filter by source interface
+      # @param limit [Integer, nil] Maximum number of sessions
+      # @return [Array<Hash>] Session data with message counts
+      def list_all_sessions(source: nil, limit: nil)
+        sql = <<~SQL
+          SELECT s.*, COUNT(m.id) as message_count
+          FROM sessions s
+          LEFT JOIN messages m ON m.session_id = s.id
+        SQL
+
+        params = []
+        if source
+          sql += " WHERE s.source = ?"
+          params << source
+        end
+
+        sql += " GROUP BY s.id ORDER BY s.updated_at DESC"
+
+        if limit
+          sql += " LIMIT ?"
+          params << limit
+        end
+
+        rows = @db.execute(sql, params)
+        rows.map { |row| parse_session_row(row, include_count: true) }
       end
 
       # Update a session's metadata.
@@ -136,8 +171,9 @@ module PromptObjects
       # @param from_po [String, nil] Source PO for delegation tracking
       # @param tool_calls [Array, nil] Tool calls data
       # @param tool_results [Array, nil] Tool results data
+      # @param source [String, nil] Source interface that added this message
       # @return [Integer] Message ID
-      def add_message(session_id:, role:, content: nil, from_po: nil, tool_calls: nil, tool_results: nil)
+      def add_message(session_id:, role:, content: nil, from_po: nil, tool_calls: nil, tool_results: nil, source: nil)
         now = Time.now.utc.iso8601
 
         params = [
@@ -155,8 +191,12 @@ module PromptObjects
           VALUES (?, ?, ?, ?, ?, ?, ?)
         SQL
 
-        # Update session's updated_at
-        @db.execute("UPDATE sessions SET updated_at = ? WHERE id = ?", [now, session_id])
+        # Update session's updated_at and optionally last_message_source
+        if source
+          @db.execute("UPDATE sessions SET updated_at = ?, last_message_source = ? WHERE id = ?", [now, source, session_id])
+        else
+          @db.execute("UPDATE sessions SET updated_at = ? WHERE id = ?", [now, session_id])
+        end
 
         @db.last_insert_row_id
       end
@@ -205,6 +245,160 @@ module PromptObjects
         row["count"]
       end
 
+      # --- Export ---
+
+      # Export a session to JSON format.
+      # @param session_id [String] Session ID
+      # @return [Hash] Session data with messages
+      def export_session_json(session_id)
+        session = get_session(session_id)
+        return nil unless session
+
+        messages = get_messages(session_id)
+
+        {
+          id: session[:id],
+          po_name: session[:po_name],
+          name: session[:name],
+          source: session[:source],
+          source_client: session[:source_client],
+          created_at: session[:created_at]&.iso8601,
+          updated_at: session[:updated_at]&.iso8601,
+          metadata: session[:metadata],
+          messages: messages.map do |m|
+            {
+              role: m[:role].to_s,
+              content: m[:content],
+              from_po: m[:from_po],
+              tool_calls: m[:tool_calls],
+              tool_results: m[:tool_results],
+              created_at: m[:created_at]&.iso8601
+            }
+          end
+        }
+      end
+
+      # Export a session to Markdown format.
+      # @param session_id [String] Session ID
+      # @return [String] Markdown content
+      def export_session_markdown(session_id)
+        session = get_session(session_id)
+        return nil unless session
+
+        messages = get_messages(session_id)
+
+        lines = []
+        lines << "# Session: #{session[:name] || 'Unnamed'}"
+        lines << ""
+        lines << "- **PO**: #{session[:po_name]}"
+        lines << "- **Source**: #{session[:source]}"
+        lines << "- **Created**: #{session[:created_at]&.strftime('%Y-%m-%d %H:%M')}"
+        lines << "- **Updated**: #{session[:updated_at]&.strftime('%Y-%m-%d %H:%M')}"
+        lines << "- **Messages**: #{messages.length}"
+        lines << ""
+        lines << "---"
+        lines << ""
+
+        messages.each do |m|
+          timestamp = m[:created_at]&.strftime('%H:%M')
+          role_label = case m[:role].to_s
+                       when "user" then "**User**"
+                       when "assistant" then "**#{m[:from_po] || session[:po_name]}**"
+                       when "tool" then "*Tool*"
+                       else "**#{m[:role]}**"
+                       end
+
+          lines << "#{role_label} (#{timestamp}):"
+          lines << ""
+
+          if m[:content]
+            lines << m[:content]
+            lines << ""
+          end
+
+          if m[:tool_calls]
+            lines << "<details><summary>Tool calls</summary>"
+            lines << ""
+            lines << "```json"
+            lines << JSON.pretty_generate(m[:tool_calls])
+            lines << "```"
+            lines << "</details>"
+            lines << ""
+          end
+
+          if m[:tool_results]
+            lines << "<details><summary>Tool results</summary>"
+            lines << ""
+            lines << "```json"
+            lines << JSON.pretty_generate(m[:tool_results])
+            lines << "```"
+            lines << "</details>"
+            lines << ""
+          end
+
+          lines << "---"
+          lines << ""
+        end
+
+        lines.join("\n")
+      end
+
+      # Export all sessions for a PO.
+      # @param po_name [String] PO name
+      # @param format [Symbol] :json or :markdown
+      # @return [String] Exported content
+      def export_all_sessions(po_name:, format: :json)
+        sessions = list_sessions(po_name: po_name)
+
+        case format
+        when :json
+          exported = sessions.map { |s| export_session_json(s[:id]) }
+          JSON.pretty_generate(exported)
+        when :markdown
+          sessions.map { |s| export_session_markdown(s[:id]) }.join("\n\n")
+        else
+          raise ArgumentError, "Unknown format: #{format}"
+        end
+      end
+
+      # --- Import ---
+
+      # Import a session from JSON data.
+      # @param data [Hash] Session data (as returned by export_session_json)
+      # @param po_name [String, nil] Override PO name
+      # @return [String] New session ID
+      def import_session(data, po_name: nil)
+        data = data.transform_keys(&:to_sym) if data.is_a?(Hash)
+
+        # Create new session with new ID
+        new_id = create_session(
+          po_name: po_name || data[:po_name],
+          name: "#{data[:name]} (imported)",
+          source: "tui",
+          metadata: (data[:metadata] || {}).merge(
+            imported_from: data[:id],
+            imported_at: Time.now.utc.iso8601,
+            original_source: data[:source]
+          )
+        )
+
+        # Import messages
+        messages = data[:messages] || []
+        messages.each do |m|
+          m = m.transform_keys(&:to_sym) if m.is_a?(Hash)
+          add_message(
+            session_id: new_id,
+            role: m[:role],
+            content: m[:content],
+            from_po: m[:from_po],
+            tool_calls: m[:tool_calls],
+            tool_results: m[:tool_results]
+          )
+        end
+
+        new_id
+      end
+
       private
 
       def setup_schema
@@ -234,6 +428,9 @@ module PromptObjects
             id TEXT PRIMARY KEY,
             po_name TEXT NOT NULL,
             name TEXT,
+            source TEXT DEFAULT 'tui',
+            source_client TEXT,
+            last_message_source TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             metadata TEXT DEFAULT '{}'
@@ -241,6 +438,7 @@ module PromptObjects
 
           CREATE INDEX IF NOT EXISTS idx_sessions_po_name ON sessions(po_name);
           CREATE INDEX IF NOT EXISTS idx_sessions_updated_at ON sessions(updated_at);
+          CREATE INDEX IF NOT EXISTS idx_sessions_source ON sessions(source);
 
           CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -258,21 +456,31 @@ module PromptObjects
       end
 
       def migrate_schema(from_version)
-        # Future migrations go here
-        # if from_version < 2
-        #   # Migration to version 2
-        # end
+        if from_version < 2
+          # Add source tracking columns
+          @db.execute_batch(<<~SQL)
+            ALTER TABLE sessions ADD COLUMN source TEXT DEFAULT 'tui';
+            ALTER TABLE sessions ADD COLUMN source_client TEXT;
+            ALTER TABLE sessions ADD COLUMN last_message_source TEXT;
+            CREATE INDEX IF NOT EXISTS idx_sessions_source ON sessions(source);
+          SQL
+        end
       end
 
-      def parse_session_row(row)
-        {
+      def parse_session_row(row, include_count: false)
+        result = {
           id: row["id"],
           po_name: row["po_name"],
           name: row["name"],
+          source: row["source"] || "tui",
+          source_client: row["source_client"],
+          last_message_source: row["last_message_source"],
           created_at: row["created_at"] ? Time.parse(row["created_at"]) : nil,
           updated_at: row["updated_at"] ? Time.parse(row["updated_at"]) : nil,
           metadata: row["metadata"] ? JSON.parse(row["metadata"], symbolize_names: true) : {}
         }
+        result[:message_count] = row["message_count"] if include_count && row["message_count"]
+        result
       end
 
       def parse_message_row(row)
