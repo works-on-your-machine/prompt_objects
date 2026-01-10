@@ -18,7 +18,9 @@ See **[epics.md](epics.md)** for detailed feature tracking and priorities.
 - **TUI**: Done (foundation, notifications, sessions)
 - **Environments**: Done (git-backed, templates, export/import)
 - **MCP Server**: Done
-- **Next Up**: Markdown rendering, Dashboard/Mouse support
+- **Charm Native**: Done (stable TUI with single Go runtime)
+- **Markdown Rendering**: Done (via Glamour/charm-native)
+- **Next Up**: Dashboard UX Overhaul (mouse support, PO-centric view)
 
 ## File Structure
 

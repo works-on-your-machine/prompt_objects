@@ -1,8 +1,17 @@
 # Charm Gem Forks: Using charm-native
 
+## Status: Done ✓
+
+Completed January 2026. charm-native is integrated with Ruby shims in `vendor/charm_shim/`.
+
 ## Overview
 
-Fork Marco's Charm Ruby gems to use the consolidated `charm-native` extension instead of each gem building its own Go extension. This fixes the FFI crash caused by multiple Go runtimes in one process.
+~~Fork Marco's Charm Ruby gems to~~ Use the consolidated `charm-native` extension instead of each gem building its own Go extension. This fixes the FFI crash caused by multiple Go runtimes in one process.
+
+**Solution implemented:**
+- Built charm-native from esmarkowski/charm-native (Go archive + C extension)
+- Created Ruby shims for Bubbletea (Model, Runner, Messages, Commands), Lipgloss (Position, Border, Color), and Glamour (Style, StyleDefinition)
+- All Charm functionality works with single Go runtime - no more crashes
 
 ## The Problem
 
