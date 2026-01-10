@@ -72,6 +72,8 @@ GEM
     mcp (0.4.0)
       json-schema (>= 4.1)
       json_rpc_handler (~> 0.1)
+    minitest (6.0.1)
+      prism (~> 1.5)
     multipart-post (2.4.1)
     net-http (0.9.1)
       uri (>= 0.11.1)
@@ -89,6 +91,7 @@ GEM
     public_suffix (7.0.1)
     racc (1.8.1)
     rainbow (3.1.1)
+    rake (13.3.1)
     rdoc (7.0.3)
       erb
       psych (>= 4.0.0)
@@ -129,7 +132,9 @@ PLATFORMS
 DEPENDENCIES
   debug
   huh!
+  minitest
   prompt_objects!
+  rake
   rubocop
 
 BUNDLED WITH
