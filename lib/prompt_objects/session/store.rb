@@ -9,7 +9,7 @@ module PromptObjects
     # SQLite-based session storage for conversation history.
     # Each environment has its own sessions.db file (gitignored for privacy).
     class Store
-      SCHEMA_VERSION = 2
+      SCHEMA_VERSION = 3
 
       # Valid source values for session tracking
       SOURCES = %w[tui mcp api web cli].freeze
@@ -128,17 +128,148 @@ module PromptObjects
         rows.map { |row| parse_session_row(row, include_count: true) }
       end
 
+      # Search sessions by message content using full-text search.
+      # @param query [String] Search query
+      # @param po_name [String, nil] Filter by PO
+      # @param source [String, nil] Filter by source
+      # @param limit [Integer] Maximum results
+      # @return [Array<Hash>] Sessions with match info
+      def search_sessions(query, po_name: nil, source: nil, limit: 50)
+        return [] if query.nil? || query.strip.empty?
+
+        # Use FTS5 MATCH syntax
+        # Escape special characters and add prefix matching
+        safe_query = query.gsub(/['"()]/, " ").strip
+        fts_query = safe_query.split.map { |term| "#{term}*" }.join(" ")
+
+        # First get matching message IDs from FTS
+        sql = <<~SQL
+          SELECT DISTINCT s.*, COUNT(m.id) as message_count
+          FROM sessions s
+          INNER JOIN messages m ON m.session_id = s.id
+          INNER JOIN messages_fts ON messages_fts.rowid = m.id
+          WHERE messages_fts MATCH ?
+        SQL
+
+        params = [fts_query]
+
+        if po_name
+          sql += " AND s.po_name = ?"
+          params << po_name
+        end
+
+        if source
+          sql += " AND s.source = ?"
+          params << source
+        end
+
+        sql += " GROUP BY s.id ORDER BY s.updated_at DESC LIMIT ?"
+        params << limit
+
+        rows = @db.execute(sql, params)
+        results = rows.map { |row| parse_session_row(row, include_count: true) }
+
+        # Get a snippet from matching messages for each session
+        results.each do |session|
+          snippet = get_match_snippet(session[:id], query)
+          session[:match_snippet] = snippet if snippet
+        end
+
+        results
+      rescue SQLite3::SQLException => e
+        # FTS table might not exist in older databases
+        if e.message.include?("no such table")
+          search_sessions_fallback(query, po_name: po_name, source: source, limit: limit)
+        else
+          raise
+        end
+      end
+
+      # Get a snippet of matching content from a session
+      # @param session_id [String] Session ID
+      # @param query [String] Search query
+      # @return [String, nil] Snippet with match highlighted
+      def get_match_snippet(session_id, query)
+        # Get first message that matches
+        row = @db.get_first_row(<<~SQL, [session_id, "%#{query}%"])
+          SELECT content FROM messages
+          WHERE session_id = ? AND content LIKE ?
+          LIMIT 1
+        SQL
+
+        return nil unless row && row["content"]
+
+        content = row["content"]
+        # Find match position and extract snippet
+        query_lower = query.downcase
+        pos = content.downcase.index(query_lower)
+        return content[0, 60] + "..." unless pos
+
+        # Extract snippet around match
+        start_pos = [pos - 20, 0].max
+        end_pos = [pos + query.length + 40, content.length].min
+        snippet = content[start_pos, end_pos - start_pos]
+
+        # Add ellipsis if truncated
+        snippet = "..." + snippet if start_pos > 0
+        snippet = snippet + "..." if end_pos < content.length
+
+        # Highlight match with markers
+        snippet.gsub(/#{Regexp.escape(query)}/i) { |m| ">>>#{m}<<<" }
+      end
+
+      # Fallback search without FTS (slower but works on older databases)
+      # @param query [String] Search query
+      # @param po_name [String, nil] Filter by PO
+      # @param source [String, nil] Filter by source
+      # @param limit [Integer] Maximum results
+      # @return [Array<Hash>] Sessions with match info
+      def search_sessions_fallback(query, po_name: nil, source: nil, limit: 50)
+        return [] if query.nil? || query.strip.empty?
+
+        sql = <<~SQL
+          SELECT DISTINCT s.*, COUNT(m.id) as message_count
+          FROM sessions s
+          INNER JOIN messages m ON m.session_id = s.id
+          WHERE m.content LIKE ?
+        SQL
+
+        params = ["%#{query}%"]
+
+        if po_name
+          sql += " AND s.po_name = ?"
+          params << po_name
+        end
+
+        if source
+          sql += " AND s.source = ?"
+          params << source
+        end
+
+        sql += " GROUP BY s.id ORDER BY s.updated_at DESC LIMIT ?"
+        params << limit
+
+        rows = @db.execute(sql, params)
+        rows.map { |row| parse_session_row(row, include_count: true) }
+      end
+
       # Update a session's metadata.
       # @param id [String] Session ID
       # @param name [String, nil] New session name
       # @param metadata [Hash, nil] New metadata (merged with existing)
-      def update_session(id, name: nil, metadata: nil)
+      # @param last_message_source [String, nil] Source of last message (tui, mcp, api)
+      def update_session(id, name: nil, metadata: nil, last_message_source: nil)
         updates = ["updated_at = ?"]
         params = [Time.now.utc.iso8601]
 
         if name
           updates << "name = ?"
           params << name
+        end
+
+        if last_message_source
+          updates << "last_message_source = ?"
+          params << last_message_source
         end
 
         if metadata
@@ -452,6 +583,27 @@ module PromptObjects
           );
 
           CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id);
+
+          -- Full-text search index for message content
+          CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+            content,
+            content='messages',
+            content_rowid='id'
+          );
+
+          -- Triggers to keep FTS in sync
+          CREATE TRIGGER IF NOT EXISTS messages_ai AFTER INSERT ON messages BEGIN
+            INSERT INTO messages_fts(rowid, content) VALUES (new.id, new.content);
+          END;
+
+          CREATE TRIGGER IF NOT EXISTS messages_ad AFTER DELETE ON messages BEGIN
+            INSERT INTO messages_fts(messages_fts, rowid, content) VALUES('delete', old.id, old.content);
+          END;
+
+          CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages BEGIN
+            INSERT INTO messages_fts(messages_fts, rowid, content) VALUES('delete', old.id, old.content);
+            INSERT INTO messages_fts(rowid, content) VALUES (new.id, new.content);
+          END;
         SQL
       end
 
@@ -464,6 +616,35 @@ module PromptObjects
             ALTER TABLE sessions ADD COLUMN last_message_source TEXT;
             CREATE INDEX IF NOT EXISTS idx_sessions_source ON sessions(source);
           SQL
+        end
+
+        if from_version < 3
+          # Add full-text search for messages
+          @db.execute_batch(<<~SQL)
+            -- Full-text search index for message content
+            CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+              content,
+              content='messages',
+              content_rowid='id'
+            );
+
+            -- Triggers to keep FTS in sync
+            CREATE TRIGGER IF NOT EXISTS messages_ai AFTER INSERT ON messages BEGIN
+              INSERT INTO messages_fts(rowid, content) VALUES (new.id, new.content);
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS messages_ad AFTER DELETE ON messages BEGIN
+              INSERT INTO messages_fts(messages_fts, rowid, content) VALUES('delete', old.id, old.content);
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages BEGIN
+              INSERT INTO messages_fts(messages_fts, rowid, content) VALUES('delete', old.id, old.content);
+              INSERT INTO messages_fts(rowid, content) VALUES (new.id, new.content);
+            END;
+          SQL
+
+          # Populate FTS with existing messages
+          @db.execute("INSERT INTO messages_fts(rowid, content) SELECT id, content FROM messages WHERE content IS NOT NULL")
         end
       end
 

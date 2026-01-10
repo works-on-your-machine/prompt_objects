@@ -52,3 +52,7 @@ require_relative "prompt_objects/universal/create_primitive"
 require_relative "prompt_objects/universal/verify_primitive"
 require_relative "prompt_objects/universal/modify_primitive"
 require_relative "prompt_objects/universal/request_primitive"
+
+# Connectors (different interfaces to environments)
+require_relative "prompt_objects/connectors/base"
+require_relative "prompt_objects/connectors/mcp"

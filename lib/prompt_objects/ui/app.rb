@@ -162,6 +162,16 @@ module PromptObjects
           # Could send a message to trigger UI update
         end
 
+        # Initialize session polling state
+        @session_poll_state = {
+          last_check: Time.now,
+          session_timestamps: {},  # session_id => updated_at
+          mcp_active: false
+        }
+
+        # Start session polling thread for live updates
+        start_session_polling if @env.session_store
+
         # Activate the first PO if available
         pos = @env.registry.prompt_objects
         if pos.any?
@@ -269,9 +279,32 @@ module PromptObjects
           @error = msg.message
           @conversation.clear_pending
           [self, nil]
+        when Messages::SessionsChanged
+          handle_sessions_changed(msg)
         else
           [self, nil]
         end
+      end
+
+      def handle_sessions_changed(msg)
+        # Check if any updated session is the active session
+        if @active_po
+          active_session_id = @active_po.instance_variable_get(:@session_id)
+          updated_session = msg.updated_sessions.find { |s| s[:id] == active_session_id }
+
+          if updated_session
+            # Reload the conversation to show new messages
+            @active_po.send(:reload_history_from_session) if @active_po.respond_to?(:reload_history_from_session, true)
+            @conversation.set_po(@active_po)
+          end
+        end
+
+        # Refresh session explorer if open
+        if @modal&.dig(:type) == :session_explorer && @session_explorer
+          @session_explorer.refresh_sessions
+        end
+
+        [self, nil]
       end
 
       def handle_po_response(msg)
@@ -370,6 +403,66 @@ module PromptObjects
         @env.registry.prompt_objects.each do |po|
           @env.load_dependencies(po)
         end
+      end
+
+      def start_session_polling
+        @session_poll_thread = Thread.new do
+          loop do
+            sleep 2  # Poll every 2 seconds
+
+            begin
+              check_for_session_changes
+            rescue StandardError => e
+              # Ignore errors in polling
+            end
+          end
+        end
+      end
+
+      def check_for_session_changes
+        return unless @env&.session_store
+
+        # Get all sessions
+        sessions = @env.session_store.list_all_sessions
+
+        new_sessions = []
+        updated_sessions = []
+
+        sessions.each do |session|
+          id = session[:id]
+          updated_at = session[:updated_at]
+
+          if @session_poll_state[:session_timestamps][id].nil?
+            # New session
+            new_sessions << session
+            @session_poll_state[:session_timestamps][id] = updated_at
+          elsif updated_at && @session_poll_state[:session_timestamps][id] != updated_at
+            # Updated session
+            updated_sessions << session
+            @session_poll_state[:session_timestamps][id] = updated_at
+          end
+        end
+
+        # Check if any MCP sessions are active (updated in last 30 seconds)
+        mcp_active = sessions.any? do |s|
+          s[:source] == "mcp" && s[:updated_at] && (Time.now - s[:updated_at]) < 30
+        end
+
+        if mcp_active != @session_poll_state[:mcp_active]
+          @session_poll_state[:mcp_active] = mcp_active
+        end
+
+        # Send message if there are changes
+        if new_sessions.any? || updated_sessions.any?
+          Bubbletea.send_message(Messages::SessionsChanged.new(
+            new_sessions: new_sessions,
+            updated_sessions: updated_sessions
+          ))
+        end
+      end
+
+      def mcp_active?
+        @session_poll_state&.dig(:mcp_active) || false
       end
 
       def handle_key(msg)
@@ -908,6 +1001,12 @@ module PromptObjects
 
       def handle_input_submit(text)
         return [self, nil] if text.nil? || text.empty?
+
+        # Handle commands
+        if text.start_with?("/")
+          return handle_command(text)
+        end
+
         return [self, nil] unless @active_po
 
         # Log to message bus
@@ -940,6 +1039,167 @@ module PromptObjects
         end
 
         [self, nil]
+      end
+
+      # --- Command handling ---
+
+      def handle_command(text)
+        parts = text.strip.split(/\s+/, 2)
+        command = parts[0].downcase
+        args = parts[1]
+
+        case command
+        when "/help"
+          show_command_help
+        when "/sessions"
+          list_sessions
+        when "/session"
+          handle_session_command(args)
+        else
+          @conversation.show_system_message("Unknown command: #{command}. Type /help for available commands.")
+        end
+
+        [self, nil]
+      end
+
+      def show_command_help
+        help = <<~HELP.strip
+          Commands: /sessions (list), /session new [name], /session rename <name>,
+          /session switch <name|id>, /session export [json|md], /session info
+        HELP
+        @conversation.show_system_message(help)
+      end
+
+      def list_sessions
+        return @conversation.show_system_message("No active PO") unless @active_po
+        return @conversation.show_system_message("Sessions not available") unless @env&.session_store
+
+        sessions = @env.session_store.list_sessions(@active_po.name)
+        if sessions.empty?
+          @conversation.show_system_message("No sessions for #{@active_po.name}")
+        else
+          current_id = @active_po.instance_variable_get(:@session_id)
+          names = sessions.map do |s|
+            marker = s[:id] == current_id ? "*" : " "
+            "#{marker}#{s[:name] || 'Unnamed'}"
+          end
+          @conversation.show_system_message("Sessions: #{names.join(', ')}")
+        end
+      end
+
+      def handle_session_command(args)
+        return @conversation.show_system_message("No active PO") unless @active_po
+        return @conversation.show_system_message("Sessions not available") unless @env&.session_store
+
+        parts = args&.split(/\s+/, 2) || []
+        subcommand = parts[0]&.downcase
+        subargs = parts[1]
+
+        case subcommand
+        when "new"
+          session_new(subargs)
+        when "rename"
+          session_rename(subargs)
+        when "switch"
+          session_switch(subargs)
+        when "export"
+          session_export(subargs)
+        when "info"
+          session_info
+        when nil
+          @conversation.show_system_message("Usage: /session <new|rename|switch|export|info> [args]")
+        else
+          @conversation.show_system_message("Unknown session command: #{subcommand}")
+        end
+      end
+
+      def session_new(name)
+        name = name&.strip
+        name = nil if name&.empty?
+        name ||= "Session #{Time.now.strftime('%Y-%m-%d %H:%M')}"
+
+        session_id = @env.session_store.create_session(
+          po_name: @active_po.name,
+          name: name,
+          source: "tui"
+        )
+        @active_po.switch_session(session_id)
+        @conversation.set_po(@active_po)
+        @conversation.show_system_message("Created and switched to session: #{name}")
+      end
+
+      def session_rename(new_name)
+        return @conversation.show_system_message("Usage: /session rename <name>") unless new_name && !new_name.strip.empty?
+
+        session_id = @active_po.instance_variable_get(:@session_id)
+        return @conversation.show_system_message("No active session") unless session_id
+
+        @env.session_store.rename_session(session_id, new_name.strip)
+        @conversation.show_system_message("Renamed session to: #{new_name.strip}")
+      end
+
+      def session_switch(identifier)
+        return @conversation.show_system_message("Usage: /session switch <name|id>") unless identifier && !identifier.strip.empty?
+
+        identifier = identifier.strip
+        sessions = @env.session_store.list_sessions(@active_po.name)
+
+        # Try to find by name first, then by ID prefix
+        session = sessions.find { |s| s[:name]&.downcase == identifier.downcase }
+        session ||= sessions.find { |s| s[:id].to_s.start_with?(identifier) }
+
+        if session
+          @active_po.switch_session(session[:id])
+          @conversation.set_po(@active_po)
+          @conversation.show_system_message("Switched to: #{session[:name] || 'Unnamed'}")
+        else
+          @conversation.show_system_message("Session not found: #{identifier}")
+        end
+      end
+
+      def session_export(format)
+        session_id = @active_po.instance_variable_get(:@session_id)
+        return @conversation.show_system_message("No active session") unless session_id
+
+        format = (format || "json").strip.downcase
+        session = @env.session_store.get_session(session_id)
+        safe_name = (session[:name] || "session").gsub(/[^a-zA-Z0-9_-]/, "_")[0, 30]
+        timestamp = Time.now.strftime("%Y%m%d_%H%M%S")
+
+        case format
+        when "json"
+          data = @env.session_store.export_session_json(session_id)
+          filename = "#{safe_name}_#{timestamp}.json"
+          File.write(filename, JSON.pretty_generate(data))
+          @conversation.show_system_message("Exported to #{filename}")
+        when "md", "markdown"
+          content = @env.session_store.export_session_markdown(session_id)
+          filename = "#{safe_name}_#{timestamp}.md"
+          File.write(filename, content)
+          @conversation.show_system_message("Exported to #{filename}")
+        else
+          @conversation.show_system_message("Unknown format: #{format}. Use 'json' or 'md'")
+        end
+      rescue StandardError => e
+        @conversation.show_system_message("Export error: #{e.message}")
+      end
+
+      def session_info
+        session_id = @active_po.instance_variable_get(:@session_id)
+        return @conversation.show_system_message("No active session") unless session_id
+
+        session = @env.session_store.get_session(session_id)
+        return @conversation.show_system_message("Session not found") unless session
+
+        msg_count = @env.session_store.message_count(session_id)
+        info = [
+          "Name: #{session[:name] || 'Unnamed'}",
+          "PO: #{session[:po_name]}",
+          "Messages: #{msg_count}",
+          "Source: #{session[:source] || 'tui'}",
+          "Created: #{session[:created_at]&.strftime('%Y-%m-%d %H:%M')}"
+        ].join(" | ")
+        @conversation.show_system_message(info)
       end
 
       def handle_toggle_panel(panel)
@@ -1049,6 +1309,13 @@ module PromptObjects
           return Styles.error.render("Error: #{@error}")
         end
 
+        # MCP live indicator
+        mcp_indicator = if mcp_active?
+                          Styles.panel_title.render(" [MCP LIVE] ")
+                        else
+                          ""
+                        end
+
         if @mode == MODE_INSERT
           parts = [
             Styles.help_key.render("Esc") + " normal mode",
@@ -1071,7 +1338,7 @@ module PromptObjects
           ]
         end
 
-        Styles.status_bar.render(parts.join("  "))
+        Styles.status_bar.render(mcp_indicator + parts.join("  "))
       end
 
       def render_modal_overlay(base)

@@ -42,6 +42,12 @@ module PromptObjects
 
       # Tick for animations (spinners)
       Tick = Struct.new(:time, keyword_init: true)
+
+      # Session poll tick (for detecting MCP changes)
+      SessionPollTick = Struct.new(:time, keyword_init: true)
+
+      # Sessions changed (from another connector)
+      SessionsChanged = Struct.new(:new_sessions, :updated_sessions, keyword_init: true)
     end
   end
 end

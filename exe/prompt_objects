@@ -33,7 +33,7 @@ class Sandbox
       end
     end
 
-    puts "🧪 Sandbox initialized at: #{@sandbox_dir}"
+    puts "Sandbox initialized at: #{@sandbox_dir}"
     puts "   Objects copied: #{Dir.glob(File.join(@objects_dir, '*.md')).count}"
   end
 
@@ -42,7 +42,7 @@ class Sandbox
       copy_back_changes
     end
     FileUtils.rm_rf(@sandbox_dir)
-    puts "🧹 Sandbox cleaned up"
+    puts "Sandbox cleaned up"
   end
 
   def copy_back_changes
@@ -57,7 +57,7 @@ class Sandbox
 
     return if new_objects.empty? && new_primitives.empty?
 
-    puts "\n📦 Changes to copy back:"
+    puts "\nChanges to copy back:"
     new_objects.each { |f| puts "   + objects/#{File.basename(f)}" }
     new_primitives.each { |f| puts "   + primitives/#{File.basename(f)}" }
 
@@ -77,7 +77,7 @@ class Sandbox
       end
     end
 
-    puts "✅ Changes copied to main project"
+    puts "Changes copied to main project"
   end
 
   def show_new_files
@@ -104,7 +104,7 @@ class REPL
   def run
     puts header
     if @sandbox
-      puts "🧪 SANDBOX MODE - changes isolated from main project"
+      puts "SANDBOX MODE - changes isolated from main project"
       puts
     end
     puts "Loaded: #{@po.name}"
@@ -180,9 +180,7 @@ class REPL
   def header
     <<~HEADER
 
-      ╔══════════════════════════════════════════════════════════════╗
-      ║                    PromptObjects v0.1.0                      ║
-      ╚══════════════════════════════════════════════════════════════╝
+      PromptObjects v0.1.0
 
     HEADER
   end
@@ -209,7 +207,7 @@ class REPL
 
     new_files = @sandbox.show_new_files
     if new_files[:objects].any? || new_files[:primitives].any?
-      puts "\n📝 Session created files:"
+      puts "\nSession created files:"
       new_files[:objects].each { |f| puts "   - #{File.basename(f)}" }
       new_files[:primitives].each { |f| puts "   - #{File.basename(f)}" }
       @sandbox.cleanup(keep_changes: true)
@@ -225,7 +223,7 @@ class REPL
       return
     end
 
-    puts "\n🧪 Sandbox Status"
+    puts "\nSandbox Status"
     puts "   Location: #{@sandbox.sandbox_dir}"
     new_files = @sandbox.show_new_files
     if new_files[:objects].any? || new_files[:primitives].any?
@@ -259,53 +257,43 @@ class REPL
     entries = @env.bus.log[start_index..]
     return if entries.nil? || entries.empty?
 
-    puts "┌─ Message Log ─────────────────────────────────────────────┐"
+    puts "--- Message Log ---"
     entries.each do |entry|
       time = entry[:timestamp].strftime("%H:%M:%S")
       from = entry[:from]
       to = entry[:to]
       msg = entry[:message]
 
-      # Color-code based on type (using ANSI codes)
-      line = "│ #{time}  #{from} → #{to}: #{msg}"
-      # Truncate if too long
+      line = "#{time}  #{from} -> #{to}: #{msg}"
       line = line[0, 70] + "..." if line.length > 73
-      line = line.ljust(73) + "│"
       puts line
     end
-    puts "└───────────────────────────────────────────────────────────┘"
+    puts "-------------------"
   end
 end
 
-# Parse command line arguments
-def parse_args
-  args = {
-    name: "greeter",
-    objects_dir: "objects",
-    sandbox: false
-  }
+# === CLI Command Handling ===
 
-  positional = []
-  ARGV.each do |arg|
-    case arg
-    when "--sandbox", "-s"
-      args[:sandbox] = true
-    when "--help", "-h"
-      print_help
-      exit 0
-    else
-      positional << arg
-    end
-  end
-
-  args[:name] = positional[0] if positional[0]
-  args[:objects_dir] = positional[1] if positional[1]
-  args
-end
-
-def print_help
+def print_main_help
   puts <<~HELP
-    Usage: prompt_objects [options] [name] [objects_dir]
+    Usage: prompt_objects <command> [options]
+
+    Commands:
+      repl [name] [objects_dir]   Start interactive REPL with a prompt object
+      serve                        Run environment as a server (MCP, API, etc.)
+      help                         Show this help message
+
+    Run 'prompt_objects <command> --help' for command-specific help.
+
+    Examples:
+      prompt_objects repl greeter              # Start REPL with 'greeter' PO
+      prompt_objects serve --mcp my-assistant  # Run as MCP server
+  HELP
+end
+
+def print_repl_help
+  puts <<~HELP
+    Usage: prompt_objects repl [options] [name] [objects_dir]
 
     Arguments:
       name         Prompt object to load (default: greeter)
@@ -322,30 +310,79 @@ def print_help
   HELP
 end
 
-# Main execution
-def main
-  args = parse_args
+def print_serve_help
+  puts <<~HELP
+    Usage: prompt_objects serve [options] <environment>
+
+    Run an environment as a server, exposing it through different interfaces.
+
+    Arguments:
+      environment  Environment name or path to environment directory
+
+    Options:
+      --mcp            Run as MCP server (stdio transport, for Claude Desktop/Cursor)
+      --api            Run as REST API server (not yet implemented)
+      --port PORT      Port for API server (default: 3000)
+      --help, -h       Show this help message
+
+    Examples:
+      prompt_objects serve --mcp my-assistant
+      prompt_objects serve --mcp ~/.prompt_objects/environments/work-tools
+
+    Claude Desktop Configuration:
+      Add to claude_desktop_config.json:
+      {
+        "mcpServers": {
+          "my-assistant": {
+            "command": "prompt_objects",
+            "args": ["serve", "--mcp", "my-assistant"]
+          }
+        }
+      }
+  HELP
+end
+
+def run_repl(args)
+  options = {
+    name: "greeter",
+    objects_dir: "objects",
+    sandbox: false
+  }
+
+  positional = []
+  args.each do |arg|
+    case arg
+    when "--sandbox", "-s"
+      options[:sandbox] = true
+    when "--help", "-h"
+      print_repl_help
+      exit 0
+    else
+      positional << arg
+    end
+  end
+
+  options[:name] = positional[0] if positional[0]
+  options[:objects_dir] = positional[1] if positional[1]
+
   sandbox = nil
   primitives_dir = nil
 
-  if args[:sandbox]
-    sandbox = Sandbox.new(args[:objects_dir])
+  if options[:sandbox]
+    sandbox = Sandbox.new(options[:objects_dir])
     objects_dir = sandbox.objects_dir
     primitives_dir = sandbox.primitives_dir
   else
-    objects_dir = args[:objects_dir]
+    objects_dir = options[:objects_dir]
   end
 
-  env = PromptObjects::Environment.new(objects_dir: objects_dir, primitives_dir: primitives_dir)
+  env = PromptObjects::Runtime.new(objects_dir: objects_dir, primitives_dir: primitives_dir)
 
   begin
-    po = env.load_by_name(args[:name])
-
-    # Load any prompt object dependencies
+    po = env.load_by_name(options[:name])
     env.load_dependencies(po)
-
   rescue PromptObjects::Error => e
-    puts "Error loading '#{args[:name]}': #{e.message}"
+    puts "Error loading '#{options[:name]}': #{e.message}"
     puts "\nAvailable objects in '#{objects_dir}/':"
     Dir.glob(File.join(objects_dir, "*.md")).each do |path|
       puts "  - #{File.basename(path, '.md')}"
@@ -355,6 +392,133 @@ def main
   end
 
   REPL.new(po, env, sandbox: sandbox).run
+end
+
+def run_serve(args)
+  options = {
+    mcp: false,
+    api: false,
+    port: 3000,
+    environment: nil
+  }
+
+  args.each_with_index do |arg, i|
+    case arg
+    when "--mcp"
+      options[:mcp] = true
+    when "--api"
+      options[:api] = true
+    when "--port"
+      options[:port] = args[i + 1].to_i
+    when "--help", "-h"
+      print_serve_help
+      exit 0
+    else
+      # Skip values that follow options
+      next if args[i - 1] == "--port"
+      # Assume it's the environment
+      options[:environment] = arg unless arg.start_with?("-")
+    end
+  end
+
+  unless options[:environment]
+    puts "Error: environment name or path required"
+    puts "Run 'prompt_objects serve --help' for usage"
+    exit 1
+  end
+
+  unless options[:mcp] || options[:api]
+    puts "Error: specify at least one interface (--mcp or --api)"
+    puts "Run 'prompt_objects serve --help' for usage"
+    exit 1
+  end
+
+  # Redirect stderr to a log file to avoid polluting MCP stdio
+  if options[:mcp] && ENV["PROMPT_OBJECTS_LOG"]
+    $stderr.reopen(ENV["PROMPT_OBJECTS_LOG"], "a")
+    $stderr.sync = true
+  end
+
+  # Resolve environment
+  env_path = resolve_environment(options[:environment])
+  unless env_path
+    $stderr.puts "Error: environment '#{options[:environment]}' not found"
+    exit 1
+  end
+
+  # Load the runtime
+  runtime = PromptObjects::Runtime.new(env_path: env_path)
+
+  # Load all prompt objects
+  load_all_objects(runtime, env_path)
+
+  if options[:mcp]
+    connector = PromptObjects::Connectors::MCP.new(runtime: runtime)
+    connector.start
+  elsif options[:api]
+    puts "API server not yet implemented"
+    exit 1
+  end
+end
+
+def resolve_environment(name_or_path)
+  # Check if it's already a path
+  if File.directory?(name_or_path)
+    manifest_path = File.join(name_or_path, "manifest.yml")
+    return name_or_path if File.exist?(manifest_path)
+  end
+
+  # Check in standard locations
+  locations = [
+    File.join(Dir.home, ".prompt_objects", "environments", name_or_path),
+    File.join(".", name_or_path)
+  ]
+
+  locations.each do |path|
+    manifest_path = File.join(path, "manifest.yml")
+    return path if File.exist?(manifest_path)
+  end
+
+  nil
+end
+
+def load_all_objects(runtime, env_path)
+  objects_dir = File.join(env_path, "objects")
+  return unless Dir.exist?(objects_dir)
+
+  Dir.glob(File.join(objects_dir, "*.md")).each do |path|
+    runtime.load_prompt_object(path)
+  rescue StandardError => e
+    $stderr.puts "Warning: Failed to load #{path}: #{e.message}"
+  end
+
+  runtime.registry.prompt_objects.each do |po|
+    runtime.load_dependencies(po)
+  end
+end
+
+# === Main Entry Point ===
+
+def main
+  if ARGV.empty?
+    print_main_help
+    exit 0
+  end
+
+  command = ARGV[0]
+  args = ARGV[1..]
+
+  case command
+  when "repl"
+    run_repl(args)
+  when "serve"
+    run_serve(args)
+  when "help", "--help", "-h"
+    print_main_help
+  else
+    # Legacy behavior: treat as repl with name argument
+    run_repl(ARGV)
+  end
 end
 
 main

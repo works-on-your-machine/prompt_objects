@@ -63,15 +63,17 @@ module PromptObjects
 
         def refresh_sessions
           source_filter = @filter == FILTER_ALL ? nil : @filter.to_s
-          @sessions = @session_store.list_all_sessions(source: source_filter)
 
-          # Apply search filter if active
+          # Use FTS search if query is present, otherwise list all
           if @search_query && !@search_query.empty?
-            query = @search_query.downcase
-            @sessions = @sessions.select do |s|
-              (s[:name]&.downcase&.include?(query)) ||
-                (s[:po_name]&.downcase&.include?(query))
-            end
+            @sessions = @session_store.search_sessions(
+              @search_query,
+              source: source_filter
+            )
+            @search_is_content = true
+          else
+            @sessions = @session_store.list_all_sessions(source: source_filter)
+            @search_is_content = false
           end
 
           # Adjust cursor if needed
@@ -264,9 +266,9 @@ module PromptObjects
           if search_mode?
             search_display = "Search: #{@search_buffer}_"
           elsif !@search_query.empty?
-            search_display = "Search: #{@search_query} (/ to edit, Esc to clear)"
+            search_display = "Search: \"#{@search_query}\" (/ to edit, Esc to clear)"
           else
-            search_display = "Press / to search"
+            search_display = "Press / to search message content"
           end
           search_padding = @width - 2 - visible_length(search_display)
           search_styled = search_mode? ? Styles.help_key.render(search_display) : Styles.timestamp.render(search_display)
@@ -368,13 +370,24 @@ module PromptObjects
         def format_session_row(session, is_selected)
           cursor = is_selected ? "▸" : " "
 
-          po_name = truncate(session[:po_name] || "unknown", 14).ljust(15)
-          name = truncate(session[:name] || "Unnamed", 17).ljust(18)
-          msg_count = (session[:message_count] || @session_store.message_count(session[:id])).to_s.rjust(5)
-          source = (session[:source] || "tui")[0..2].center(5)
-          time = format_time(session[:updated_at]).rjust(10)
+          # If we have a match snippet, show a condensed view with snippet
+          if session[:match_snippet] && @search_is_content
+            po_name = truncate(session[:po_name] || "unknown", 12).ljust(13)
+            name = truncate(session[:name] || "Unnamed", 12).ljust(13)
+            # Clean up snippet markers
+            snippet = session[:match_snippet].to_s.gsub(">>>", "[").gsub("<<<", "]").gsub(/\s+/, " ").strip
+            snippet = truncate(snippet, @width - 32)
 
-          content = "#{cursor}#{po_name} #{name} #{msg_count} #{source} #{time}"
+            content = "#{cursor}#{po_name} #{name} #{snippet}"
+          else
+            po_name = truncate(session[:po_name] || "unknown", 14).ljust(15)
+            name = truncate(session[:name] || "Unnamed", 17).ljust(18)
+            msg_count = (session[:message_count] || @session_store.message_count(session[:id])).to_s.rjust(5)
+            source = (session[:source] || "tui")[0..2].center(5)
+            time = format_time(session[:updated_at]).rjust(10)
+
+            content = "#{cursor}#{po_name} #{name} #{msg_count} #{source} #{time}"
+          end
 
           if is_selected
             Styles.help_key.render(content.ljust(@width - 2))

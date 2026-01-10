@@ -14,6 +14,19 @@ module PromptObjects
           @scroll_offset = 0
           @pending_message = nil
           @waiting_for_response = false
+          @system_message = nil
+          @system_message_time = nil
+        end
+
+        # Show a temporary system message (auto-clears after display)
+        def show_system_message(text)
+          @system_message = text
+          @system_message_time = Time.now
+        end
+
+        def clear_system_message
+          @system_message = nil
+          @system_message_time = nil
         end
 
         def set_po(po)
@@ -76,6 +89,16 @@ module PromptObjects
           if @waiting_for_response
             lines << Styles.thinking.render("  #{@po.name} is thinking...")
             lines << ""
+          end
+
+          # Show system message (command feedback)
+          if @system_message
+            lines << Styles.panel_title.render("  #{@system_message}")
+            lines << ""
+            # Auto-clear after 5 seconds
+            if @system_message_time && (Time.now - @system_message_time) > 5
+              clear_system_message
+            end
           end
 
           # If empty history and not waiting
