@@ -412,8 +412,11 @@ module PromptObjects
 
             begin
               check_for_session_changes
-            rescue StandardError => e
-              # Ignore errors in polling
+            rescue SQLite3::BusyException
+              # Database is locked, skip this poll cycle
+              # WAL mode + busy_timeout should prevent this, but handle it gracefully
+            rescue StandardError
+              # Ignore other errors in polling
             end
           end
         end
@@ -444,8 +447,11 @@ module PromptObjects
         end
 
         # Check if any MCP sessions are active (updated in last 30 seconds)
+        # Check both source and last_message_source since a TUI session could be messaged via MCP
         mcp_active = sessions.any? do |s|
-          s[:source] == "mcp" && s[:updated_at] && (Time.now - s[:updated_at]) < 30
+          mcp_involved = s[:source] == "mcp" || s[:last_message_source] == "mcp"
+          recently_active = s[:updated_at] && (Time.now - s[:updated_at]) < 30
+          mcp_involved && recently_active
         end
 
         if mcp_active != @session_poll_state[:mcp_active]

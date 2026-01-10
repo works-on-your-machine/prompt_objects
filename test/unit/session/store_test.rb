@@ -347,4 +347,72 @@ class SessionStoreTest < PromptObjectsTest
 
     assert_equal 3, @store.total_messages
   end
+
+  # --- Concurrent Access (WAL mode) ---
+
+  def test_concurrent_access_with_wal_mode
+    # Create a file-based store to test concurrent access
+    Dir.mktmpdir do |dir|
+      db_path = File.join(dir, "sessions.db")
+
+      # Create two stores pointing at same file (simulates TUI + MCP)
+      store1 = PromptObjects::Session::Store.new(db_path)
+      store2 = PromptObjects::Session::Store.new(db_path)
+
+      # Create session in store1
+      id = store1.create_session(po_name: "test_po", name: "Concurrent Test")
+
+      # Both stores can read it
+      assert_equal "test_po", store1.get_session(id)[:po_name]
+      assert_equal "test_po", store2.get_session(id)[:po_name]
+
+      # Concurrent writes from different threads
+      errors = []
+      threads = []
+
+      10.times do |i|
+        threads << Thread.new do
+          begin
+            store1.add_message(session_id: id, role: :user, content: "Message #{i} from store1")
+          rescue StandardError => e
+            errors << e
+          end
+        end
+
+        threads << Thread.new do
+          begin
+            store2.add_message(session_id: id, role: :assistant, content: "Message #{i} from store2")
+          rescue StandardError => e
+            errors << e
+          end
+        end
+      end
+
+      threads.each(&:join)
+
+      # Should have no errors with WAL mode
+      assert_empty errors, "Expected no errors, got: #{errors.map(&:message).join(', ')}"
+
+      # Should have all 20 messages
+      assert_equal 20, store1.message_count(id)
+
+      store1.close
+      store2.close
+    end
+  end
+
+  def test_wal_mode_enabled
+    Dir.mktmpdir do |dir|
+      db_path = File.join(dir, "sessions.db")
+      store = PromptObjects::Session::Store.new(db_path)
+
+      # Check that WAL mode is enabled
+      db = SQLite3::Database.new(db_path)
+      journal_mode = db.get_first_value("PRAGMA journal_mode")
+      db.close
+      store.close
+
+      assert_equal "wal", journal_mode, "Expected WAL journal mode"
+    end
+  end
 end

@@ -19,6 +19,13 @@ module PromptObjects
         @db_path = db_path
         @db = SQLite3::Database.new(db_path)
         @db.results_as_hash = true
+
+        # Enable WAL mode for better concurrent access (TUI + MCP can access simultaneously)
+        @db.execute("PRAGMA journal_mode=WAL")
+
+        # Set busy timeout to 5 seconds - wait for locks instead of failing immediately
+        @db.busy_timeout = 5000
+
         setup_schema
       end
 
