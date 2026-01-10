@@ -131,15 +131,16 @@ Grid view and mouse interaction.
 - Search/filter POs
 - See: [epics/dashboard-and-mouse.md](epics/dashboard-and-mouse.md)
 
-### Connectors: Multi-Interface Runtime (Phase 1 Done)
-Run environments as MCP servers, APIs, web UIs, and more.
-- [x] `prompt_objects serve --mcp <env>` for Claude Desktop
-- [x] MCP connector with session source tracking
-- [x] TUI live updates when MCP sessions are active
-- [ ] `prompt_objects serve --api <env>` for REST API
-- [ ] Web UI for end-user friendly interface
-- All interfaces share same sessions and state
-- Future: Slack, Discord, email, webhooks
+### Connectors: Reactive Multi-Interface Runtime
+Daemon architecture for true reactive multi-interface access (Smalltalk image model).
+- [x] Phase 0: MCP connector with session source tracking (temporary polling)
+- [x] Phase 0: TUI live updates when MCP sessions are active
+- [x] Phase 0: SQLite WAL mode for concurrent access
+- [ ] Phase 1: Event stream foundation (internal pub/sub)
+- [ ] Phase 2: IPC protocol & daemon process
+- [ ] Phase 3: TUI as IPC client (daemon mode)
+- [ ] Phase 4: HTTP/REST API connector with WebSocket events
+- [ ] Phase 5: PO-spawned interfaces (POs can create their own HTTP servers)
 - See: [epics/connectors.md](epics/connectors.md)
 
 ---
