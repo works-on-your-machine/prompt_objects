@@ -123,13 +123,16 @@ Render LLM markdown output with proper formatting.
 - Options: Pure Ruby ANSI, TTY-Markdown, or Glamour FFI
 - See: [epics/markdown-rendering.md](epics/markdown-rendering.md)
 
-### Dashboard & Mouse Support
-Grid view and mouse interaction.
-- Click to select PO
-- Scroll wheel support
-- Dashboard grid view with PO cards
-- Search/filter POs
-- See: [epics/dashboard-and-mouse.md](epics/dashboard-and-mouse.md)
+### Dashboard UX Overhaul
+Transform TUI from flat chat-centric to hierarchical PO-centric dashboard.
+- Dashboard → PO Detail → Session Chat navigation
+- PO cards with live indicators (state, tools, pending requests)
+- Activity feed showing cross-PO messages and tool calls
+- Session list per PO with source indicators (TUI/MCP/API)
+- Chat only visible when in specific session
+- Mouse + keyboard navigation
+- **Requires**: charm-native (markdown), Event Stream (live updates)
+- See: [epics/dashboard-ux-overhaul.md](epics/dashboard-ux-overhaul.md)
 
 ### Connectors: Reactive Multi-Interface Runtime
 Daemon architecture for true reactive multi-interface access (Smalltalk image model).
@@ -215,6 +218,6 @@ Speech interaction.
 | Primitive Management | [epics/primitive-management.md](epics/primitive-management.md) | Done |
 | Environment Data | [epics/environment-data.md](epics/environment-data.md) | Ready |
 | Markdown Rendering | [epics/markdown-rendering.md](epics/markdown-rendering.md) | Ready |
-| Dashboard & Mouse | [epics/dashboard-and-mouse.md](epics/dashboard-and-mouse.md) | Ready |
+| Dashboard UX Overhaul | [epics/dashboard-ux-overhaul.md](epics/dashboard-ux-overhaul.md) | Ready |
 | Session Management | [epics/session-management.md](epics/session-management.md) | Done |
 | Connectors | [epics/connectors.md](epics/connectors.md) | Ready |
