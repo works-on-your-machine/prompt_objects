@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "bubbletea"
+# Charm libraries loaded via app.rb -> charm.rb
 
 module PromptObjects
   module UI

@@ -85,6 +85,15 @@ Environment-wide session exploration beyond per-PO picker.
 - Session commands (/sessions, /session new|rename|switch|export|info)
 - See: [epics/session-management.md](epics/session-management.md)
 
+### Charm Native Integration (FFI Stability Fix)
+Fixed FFI crashes by using charm-native as single Go runtime for all Charm gems.
+- Root cause: Multiple Go runtimes conflict when loading bubbletea + lipgloss + glamour
+- Solution: Use Spencer's charm-native gem + Ruby shims for Model/Runner/Commands
+- Built charm-native Go archive and C extension locally
+- Created vendor/charm_shim/ with Ruby compatibility code (Messages, Commands, Model, Runner)
+- All Charm functionality works with single Go runtime - no more crashes
+- See: [epics/charm-forks.md](epics/charm-forks.md)
+
 ---
 
 ## In Progress
@@ -101,14 +110,6 @@ Visual refinements for picker/wizard screens. Non-blocking.
 
 ## Ready
 
-### Charm Gem Forks (FFI Stability Fix)
-Fix FFI crashes by forking Charm gems to use consolidated charm-native extension.
-- Root cause: Multiple Go runtimes conflict when loading bubbletea + lipgloss + glamour
-- Solution: Fork gems to use Ruby FFI → charm-native (single Go runtime)
-- Spencer/Marco unresponsive - doing it ourselves
-- ~2-3 days effort: bubbletea-ruby, lipgloss-ruby, glamour-ruby forks
-- See: [epics/charm-forks.md](epics/charm-forks.md)
-
 ### Environment Data (Stigmergy)
 Shared data space for loose-coupled PO coordination.
 - `place_data`: Put data into environment
@@ -118,10 +119,6 @@ Shared data space for loose-coupled PO coordination.
 - Foundation for external integrations (email, webhooks, cron)
 - See: [epics/environment-data.md](epics/environment-data.md)
 
-### Markdown Rendering
-Render LLM markdown output with proper formatting.
-- Options: Pure Ruby ANSI, TTY-Markdown, or Glamour FFI
-- See: [epics/markdown-rendering.md](epics/markdown-rendering.md)
 
 ### Dashboard UX Overhaul
 Transform TUI from flat chat-centric to hierarchical PO-centric dashboard.
@@ -131,7 +128,7 @@ Transform TUI from flat chat-centric to hierarchical PO-centric dashboard.
 - Session list per PO with source indicators (TUI/MCP/API)
 - Chat only visible when in specific session
 - Mouse + keyboard navigation
-- **Requires**: charm-native (markdown), Event Stream (live updates)
+- **Requires**: ~~charm-native (markdown)~~, Event Stream (live updates)
 - See: [epics/dashboard-ux-overhaul.md](epics/dashboard-ux-overhaul.md)
 
 ### Connectors: Reactive Multi-Interface Runtime
@@ -214,10 +211,10 @@ Speech interaction.
 | Sessions | [epics/sessions.md](epics/sessions.md) | Done |
 | MCP Server | [epics/mcp-server.md](epics/mcp-server.md) | Done |
 | MCP Tools Reference | [epics/mcp-tools.md](epics/mcp-tools.md) | Done |
-| Charm Gem Forks | [epics/charm-forks.md](epics/charm-forks.md) | Ready |
+| Charm Native Integration | [epics/charm-forks.md](epics/charm-forks.md) | Done |
 | Primitive Management | [epics/primitive-management.md](epics/primitive-management.md) | Done |
 | Environment Data | [epics/environment-data.md](epics/environment-data.md) | Ready |
-| Markdown Rendering | [epics/markdown-rendering.md](epics/markdown-rendering.md) | Ready |
+| Markdown Rendering | [epics/markdown-rendering.md](epics/markdown-rendering.md) | Done (via charm-native) |
 | Dashboard UX Overhaul | [epics/dashboard-ux-overhaul.md](epics/dashboard-ux-overhaul.md) | Ready |
 | Session Management | [epics/session-management.md](epics/session-management.md) | Done |
 | Connectors | [epics/connectors.md](epics/connectors.md) | Ready |

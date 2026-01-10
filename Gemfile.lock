@@ -1,22 +1,13 @@
-GIT
-  remote: https://github.com/marcoroth/huh-ruby.git
-  revision: 907cd5a7602021aaff360fdcdb5dd5dce677b25a
+PATH
+  remote: ../charm-native
   specs:
-    huh (0.1.0)
-      bubbles
-      bubbletea
-      glamour
-      lipgloss
+    charm-native (0.1.0)
 
 PATH
   remote: .
   specs:
     prompt_objects (0.1.0)
-      bubbles
-      bubbletea
       front_matter_parser
-      glamour
-      lipgloss
       mcp
       ruby-openai (~> 7.0)
       sqlite3 (~> 2.0)
@@ -28,14 +19,6 @@ GEM
       public_suffix (>= 2.0.2, < 8.0)
     ast (2.4.3)
     bigdecimal (4.0.1)
-    bubbles (0.1.0)
-      bubbletea
-      harmonica
-      lipgloss
-    bubbletea (0.1.0)
-      lipgloss (~> 0.1)
-    bubbletea (0.1.0-arm64-darwin)
-      lipgloss (~> 0.1)
     date (3.5.1)
     debug (1.11.1)
       irb (~> 1.10)
@@ -51,9 +34,6 @@ GEM
     faraday-net_http (3.4.2)
       net-http (~> 0.5)
     front_matter_parser (1.0.1)
-    glamour (0.2.1)
-    glamour (0.2.1-arm64-darwin)
-    harmonica (0.1.0)
     io-console (0.8.2)
     irb (1.16.0)
       pp (>= 0.6.0)
@@ -66,8 +46,6 @@ GEM
     json_rpc_handler (0.1.1)
     language_server-protocol (3.17.0.5)
     lint_roller (1.1.0)
-    lipgloss (0.2.0)
-    lipgloss (0.2.0-arm64-darwin)
     logger (1.7.0)
     mcp (0.4.0)
       json-schema (>= 4.1)
@@ -130,8 +108,8 @@ PLATFORMS
   arm64-darwin-24
 
 DEPENDENCIES
+  charm-native!
   debug
-  huh!
   minitest
   prompt_objects!
   rake

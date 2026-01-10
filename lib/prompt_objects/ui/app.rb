@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-require "bubbletea"
+# Load Charm libraries via charm-native (single Go runtime)
+require_relative "../charm"
 
 require_relative "styles"
 require_relative "messages"

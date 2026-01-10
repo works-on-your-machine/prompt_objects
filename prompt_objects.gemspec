@@ -32,11 +32,10 @@ Gem::Specification.new do |spec|
   spec.add_dependency "front_matter_parser"
   spec.add_dependency "sqlite3", "~> 2.0"
 
-  # TUI dependencies (Charm Ruby ports)
-  spec.add_dependency "bubbletea"
-  spec.add_dependency "lipgloss"
-  spec.add_dependency "bubbles"
-  spec.add_dependency "glamour"
+  # TUI dependencies
+  # Note: We use charm-native (specified in Gemfile) which provides unified
+  # Bubbletea/Lipgloss/Glamour with a single Go runtime, avoiding FFI crashes.
+  # The Ruby shims in vendor/charm_shim add Model, Runner, etc. on top.
 
   # MCP server
   spec.add_dependency "mcp"
