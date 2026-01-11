@@ -1,8 +1,8 @@
 # Web UI Complete
 
-**Status**: Backlog
+**Status**: In Progress
 **Priority**: High
-**Depends on**: [web-server-infrastructure.md](web-server-infrastructure.md)
+**Depends on**: [web-server-infrastructure.md](web-server-infrastructure.md) (Complete)
 **Design doc**: [web-server-design.md](../web-server-design.md)
 
 ## Overview
@@ -29,39 +29,45 @@ Build the complete web UI: dashboard with PO cards, detail view with tabs, messa
 
 ### Tasks
 
-- [ ] Dashboard component
-  - [ ] Grid layout for PO cards
-  - [ ] POCard component with:
-    - [ ] Name and description
-    - [ ] Status indicator (idle/busy/waiting)
-    - [ ] Notification badge (count)
-    - [ ] Session count
-  - [ ] Click card to navigate to detail
-- [ ] PO Detail component
-  - [ ] Back navigation to dashboard
-  - [ ] PO name in header
-  - [ ] Tab bar (Chat, Sessions, Capabilities, Edit)
-  - [ ] Tab content area
-- [ ] Chat tab (from Phase 2, refined)
-  - [ ] Message list with proper styling
-  - [ ] Streaming message component
-  - [ ] Input with submit button
-  - [ ] Auto-scroll on new messages
-- [ ] Message bus sidebar
-  - [ ] Toggle button in header
-  - [ ] Collapsible right panel
-  - [ ] List of recent bus messages
-  - [ ] From → To with timestamp
-  - [ ] Auto-scroll, keep last N messages
-- [ ] Routing/navigation state in Zustand
+- [x] Dashboard component
+  - [x] Grid layout for PO cards
+  - [x] POCard component with:
+    - [x] Name and description
+    - [x] Status indicator (idle/busy/waiting)
+    - [x] Notification badge (count)
+    - [x] Session count
+  - [x] Click card to navigate to detail
+- [x] PO Detail component
+  - [x] Back navigation to dashboard
+  - [x] PO name in header
+  - [x] Tab bar (Chat, Sessions, Capabilities, Edit)
+  - [x] Tab content area
+- [x] Chat tab
+  - [x] Message list with markdown rendering
+  - [x] Syntax-highlighted code blocks with copy button
+  - [x] Streaming message component
+  - [x] Input with submit button
+  - [x] Auto-scroll on new messages
+- [x] Message bus sidebar
+  - [x] Toggle button in header
+  - [x] Collapsible right panel
+  - [x] List of recent bus messages
+  - [x] From → To with timestamp
+  - [x] Auto-scroll, keep last N messages
+- [x] Split view layout
+  - [x] See PO list sidebar while chatting
+  - [x] Toggle sidebar on/off
+  - [x] Compact list view with status indicators
+- [x] Routing/navigation state in Zustand
 
 ### Exit Criteria
 
-- Can see all POs on dashboard
-- Can click into any PO
-- Can chat with PO, see streaming
-- Can toggle message bus sidebar
-- Can navigate back to dashboard
+- [x] Can see all POs on dashboard
+- [x] Can click into any PO
+- [x] Can chat with PO, see markdown-rendered responses
+- [x] Can toggle message bus sidebar
+- [x] Can navigate back to dashboard
+- [x] Can see PO sidebar while chatting (split view)
 
 ---
 

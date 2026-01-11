@@ -1,6 +1,6 @@
 # Web Server Infrastructure
 
-**Status**: Ready
+**Status**: Complete
 **Priority**: High
 **Depends on**: Core framework (done)
 **Design doc**: [web-server-design.md](../web-server-design.md)
@@ -28,23 +28,25 @@ Build the Falcon-based web server and React frontend foundation. This epic cover
 
 ### Tasks
 
-- [ ] Add falcon and async-websocket to Gemfile
-- [ ] Create `lib/prompt_objects/server/` directory structure
-- [ ] Implement `Server::App` Rack application
-  - [ ] Route WebSocket upgrade requests
-  - [ ] Route `/api/*` to API handler
-  - [ ] Serve static files from `public/`
-  - [ ] SPA fallback (serve index.html for unknown routes)
-- [ ] Implement `Server::WebSocketHandler`
-  - [ ] Subscribe to MessageBus on connect
-  - [ ] Send initial PO state on connect
-  - [ ] Handle incoming messages (send_message, respond_to_notification)
-  - [ ] Broadcast state changes, stream chunks, bus messages
-- [ ] Implement basic `Server::API::Routes`
-  - [ ] GET /api/prompt_objects
-  - [ ] GET /api/prompt_objects/:name
-  - [ ] GET /api/environment
-- [ ] Manual testing with wscat/curl
+- [x] Add falcon and async-websocket to Gemfile
+- [x] Create `lib/prompt_objects/server/` directory structure
+- [x] Implement `Server::App` Rack application
+  - [x] Route WebSocket upgrade requests
+  - [x] Route `/api/*` to API handler
+  - [x] Serve static files from `public/`
+  - [x] SPA fallback (serve index.html for unknown routes)
+- [x] Implement `Server::WebSocketHandler`
+  - [x] Subscribe to MessageBus on connect
+  - [x] Subscribe to HumanQueue for notifications
+  - [x] Send initial PO state on connect
+  - [x] Handle incoming messages (send_message, respond_to_notification)
+  - [x] Broadcast state changes, stream chunks, bus messages
+  - [x] Fix tui_mode context for proper ask_human blocking
+- [x] Implement basic `Server::API::Routes`
+  - [x] GET /api/prompt_objects
+  - [x] GET /api/prompt_objects/:name
+  - [x] GET /api/environment
+- [x] Manual testing with wscat/curl
 
 ### Exit Criteria
 
@@ -68,24 +70,27 @@ wscat -c ws://localhost:3000
 
 ### Tasks
 
-- [ ] Set up `frontend/` directory with Vite + React + TypeScript
-- [ ] Configure Tailwind CSS
-- [ ] Create Zustand store with full state shape
-  - [ ] promptObjects: Record<string, PromptObject>
-  - [ ] busMessages: BusMessage[]
-  - [ ] notifications: Notification[]
-  - [ ] selectedPO, streamingContent, busOpen, activeTab
-- [ ] Implement `useWebSocket` hook
-  - [ ] Connect on mount
-  - [ ] Route incoming messages to store actions
-  - [ ] Expose sendMessage, respondToNotification
-- [ ] Build minimal test UI
-  - [ ] Header with environment name
-  - [ ] Single PO card (hardcoded or first from list)
-  - [ ] Basic chat: message list + input
-  - [ ] Show streaming content as it arrives
-- [ ] Configure Vite proxy for development (proxy WS to Ruby server)
-- [ ] Build script outputs to `lib/prompt_objects/server/public/`
+- [x] Set up `frontend/` directory with Vite + React + TypeScript
+- [x] Configure Tailwind CSS
+- [x] Create Zustand store with full state shape
+  - [x] promptObjects: Record<string, PromptObject>
+  - [x] busMessages: BusMessage[]
+  - [x] notifications: Notification[]
+  - [x] selectedPO, streamingContent, busOpen, activeTab
+- [x] Implement `useWebSocket` hook
+  - [x] Connect on mount
+  - [x] Route incoming messages to store actions
+  - [x] Expose sendMessage, respondToNotification
+- [x] Build full UI (exceeded minimal goals)
+  - [x] Header with environment name, notification bell with badge
+  - [x] Dashboard with PO cards grid
+  - [x] PO detail view with tabs (Chat, Sessions, Capabilities)
+  - [x] Chat with markdown rendering and syntax highlighting
+  - [x] Split view layout (see dashboard while chatting)
+  - [x] Message bus sidebar
+  - [x] Notification panel with response UI
+- [x] Configure Vite for development (direct WS connection in dev mode)
+- [x] Build script outputs to `lib/prompt_objects/server/public/`
 
 ### Exit Criteria
 
