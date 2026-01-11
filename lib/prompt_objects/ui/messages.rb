@@ -48,6 +48,20 @@ module PromptObjects
 
       # Sessions changed (from another connector)
       SessionsChanged = Struct.new(:new_sessions, :updated_sessions, keyword_init: true)
+
+      # --- Dashboard Navigation Messages ---
+
+      # Navigate to a sub-screen
+      NavigateTo = Struct.new(:screen, :data, keyword_init: true)
+
+      # Navigate back to previous screen
+      NavigateBack = Struct.new(keyword_init: true)
+
+      # PO card selected in dashboard
+      POCardSelected = Struct.new(:po_name, keyword_init: true)
+
+      # Session selected in PO detail
+      SessionSelected = Struct.new(:session_id, :po_name, keyword_init: true)
     end
   end
 end

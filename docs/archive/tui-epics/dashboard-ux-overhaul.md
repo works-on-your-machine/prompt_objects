@@ -1,3 +1,7 @@
+> **ARCHIVED**: This epic was for the Charm-based TUI interface. The project has pivoted to a web-based interface (see docs/web-server-design.md and docs/epics/web-*.md). This file is preserved for historical reference.
+
+---
+
 # Dashboard UX Overhaul
 
 ## Vision

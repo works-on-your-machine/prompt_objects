@@ -17,6 +17,9 @@ require_relative "models/setup_wizard"
 require_relative "models/env_picker"
 require_relative "models/session_picker"
 require_relative "models/session_explorer"
+require_relative "models/dashboard"
+require_relative "models/po_detail"
+require_relative "models/chat_panel"
 
 module PromptObjects
   module UI
@@ -36,6 +39,11 @@ module PromptObjects
       SCREEN_WIZARD = :wizard
       SCREEN_MAIN = :main
 
+      # Sub-screen states within SCREEN_MAIN (dashboard navigation)
+      MAIN_SUBSCREEN_DASHBOARD = :dashboard
+      MAIN_SUBSCREEN_PO_DETAIL = :po_detail
+      MAIN_SUBSCREEN_SESSION_CHAT = :session_chat
+
       # Vim-like modes (for main screen)
       MODE_NORMAL = :normal
       MODE_INSERT = :insert
@@ -53,15 +61,26 @@ module PromptObjects
         # Screen state
         @screen = nil  # Set in init based on context
 
+        # Sub-screen state for dashboard navigation (within SCREEN_MAIN)
+        @main_subscreen = MAIN_SUBSCREEN_DASHBOARD
+        @nav_stack = []  # Navigation history for back button
+        @selected_po_for_detail = nil  # PO being viewed in detail
+        @selected_session_for_chat = nil  # Session being chatted in
+
         # Sub-models for picker/wizard
         @picker = nil
         @wizard = nil
 
-        # Sub-models for main screen
+        # Sub-models for main screen (chat mode - existing)
         @capability_bar = nil
         @message_log = nil
         @conversation = nil
         @input = nil
+
+        # Sub-models for dashboard mode (new)
+        @dashboard = nil
+        @po_detail = nil
+        @chat_panel = nil
 
         # UI state
         @width = 80
@@ -173,6 +192,9 @@ module PromptObjects
         # Start session polling thread for live updates
         start_session_polling if @env.session_store
 
+        # Initialize dashboard as the default view
+        init_dashboard
+
         # Activate the first PO if available
         pos = @env.registry.prompt_objects
         if pos.any?
@@ -255,11 +277,293 @@ module PromptObjects
       end
 
       private def update_main(msg)
+        # Handle window resize for all sub-screens
+        if msg.is_a?(Bubbletea::WindowSizeMessage)
+          return handle_resize(msg)
+        end
+
+        # Handle navigation messages
+        case msg
+        when Messages::NavigateTo
+          navigate_to(msg.screen, msg.data || {})
+          return [self, nil]
+        when Messages::NavigateBack
+          navigate_back
+          return [self, nil]
+        end
+
+        # Route to sub-screen handler based on current state
+        case @main_subscreen
+        when MAIN_SUBSCREEN_DASHBOARD
+          update_dashboard(msg)
+        when MAIN_SUBSCREEN_PO_DETAIL
+          update_po_detail(msg)
+        else  # MAIN_SUBSCREEN_SESSION_CHAT
+          update_session_chat(msg)
+        end
+      end
+
+      private def update_dashboard(msg)
+        return [self, nil] unless msg.is_a?(Bubbletea::KeyMessage)
+
+        char = msg.char.to_s
+
+        # Ctrl+C always quits
+        if msg.ctrl? && char == "c"
+          return [self, Bubbletea.quit]
+        end
+
+        # If chat panel is open, route input there
+        if @chat_panel&.visible
+          return update_chat_panel(msg)
+        end
+
+        case
+        when msg.esc? || char == "q"
+          [self, Bubbletea.quit]
+        when msg.enter?
+          po = @dashboard&.selected_po
+          if po
+            open_chat_panel(po)
+          end
+          [self, nil]
+        when msg.up? || char == "k"
+          @dashboard&.move_up
+          [self, nil]
+        when msg.down? || char == "j"
+          @dashboard&.move_down
+          [self, nil]
+        when msg.left? || char == "h"
+          @dashboard&.move_left
+          [self, nil]
+        when msg.right? || char == "l"
+          @dashboard&.move_right
+          [self, nil]
+        when msg.tab?
+          @dashboard&.toggle_focus
+          [self, nil]
+        when char == "N"
+          # Open notification panel
+          @notification_panel.set_dimensions(@width, @height)
+          @notification_panel.toggle
+          [self, nil]
+        when char == "?"
+          @show_help = !@show_help
+          [self, nil]
+        else
+          [self, nil]
+        end
+      end
+
+      private def open_chat_panel(po)
+        @chat_panel = Models::ChatPanel.new(
+          po: po,
+          session_store: @env.session_store,
+          env: @env,
+          context: @context
+        )
+        # Chat panel gets ~65% of width
+        panel_width = (@width * 0.65).to_i
+        @chat_panel.set_dimensions(panel_width, @height - 2)
+        @active_po = po
+        @context.current_capability = po.name
+      end
+
+      private def close_chat_panel
+        @chat_panel = nil
+      end
+
+      private def update_chat_panel(msg)
+        return [self, nil] unless @chat_panel
+
+        char = msg.char.to_s
+
+        # Ctrl+C always quits
+        if msg.ctrl? && char == "c"
+          return [self, Bubbletea.quit]
+        end
+
+        case @chat_panel.mode
+        when Models::ChatPanel::MODE_INSERT
+          handle_chat_insert_mode(msg, char)
+        when Models::ChatPanel::MODE_SESSION_SELECT
+          handle_chat_session_mode(msg, char)
+        else
+          handle_chat_normal_mode(msg, char)
+        end
+      end
+
+      private def handle_chat_normal_mode(msg, char)
+        case
+        when msg.esc?
+          close_chat_panel
+          [self, nil]
+        when char == "q"
+          close_chat_panel
+          [self, nil]
+        when char == "i" || msg.enter?
+          @chat_panel.mode = Models::ChatPanel::MODE_INSERT
+          [self, nil]
+        when char == "s"
+          @chat_panel.mode = Models::ChatPanel::MODE_SESSION_SELECT
+          [self, nil]
+        when char == "n"
+          @chat_panel.create_new_session
+          [self, nil]
+        when char == "N"
+          # Open notification panel
+          @notification_panel.set_dimensions(@width, @height)
+          @notification_panel.toggle
+          [self, nil]
+        else
+          [self, nil]
+        end
+      end
+
+      private def handle_chat_insert_mode(msg, char)
+        case
+        when msg.esc?
+          @chat_panel.mode = Models::ChatPanel::MODE_NORMAL
+          [self, nil]
+        when msg.enter?
+          text = @chat_panel.submit_input
+          if text && !text.empty?
+            send_chat_message(text)
+          end
+          @chat_panel.mode = Models::ChatPanel::MODE_NORMAL
+          [self, nil]
+        when msg.backspace?
+          @chat_panel.delete_char
+          [self, nil]
+        when msg.space?
+          @chat_panel.insert_char(" ")
+          [self, nil]
+        when msg.ctrl? && char == "u"
+          @chat_panel.clear_input
+          [self, nil]
+        when msg.runes? && !char.empty?
+          @chat_panel.insert_char(char)
+          [self, nil]
+        else
+          [self, nil]
+        end
+      end
+
+      private def handle_chat_session_mode(msg, char)
+        case
+        when msg.esc?
+          @chat_panel.mode = Models::ChatPanel::MODE_NORMAL
+          [self, nil]
+        when msg.left? || char == "h"
+          @chat_panel.prev_session
+          [self, nil]
+        when msg.right? || char == "l"
+          @chat_panel.next_session
+          [self, nil]
+        when char == "n"
+          @chat_panel.create_new_session
+          [self, nil]
+        when msg.enter?
+          @chat_panel.mode = Models::ChatPanel::MODE_NORMAL
+          [self, nil]
+        else
+          [self, nil]
+        end
+      end
+
+      private def send_chat_message(text)
+        return unless @chat_panel && @active_po
+
+        # Log to message bus
+        @env.bus.publish(from: "human", to: @active_po.name, message: text)
+
+        # Show pending state
+        @chat_panel.set_pending_message(text)
+        @active_po.state = :working
+
+        # Run LLM call in background
+        po = @active_po
+        context = @context
+        env = @env
+        chat_panel = @chat_panel
+
+        Thread.new do
+          begin
+            response = po.receive(text, context: context)
+            po.state = :idle
+            env.bus.publish(from: po.name, to: "human", message: response)
+            Bubbletea.send_message(Messages::POResponse.new(po_name: po.name, text: response))
+          rescue StandardError => e
+            Bubbletea.send_message(Messages::ErrorOccurred.new(message: e.message))
+            po.state = :idle
+          end
+        end
+      end
+
+      private def update_po_detail(msg)
+        return [self, nil] unless msg.is_a?(Bubbletea::KeyMessage)
+        return [self, nil] unless @po_detail
+
+        char = msg.char.to_s
+
+        # Ctrl+C always quits
+        if msg.ctrl? && char == "c"
+          return [self, Bubbletea.quit]
+        end
+
+        case
+        when msg.esc?
+          navigate_back
+          [self, nil]
+        when char == "q"
+          [self, Bubbletea.quit]
+        when msg.up? || char == "k"
+          @po_detail.move_up
+          [self, nil]
+        when msg.down? || char == "j"
+          @po_detail.move_down
+          [self, nil]
+        when msg.tab?
+          @po_detail.cycle_focus
+          [self, nil]
+        when char == "n"
+          # Create new session for this PO
+          create_new_session_for_po
+          [self, nil]
+        when msg.enter?
+          # Open selected session in chat
+          session = @po_detail.selected_session
+          if session
+            navigate_to(MAIN_SUBSCREEN_SESSION_CHAT, { session: session })
+          end
+          [self, nil]
+        when char == "?"
+          @show_help = !@show_help
+          [self, nil]
+        else
+          [self, nil]
+        end
+      end
+
+      def create_new_session_for_po
+        return unless @selected_po_for_detail && @env.session_store
+
+        name = "Session #{Time.now.strftime('%Y-%m-%d %H:%M')}"
+        session_id = @env.session_store.create_session(
+          po_name: @selected_po_for_detail.name,
+          name: name,
+          source: "tui"
+        )
+
+        # Refresh po_detail to show new session
+        init_po_detail
+      end
+
+      private def update_session_chat(msg)
+        # Original update_main logic for session chat
         case msg
         when Bubbletea::KeyMessage
           handle_key(msg)
-        when Bubbletea::WindowSizeMessage
-          handle_resize(msg)
         when Messages::SelectPO
           handle_select_po(msg.name)
         when Messages::ActivatePO
@@ -312,6 +616,13 @@ module PromptObjects
         # Clear the pending message and update conversation
         @conversation.clear_pending
         @conversation.set_po(@active_po)
+
+        # Also update chat panel if open
+        if @chat_panel&.visible
+          @chat_panel.clear_pending
+          @chat_panel.refresh_conversation
+        end
+
         @error = nil
         [self, nil]
       end
@@ -333,6 +644,94 @@ module PromptObjects
       end
 
       private def view_main
+        # Route view based on current sub-screen
+        output = case @main_subscreen
+                 when MAIN_SUBSCREEN_DASHBOARD
+                   view_dashboard
+                 when MAIN_SUBSCREEN_PO_DETAIL
+                   view_po_detail
+                 else  # MAIN_SUBSCREEN_SESSION_CHAT
+                   view_session_chat
+                 end
+
+        # Modal overlay (if any)
+        output = render_modal_overlay(output) if @modal
+
+        # Notification panel overlay
+        output = render_notification_overlay(output) if @notification_panel&.visible
+
+        # Responder modal overlay (highest priority)
+        output = render_responder_overlay(output) if @responder
+
+        output
+      end
+
+      private def view_dashboard
+        return "" unless @dashboard
+
+        if @chat_panel&.visible
+          # Side-by-side: dashboard on left, chat panel on right
+          return view_dashboard_with_chat_panel
+        end
+
+        @dashboard.set_dimensions(@width, @height)
+
+        lines = []
+        lines << render_header
+        lines << ""
+        lines << @dashboard.view
+        lines.join("\n")
+      end
+
+      private def view_dashboard_with_chat_panel
+        # Calculate widths: chat panel gets 65%, dashboard gets 35%
+        chat_width = (@width * 0.65).to_i
+        dash_width = @width - chat_width - 1  # -1 for separator
+
+        @dashboard.set_dimensions(dash_width, @height - 2)
+        @chat_panel.set_dimensions(chat_width, @height - 2)
+
+        # Get views
+        dash_lines = @dashboard.view.split("\n")
+        chat_lines = @chat_panel.view.split("\n")
+
+        # Ensure both have same height
+        max_lines = @height - 1
+        while dash_lines.length < max_lines
+          dash_lines << ""
+        end
+        while chat_lines.length < max_lines
+          chat_lines << ""
+        end
+
+        # Compose side by side
+        lines = [render_header]
+
+        (max_lines - 1).times do |i|
+          dash_line = dash_lines[i] || ""
+          chat_line = chat_lines[i] || ""
+
+          # Pad dashboard line to width
+          dash_visible = dash_line.gsub(/\e\[[0-9;]*m/, '').length
+          dash_padded = dash_line + (" " * [dash_width - dash_visible, 0].max)
+
+          lines << "#{dash_padded}│#{chat_line}"
+        end
+
+        lines.join("\n")
+      end
+
+      private def view_po_detail
+        return "" unless @po_detail
+
+        @po_detail.set_dimensions(@width, @height - 1)  # Leave room for header
+        lines = []
+        lines << render_header
+        lines << @po_detail.view
+        lines.join("\n")
+      end
+
+      private def view_session_chat
         lines = []
 
         # Header
@@ -354,17 +753,7 @@ module PromptObjects
         # Status bar
         lines << render_status_bar
 
-        # Modal overlay (if any)
-        output = lines.join("\n")
-        output = render_modal_overlay(output) if @modal
-
-        # Notification panel overlay
-        output = render_notification_overlay(output) if @notification_panel.visible
-
-        # Responder modal overlay (highest priority)
-        output = render_responder_overlay(output) if @responder
-
-        output
+        lines.join("\n")
       end
 
       # Class method to run the app
@@ -594,6 +983,12 @@ module PromptObjects
             @session_explorer.show
             @modal = { type: :session_explorer, data: @session_explorer }
           end
+          [self, nil]
+        when char == "D"
+          # Switch to dashboard view
+          @main_subscreen = MAIN_SUBSCREEN_DASHBOARD
+          @nav_stack = []  # Clear nav stack when explicitly going to dashboard
+          init_dashboard
           [self, nil]
         when msg.left? || char == "h"
           @capability_bar.prev
@@ -868,6 +1263,76 @@ module PromptObjects
         @editor = nil
         @session_picker = nil
         @session_explorer = nil
+      end
+
+      # --- Dashboard Navigation Helpers ---
+
+      def navigate_to(subscreen, data = {})
+        @nav_stack.push(@main_subscreen)
+        @main_subscreen = subscreen
+
+        case subscreen
+        when MAIN_SUBSCREEN_DASHBOARD
+          init_dashboard
+        when MAIN_SUBSCREEN_PO_DETAIL
+          @selected_po_for_detail = data[:po]
+          init_po_detail
+        when MAIN_SUBSCREEN_SESSION_CHAT
+          @selected_session_for_chat = data[:session]
+          init_session_chat_from_nav
+        end
+      end
+
+      def navigate_back
+        return if @nav_stack.empty?
+
+        previous = @nav_stack.pop
+        @main_subscreen = previous
+
+        case @main_subscreen
+        when MAIN_SUBSCREEN_DASHBOARD
+          @selected_po_for_detail = nil
+          @selected_session_for_chat = nil
+        when MAIN_SUBSCREEN_PO_DETAIL
+          @selected_session_for_chat = nil
+          # Refresh the detail view in case sessions changed
+          init_po_detail if @selected_po_for_detail
+        end
+      end
+
+      def init_dashboard
+        @dashboard = Models::Dashboard.new(
+          registry: @env.registry,
+          session_store: @env.session_store,
+          human_queue: @env.human_queue
+        )
+        @dashboard.set_dimensions(@width, @height)
+      end
+
+      def init_po_detail
+        return unless @selected_po_for_detail
+
+        @po_detail = Models::PODetail.new(
+          po: @selected_po_for_detail,
+          session_store: @env.session_store,
+          human_queue: @env.human_queue
+        )
+        @po_detail.set_dimensions(@width, @height)
+      end
+
+      def init_session_chat_from_nav
+        return unless @selected_session_for_chat
+
+        session = @selected_session_for_chat
+        po = @env.registry.get(session[:po_name])
+
+        if po.is_a?(PromptObject)
+          @active_po = po
+          @capability_bar.select(po.name)
+          @active_po.switch_session(session[:id])
+          @conversation.set_po(@active_po)
+          @context.current_capability = po.name
+        end
       end
 
       def handle_notification_key(msg, char)
@@ -1337,6 +1802,7 @@ module PromptObjects
           parts = [
             Styles.help_key.render("i") + " insert",
             Styles.help_key.render("h/l") + " switch PO",
+            Styles.help_key.render("D") + " dashboard",
             Styles.help_key.render("S") + " sessions",
             Styles.help_key.render("E") + " explorer",
             Styles.help_key.render(notif_label) + " notifications",

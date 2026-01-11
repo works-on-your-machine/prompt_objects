@@ -92,23 +92,41 @@ Fixed FFI crashes by using charm-native as single Go runtime for all Charm gems.
 - Built charm-native Go archive and C extension locally
 - Created vendor/charm_shim/ with Ruby compatibility code (Messages, Commands, Model, Runner)
 - All Charm functionality works with single Go runtime - no more crashes
-- See: [epics/charm-forks.md](epics/charm-forks.md)
+- See: [archive/tui-epics/charm-forks.md](archive/tui-epics/charm-forks.md) (archived)
 
 ---
 
 ## In Progress
 
-### Onboarding UI Polish
-Visual refinements for picker/wizard screens. Non-blocking.
-- [ ] Center alignment consistency
-- [ ] Box drawing alignment
-- [ ] Consistent spacing/padding
-- [ ] Loading states/spinners
-- [ ] Keyboard shortcut hints
+*Nothing currently in progress. Web server implementation ready to start.*
 
 ---
 
 ## Ready
+
+### Web Server Infrastructure (NEW)
+Falcon-based web server and React frontend foundation.
+- Falcon server with WebSocket support
+- WebSocketHandler integrated with MessageBus
+- React + Zustand + Vite frontend
+- End-to-end streaming: message → LLM → WebSocket → UI
+- See: [epics/web-server-infrastructure.md](epics/web-server-infrastructure.md)
+- Design doc: [web-server-design.md](web-server-design.md)
+
+### Web UI Complete (NEW)
+Full web interface with dashboard, detail views, and all features.
+- Dashboard with PO cards (status, notifications, sessions)
+- PO detail view with tabs (Chat, Sessions, Capabilities, Edit)
+- Collapsible message bus sidebar
+- Notifications (global + per-PO)
+- See: [epics/web-ui-complete.md](epics/web-ui-complete.md)
+
+### Web Distribution (NEW)
+CLI integration and gem packaging for the web interface.
+- `prompt_objects serve` command
+- Frontend assets bundled with gem
+- Export/import .poenv bundles
+- See: [epics/web-distribution.md](epics/web-distribution.md)
 
 ### Environment Data (Stigmergy)
 Shared data space for loose-coupled PO coordination.
@@ -119,52 +137,26 @@ Shared data space for loose-coupled PO coordination.
 - Foundation for external integrations (email, webhooks, cron)
 - See: [epics/environment-data.md](epics/environment-data.md)
 
-
-### Dashboard UX Overhaul
-Transform TUI from flat chat-centric to hierarchical PO-centric dashboard.
-- Dashboard → PO Detail → Session Chat navigation
-- PO cards with live indicators (state, tools, pending requests)
-- Activity feed showing cross-PO messages and tool calls
-- Session list per PO with source indicators (TUI/MCP/API)
-- Chat only visible when in specific session
-- Mouse + keyboard navigation
-- **Requires**: ~~charm-native (markdown)~~, Event Stream (live updates)
-- See: [epics/dashboard-ux-overhaul.md](epics/dashboard-ux-overhaul.md)
-
-### Connectors: Reactive Multi-Interface Runtime
-Daemon architecture for true reactive multi-interface access (Smalltalk image model).
-- [x] Phase 0: MCP connector with session source tracking (temporary polling)
-- [x] Phase 0: TUI live updates when MCP sessions are active
-- [x] Phase 0: SQLite WAL mode for concurrent access
-- [ ] Phase 1: Event stream foundation (internal pub/sub)
-- [ ] Phase 2: IPC protocol & daemon process
-- [ ] Phase 3: TUI as IPC client (daemon mode)
-- [ ] Phase 4: HTTP/REST API connector with WebSocket events
-- [ ] Phase 5: PO-spawned interfaces (POs can create their own HTTP servers)
-- See: [epics/connectors.md](epics/connectors.md)
-
 ---
 
 ## Backlog
 
-### Streaming Responses
-Token-by-token LLM output display.
-- Progressive rendering in conversation panel
-- Typing indicator
-- Cancel mid-stream
+### TUI Maintenance (Low Priority)
+The TUI still works via `prompt_objects tui`. Not actively developed but maintained.
+- Existing TUI epics archived to [archive/tui-epics/](archive/tui-epics/)
+- Bug fixes only, no new features
 
-### PO Creation from TUI
-Create new POs without editing files.
-- New PO wizard modal
-- Template selection
-- Capability configuration
-- Save to environment
+### Themes (Web)
+Dark/light mode and custom color schemes for web UI.
+- Theme toggle in header
+- System preference detection
+- Custom color schemes in manifest
 
-### Themes
-Dark/light mode and custom color schemes.
-- Theme configuration in manifest
-- Built-in themes
-- Custom color definitions
+### Streaming Cancel
+Ability to cancel LLM generation mid-stream.
+- Cancel button appears during streaming
+- Server-side cancellation
+- Clean UI state on cancel
 
 ---
 
@@ -205,16 +197,38 @@ Speech interaction.
 
 ## Epic File Index
 
+### Active Epics
+
+| Epic | File | Status |
+|------|------|--------|
+| **Web Server Infrastructure** | [epics/web-server-infrastructure.md](epics/web-server-infrastructure.md) | Ready |
+| **Web UI Complete** | [epics/web-ui-complete.md](epics/web-ui-complete.md) | Backlog |
+| **Web Distribution** | [epics/web-distribution.md](epics/web-distribution.md) | Backlog |
+| Environment Data (Stigmergy) | [epics/environment-data.md](epics/environment-data.md) | Ready |
+| Connectors | [epics/connectors.md](epics/connectors.md) | Partially superseded by web |
+
+### Completed Epics
+
 | Epic | File | Status |
 |------|------|--------|
 | Environments | [epics/environments.md](epics/environments.md) | Done |
 | Sessions | [epics/sessions.md](epics/sessions.md) | Done |
 | MCP Server | [epics/mcp-server.md](epics/mcp-server.md) | Done |
 | MCP Tools Reference | [epics/mcp-tools.md](epics/mcp-tools.md) | Done |
-| Charm Native Integration | [epics/charm-forks.md](epics/charm-forks.md) | Done |
 | Primitive Management | [epics/primitive-management.md](epics/primitive-management.md) | Done |
-| Environment Data | [epics/environment-data.md](epics/environment-data.md) | Ready |
-| Markdown Rendering | [epics/markdown-rendering.md](epics/markdown-rendering.md) | Done (via charm-native) |
-| Dashboard UX Overhaul | [epics/dashboard-ux-overhaul.md](epics/dashboard-ux-overhaul.md) | Ready |
 | Session Management | [epics/session-management.md](epics/session-management.md) | Done |
-| Connectors | [epics/connectors.md](epics/connectors.md) | Ready |
+
+### Archived (TUI-specific)
+
+| Epic | File | Notes |
+|------|------|-------|
+| Charm Native Integration | [archive/tui-epics/charm-forks.md](archive/tui-epics/charm-forks.md) | Still works, not actively developed |
+| Markdown Rendering | [archive/tui-epics/markdown-rendering.md](archive/tui-epics/markdown-rendering.md) | Glamour integration for TUI |
+| Dashboard UX Overhaul | [archive/tui-epics/dashboard-ux-overhaul.md](archive/tui-epics/dashboard-ux-overhaul.md) | Superseded by web UI |
+| Dashboard and Mouse | [archive/tui-epics/dashboard-and-mouse.md](archive/tui-epics/dashboard-and-mouse.md) | TUI mouse support |
+
+### Design Documents
+
+| Document | File |
+|----------|------|
+| Web Server Design | [web-server-design.md](web-server-design.md) |
