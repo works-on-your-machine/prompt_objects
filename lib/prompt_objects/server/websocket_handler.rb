@@ -30,14 +30,38 @@ module PromptObjects
       def subscribe_to_bus
         @bus_subscription = ->(entry) { on_bus_message(entry) }
         @runtime.bus.subscribe(&@bus_subscription)
+
+        # Subscribe to HumanQueue for notification events
+        @human_queue_subscription = ->(event, request) { on_human_queue_event(event, request) }
+        @runtime.human_queue.subscribe(&@human_queue_subscription)
+
         @subscribed = true
       end
 
       def unsubscribe_from_bus
-        return unless @subscribed && @bus_subscription
+        return unless @subscribed
 
-        @runtime.bus.unsubscribe(@bus_subscription)
+        @runtime.bus.unsubscribe(@bus_subscription) if @bus_subscription
+        @runtime.human_queue.unsubscribe(@human_queue_subscription) if @human_queue_subscription
+
         @subscribed = false
+      end
+
+      def on_human_queue_event(event, request)
+        case event
+        when :added
+          send_message(
+            type: "notification",
+            payload: request_to_hash(request)
+          )
+        when :resolved
+          send_message(
+            type: "notification_resolved",
+            payload: { id: request.id }
+          )
+        end
+      rescue => e
+        puts "WebSocket notification error: #{e.message}" if ENV["DEBUG"]
       end
 
       def on_bus_message(entry)
@@ -150,7 +174,8 @@ module PromptObjects
 
         # Run in async context
         Async do
-          context = @runtime.context
+          # Use tui_mode: true so ask_human uses HumanQueue (blocking) instead of REPL mode
+          context = @runtime.context(tui_mode: true)
           context.current_capability = "human"
 
           begin
