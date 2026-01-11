@@ -320,16 +320,20 @@ def print_serve_help
       environment  Environment name or path to environment directory
 
     Options:
+      --web            Run as web server with React UI (default)
       --mcp            Run as MCP server (stdio transport, for Claude Desktop/Cursor)
-      --api            Run as REST API server (not yet implemented)
-      --port PORT      Port for API server (default: 3000)
+      --port PORT      Port for web server (default: 3000)
+      --host HOST      Host for web server (default: localhost)
+      --open           Open browser automatically
       --help, -h       Show this help message
 
     Examples:
-      prompt_objects serve --mcp my-assistant
-      prompt_objects serve --mcp ~/.prompt_objects/environments/work-tools
+      prompt_objects serve my-assistant              # Web UI (default)
+      prompt_objects serve my-assistant --port 4000  # Custom port
+      prompt_objects serve --mcp my-assistant        # MCP server mode
+      prompt_objects serve ./my-environment          # Serve from path
 
-    Claude Desktop Configuration:
+    Claude Desktop Configuration (MCP mode):
       Add to claude_desktop_config.json:
       {
         "mcpServers": {
@@ -396,26 +400,38 @@ end
 
 def run_serve(args)
   options = {
+    web: false,
     mcp: false,
-    api: false,
     port: 3000,
+    host: "localhost",
+    open: false,
     environment: nil
   }
 
+  skip_next = false
   args.each_with_index do |arg, i|
+    if skip_next
+      skip_next = false
+      next
+    end
+
     case arg
+    when "--web"
+      options[:web] = true
     when "--mcp"
       options[:mcp] = true
-    when "--api"
-      options[:api] = true
     when "--port"
       options[:port] = args[i + 1].to_i
+      skip_next = true
+    when "--host"
+      options[:host] = args[i + 1]
+      skip_next = true
+    when "--open", "-o"
+      options[:open] = true
     when "--help", "-h"
       print_serve_help
       exit 0
     else
-      # Skip values that follow options
-      next if args[i - 1] == "--port"
       # Assume it's the environment
       options[:environment] = arg unless arg.start_with?("-")
     end
@@ -427,11 +443,8 @@ def run_serve(args)
     exit 1
   end
 
-  unless options[:mcp] || options[:api]
-    puts "Error: specify at least one interface (--mcp or --api)"
-    puts "Run 'prompt_objects serve --help' for usage"
-    exit 1
-  end
+  # Default to web if no interface specified
+  options[:web] = true unless options[:mcp]
 
   # Redirect stderr to a log file to avoid polluting MCP stdio
   if options[:mcp] && ENV["PROMPT_OBJECTS_LOG"]
@@ -455,9 +468,31 @@ def run_serve(args)
   if options[:mcp]
     connector = PromptObjects::Connectors::MCP.new(runtime: runtime)
     connector.start
-  elsif options[:api]
-    puts "API server not yet implemented"
-    exit 1
+  elsif options[:web]
+    require "prompt_objects/server"
+
+    # Open browser if requested
+    if options[:open]
+      url = "http://#{options[:host]}:#{options[:port]}"
+      open_browser(url)
+    end
+
+    PromptObjects::Server.start(
+      runtime: runtime,
+      host: options[:host],
+      port: options[:port]
+    )
+  end
+end
+
+def open_browser(url)
+  case RUBY_PLATFORM
+  when /darwin/
+    system("open", url)
+  when /linux/
+    system("xdg-open", url)
+  when /mswin|mingw/
+    system("start", url)
   end
 end
 

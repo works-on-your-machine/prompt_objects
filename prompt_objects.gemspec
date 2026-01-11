@@ -32,6 +32,11 @@ Gem::Specification.new do |spec|
   spec.add_dependency "front_matter_parser"
   spec.add_dependency "sqlite3", "~> 2.0"
 
+  # Web server dependencies
+  spec.add_dependency "falcon", "~> 0.47"
+  spec.add_dependency "async-websocket", "~> 0.26"
+  spec.add_dependency "rack", "~> 3.0"
+
   # TUI dependencies
   # Note: We use charm-native (specified in Gemfile) which provides unified
   # Bubbletea/Lipgloss/Glamour with a single Go runtime, avoiding FFI crashes.
