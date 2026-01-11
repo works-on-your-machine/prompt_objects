@@ -57,9 +57,19 @@ The following options were considered before charm-native was available:
 ## Implementation Steps
 
 1. ~~Wait for charm-native~~ ✓ Done
-2. [ ] Integrate Glamour into conversation panel
-3. [ ] Add style configuration (allow user to choose dark/light)
-4. [ ] Handle edge cases (very wide content, nested code blocks)
+2. ~~Integrate Glamour into conversation panel~~ ✓ Done
+3. [ ] Add style configuration (allow user to choose dark/light) - deferred
+4. ~~Handle edge cases (very wide content, nested code blocks)~~ ✓ Done
+
+### Implementation Details
+
+The conversation panel (`lib/prompt_objects/ui/models/conversation.rb`) now:
+- Renders assistant messages through Glamour with "dark" style
+- Strips leading/trailing empty lines from Glamour output
+- Strips trailing ANSI-styled whitespace (Glamour pads lines to width)
+- Truncates wide lines while preserving ANSI escape codes
+- Falls back to simple text wrapping if Glamour fails
+- Uses smart display: single-line text inline with prefix, multi-line content indented below
 
 ## Testing
 
