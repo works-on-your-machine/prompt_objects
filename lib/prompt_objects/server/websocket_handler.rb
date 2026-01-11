@@ -81,7 +81,7 @@ module PromptObjects
         end
 
         # Send pending human requests (notifications)
-        @runtime.human_queue.pending_requests.each do |request|
+        @runtime.human_queue.all_pending.each do |request|
           send_message(
             type: "notification",
             payload: request_to_hash(request)

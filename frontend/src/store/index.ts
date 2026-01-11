@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useShallow } from 'zustand/react/shallow'
 import type {
   PromptObject,
   BusMessage,
@@ -138,9 +139,9 @@ export const useStore = create<Store>((set) => ({
     }),
 }))
 
-// Selectors
+// Selectors - use useShallow to prevent infinite re-renders with derived arrays
 export const usePromptObjects = () =>
-  useStore((s) => Object.values(s.promptObjects))
+  useStore(useShallow((s) => Object.values(s.promptObjects)))
 
 export const useSelectedPO = () =>
   useStore((s) => (s.selectedPO ? s.promptObjects[s.selectedPO] : null))
@@ -149,4 +150,4 @@ export const useNotificationCount = () =>
   useStore((s) => s.notifications.length)
 
 export const usePONotifications = (poName: string) =>
-  useStore((s) => s.notifications.filter((n) => n.po_name === poName))
+  useStore(useShallow((s) => s.notifications.filter((n) => n.po_name === poName)))

@@ -31,8 +31,12 @@ export function useWebSocket() {
 
   const connect = useCallback(() => {
     // Determine WebSocket URL
+    // In dev mode (Vite on 5173), connect directly to Ruby server on 3000
+    // In production, connect to same host
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}`
+    const isDev = window.location.port === '5173'
+    const host = isDev ? 'localhost:3000' : window.location.host
+    const wsUrl = `${protocol}//${host}`
 
     console.log('Connecting to WebSocket:', wsUrl)
     ws.current = new WebSocket(wsUrl)
