@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useStore } from '../store'
+import { MarkdownMessage } from './MarkdownMessage'
 import type { PromptObject, Message } from '../types'
 
 interface ChatPanelProps {
@@ -51,7 +52,7 @@ export function ChatPanel({ po, sendMessage }: ChatPanelProps) {
               AI
             </div>
             <div className="flex-1 bg-po-surface rounded-lg p-3 text-gray-200">
-              <div className="whitespace-pre-wrap">{streaming}</div>
+              <MarkdownMessage content={streaming} />
               <span className="inline-block w-2 h-4 bg-po-accent animate-pulse ml-1" />
             </div>
           </div>
@@ -118,7 +119,11 @@ function MessageBubble({ message }: { message: Message }) {
         }`}
       >
         {message.content && (
-          <div className="whitespace-pre-wrap">{message.content}</div>
+          isAssistant ? (
+            <MarkdownMessage content={message.content} />
+          ) : (
+            <div className="whitespace-pre-wrap">{message.content}</div>
+          )
         )}
 
         {/* Tool calls */}
