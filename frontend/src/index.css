@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base styles */
+html {
+  color-scheme: dark;
+}
+
+body {
+  @apply antialiased;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-po-bg;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-po-border rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-po-accent;
+}
+
+/* Custom utilities */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+}
