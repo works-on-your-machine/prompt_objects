@@ -176,6 +176,9 @@ module PromptObjects
           return
         end
 
+        # Capture the session_id at request start so response goes to correct session
+        request_session_id = po.session_id
+
         # Update PO state to working
         send_message(
           type: "po_state",
@@ -193,21 +196,35 @@ module PromptObjects
             # For now, just get the full response
             response = po.receive(content, context: context)
 
-            # Send the complete response
+            # Send the complete response with session_id for correct routing
             send_message(
               type: "po_response",
               payload: {
                 target: po_name,
+                session_id: request_session_id,
                 content: response
               }
             )
+
+            # Send session update for the session where messages were added
+            # This ensures the correct session is updated even if user switched
+            if request_session_id
+              send_message(
+                type: "session_updated",
+                payload: {
+                  target: po_name,
+                  session_id: request_session_id,
+                  messages: session_messages(po, request_session_id)
+                }
+              )
+            end
           rescue => e
             send_error("Error from #{po_name}: #{e.message}")
           ensure
-            # Update PO state back to idle
+            # Update PO state back to idle (status only, not session data)
             send_message(
               type: "po_state",
-              payload: { name: po_name, state: po_state_hash(po) }
+              payload: { name: po_name, state: { status: "idle" } }
             )
           end
         end
@@ -313,6 +330,14 @@ module PromptObjects
           id: po.session_id,
           messages: po.history.map { |m| message_to_hash(m) }
         }
+      end
+
+      # Get messages for a specific session (may not be current session)
+      def session_messages(po, session_id)
+        return [] unless @runtime.session_store
+
+        messages = @runtime.session_store.get_messages(session_id: session_id)
+        messages.map { |m| message_to_hash(m) }
       end
 
       def session_summary(session)

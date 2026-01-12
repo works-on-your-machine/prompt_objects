@@ -96,15 +96,18 @@ module PromptObjects
 
       # List all sessions for a PO.
       # @param po_name [String] Name of the prompt object
-      # @return [Array<Hash>] Session data
+      # @return [Array<Hash>] Session data with message counts
       def list_sessions(po_name:)
         rows = @db.execute(<<~SQL, [po_name])
-          SELECT * FROM sessions
-          WHERE po_name = ?
-          ORDER BY updated_at DESC
+          SELECT s.*, COUNT(m.id) as message_count
+          FROM sessions s
+          LEFT JOIN messages m ON m.session_id = s.id
+          WHERE s.po_name = ?
+          GROUP BY s.id
+          ORDER BY s.updated_at DESC
         SQL
 
-        rows.map { |row| parse_session_row(row) }
+        rows.map { |row| parse_session_row(row, include_count: true) }
       end
 
       # List all sessions across all POs.

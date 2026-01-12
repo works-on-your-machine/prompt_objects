@@ -79,6 +79,7 @@ export type WSMessageType =
   | 'notification_resolved'
   | 'session_created'
   | 'session_switched'
+  | 'session_updated'
   | 'error'
   | 'pong'
 

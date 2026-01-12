@@ -6,6 +6,7 @@ import type {
   BusMessage,
   Notification,
   Environment,
+  Message,
   SendMessagePayload,
   RespondToNotificationPayload,
   CreateSessionPayload,
@@ -21,6 +22,7 @@ export function useWebSocket() {
     setEnvironment,
     setPromptObject,
     removePromptObject,
+    updateSessionMessages,
     addBusMessage,
     addNotification,
     removeNotification,
@@ -162,6 +164,16 @@ export function useWebSocket() {
           break
         }
 
+        case 'session_updated': {
+          const { target, session_id, messages } = message.payload as {
+            target: string
+            session_id: string
+            messages: Message[]
+          }
+          updateSessionMessages(target, session_id, messages)
+          break
+        }
+
         case 'error': {
           const { message: errorMsg } = message.payload as { message: string }
           console.error('Server error:', errorMsg)
@@ -180,6 +192,7 @@ export function useWebSocket() {
       setEnvironment,
       setPromptObject,
       removePromptObject,
+      updateSessionMessages,
       setPendingResponse,
       clearPendingResponse,
       appendStreamChunk,
