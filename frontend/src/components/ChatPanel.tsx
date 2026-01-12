@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useStore } from '../store'
 import { MarkdownMessage } from './MarkdownMessage'
-import type { PromptObject, Message } from '../types'
+import type { PromptObject, Message, ToolCall } from '../types'
 
 interface ChatPanelProps {
   po: PromptObject
@@ -138,21 +138,68 @@ function MessageBubble({ message }: { message: Message }) {
 
         {/* Tool calls */}
         {isAssistant && message.tool_calls && message.tool_calls.length > 0 && (
-          <div className="mt-2 space-y-1">
+          <div className="mt-2 space-y-2">
             {message.tool_calls.map((tc) => (
-              <div
-                key={tc.id}
-                className="text-xs bg-po-bg/50 rounded px-2 py-1 font-mono"
-              >
-                <span className="text-po-warning">{tc.name}</span>
-                <span className="text-gray-500">
-                  ({Object.keys(tc.arguments).join(', ')})
-                </span>
-              </div>
+              <ToolCallDisplay key={tc.id} toolCall={tc} />
             ))}
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function ToolCallDisplay({ toolCall }: { toolCall: ToolCall }) {
+  const { notifications } = useStore()
+
+  // Special display for ask_human
+  if (toolCall.name === 'ask_human') {
+    const question = toolCall.arguments.question as string
+    const options = toolCall.arguments.options as string[] | undefined
+
+    // Check if there's a pending notification for this (by matching question)
+    const isPending = notifications.some((n) => n.message === question)
+
+    return (
+      <div className="bg-po-warning/10 border border-po-warning/30 rounded-lg p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-po-warning text-sm font-medium">
+            Waiting for human input
+          </span>
+          {isPending ? (
+            <span className="text-xs bg-po-warning text-black px-2 py-0.5 rounded animate-pulse">
+              PENDING
+            </span>
+          ) : (
+            <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded">
+              RESOLVED
+            </span>
+          )}
+        </div>
+        <p className="text-gray-200 text-sm mb-2">{question}</p>
+        {options && options.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {options.map((opt, i) => (
+              <span
+                key={i}
+                className="text-xs bg-po-bg px-2 py-1 rounded text-gray-400"
+              >
+                {opt}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Default display for other tool calls
+  return (
+    <div className="text-xs bg-po-bg/50 rounded px-2 py-1 font-mono">
+      <span className="text-po-accent">{toolCall.name}</span>
+      <span className="text-gray-500">
+        ({Object.keys(toolCall.arguments).join(', ')})
+      </span>
     </div>
   )
 }
