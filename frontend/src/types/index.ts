@@ -121,6 +121,7 @@ export interface WSMessage<T = unknown> {
 export interface SendMessagePayload {
   target: string
   content: string
+  new_thread?: boolean  // If true, create a new thread before sending
 }
 
 export interface RespondToNotificationPayload {

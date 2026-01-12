@@ -254,13 +254,13 @@ export function useWebSocket() {
   }, [connect])
 
   // Send message to a PO
-  const sendMessage = useCallback((target: string, content: string) => {
+  const sendMessage = useCallback((target: string, content: string, newThread?: boolean) => {
     if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
       console.error('WebSocket not connected')
       return
     }
 
-    const payload: SendMessagePayload = { target, content }
+    const payload: SendMessagePayload = { target, content, new_thread: newThread }
     ws.current.send(
       JSON.stringify({
         type: 'send_message',

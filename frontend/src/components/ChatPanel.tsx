@@ -5,15 +5,14 @@ import type { PromptObject, Message, ToolCall } from '../types'
 
 interface ChatPanelProps {
   po: PromptObject
-  sendMessage: (target: string, content: string) => void
-  createThread?: (target: string, name?: string) => void
+  sendMessage: (target: string, content: string, newThread?: boolean) => void
 }
 
-export function ChatPanel({ po, sendMessage, createThread }: ChatPanelProps) {
+export function ChatPanel({ po, sendMessage }: ChatPanelProps) {
   const [input, setInput] = useState('')
   const [continueThread, setContinueThread] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const { streamingContent, addMessageToPO } = useStore()
+  const { streamingContent } = useStore()
 
   const messages = po.current_session?.messages || []
   const streaming = streamingContent[po.name]
@@ -29,24 +28,12 @@ export function ChatPanel({ po, sendMessage, createThread }: ChatPanelProps) {
 
     const content = input.trim()
 
-    // If not continuing and there are existing messages, create a new thread first
-    if (!continueThread && hasMessages && createThread) {
-      // Create new thread - the server will switch to it and send updated state
-      createThread(po.name)
-      // Small delay to let the thread be created before sending
-      setTimeout(() => {
-        sendMessage(po.name, content)
-      }, 100)
-    } else {
-      // Add user message immediately (optimistic update)
-      addMessageToPO(po.name, {
-        role: 'user',
-        content,
-        from: 'human',
-      })
-      // Send to server
-      sendMessage(po.name, content)
-    }
+    // Determine if we should create a new thread
+    const shouldCreateNewThread = !continueThread && hasMessages
+
+    // Send message to server - it will handle thread creation + message in one operation
+    // Server sends immediate session_updated with user message for instant feedback
+    sendMessage(po.name, content, shouldCreateNewThread)
     setInput('')
   }
 

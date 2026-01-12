@@ -194,6 +194,7 @@ module PromptObjects
       def handle_send_message(payload)
         po_name = payload["target"]
         content = payload["content"]
+        new_thread = payload["new_thread"] # If true, create a new thread first
 
         po = @runtime.registry.get(po_name)
 
@@ -202,13 +203,38 @@ module PromptObjects
           return
         end
 
+        # If new_thread requested, create one first
+        if new_thread
+          thread_id = po.new_thread
+          # Notify client of new thread immediately so they see it
+          send_message(
+            type: "thread_created",
+            payload: {
+              target: po_name,
+              thread_id: thread_id,
+              thread_type: "root"
+            }
+          )
+        end
+
         # Capture the session_id at request start so response goes to correct session
         request_session_id = po.session_id
 
-        # Update PO state to working
+        # Update PO state to working AND send the user message for immediate UI feedback
         send_message(
           type: "po_state",
           payload: { name: po_name, state: { status: "thinking" } }
+        )
+
+        # Send immediate session update showing the user's message
+        # This gives instant feedback before the AI responds
+        send_message(
+          type: "session_updated",
+          payload: {
+            target: po_name,
+            session_id: request_session_id,
+            messages: [{ role: "user", content: content, from: "human" }]
+          }
         )
 
         # Run in async context
@@ -221,6 +247,9 @@ module PromptObjects
             # TODO: Add streaming support to receive()
             # For now, just get the full response
             response = po.receive(content, context: context)
+
+            # Auto-name the thread if it doesn't have a name yet
+            auto_name_thread_if_needed(po, request_session_id, content)
 
             # Send the complete response with session_id for correct routing
             send_message(
@@ -244,6 +273,15 @@ module PromptObjects
                 }
               )
             end
+
+            # Also send updated sessions list (for thread panel)
+            send_message(
+              type: "po_state",
+              payload: {
+                name: po_name,
+                state: { sessions: po.list_sessions.map { |s| session_summary(s) } }
+              }
+            )
           rescue => e
             send_error("Error from #{po_name}: #{e.message}")
           ensure
@@ -254,6 +292,16 @@ module PromptObjects
             )
           end
         end
+      end
+
+      # Auto-name a thread based on the user's first message if it doesn't have a name
+      def auto_name_thread_if_needed(po, session_id, user_message)
+        return unless @runtime.session_store && session_id
+
+        session = @runtime.session_store.get_session(session_id)
+        return if session.nil? || session[:name] # Already has a name
+
+        @runtime.session_store.auto_name_thread(session_id, user_message)
       end
 
       def handle_notification_response(payload)

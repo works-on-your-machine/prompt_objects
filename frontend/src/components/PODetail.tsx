@@ -84,7 +84,7 @@ export function PODetail({
       {/* Tab content */}
       <div className="flex-1 overflow-hidden">
         {activeTab === 'chat' && (
-          <ChatPanel po={po} sendMessage={sendMessage} createThread={createThread} />
+          <ChatPanel po={po} sendMessage={sendMessage} />
         )}
         {activeTab === 'sessions' && (
           <SessionsPanel
