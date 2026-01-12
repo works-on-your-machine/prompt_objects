@@ -12,6 +12,8 @@ import type {
   RespondToNotificationPayload,
   CreateSessionPayload,
   SwitchSessionPayload,
+  CreateThreadPayload,
+  ThreadType,
 } from '../types'
 
 export function useWebSocket() {
@@ -177,6 +179,24 @@ export function useWebSocket() {
           break
         }
 
+        case 'thread_created': {
+          const { target, thread_id, thread_type } = message.payload as {
+            target: string
+            thread_id: string
+            name: string | null
+            thread_type: ThreadType
+          }
+          console.log('Thread created:', target, thread_id, thread_type)
+          // State will be updated by the subsequent po_state message
+          break
+        }
+
+        case 'thread_tree': {
+          // Thread tree response - could be used for navigation
+          console.log('Thread tree received:', message.payload)
+          break
+        }
+
         case 'llm_config':
           setLLMConfig(message.payload as LLMConfig)
           break
@@ -312,11 +332,28 @@ export function useWebSocket() {
     )
   }, [])
 
+  // Create a new thread (defaults to root thread)
+  const createThread = useCallback((target: string, name?: string, threadType?: ThreadType) => {
+    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket not connected')
+      return
+    }
+
+    const payload: CreateThreadPayload = { target, name, thread_type: threadType }
+    ws.current.send(
+      JSON.stringify({
+        type: 'create_thread',
+        payload,
+      })
+    )
+  }, [])
+
   return {
     sendMessage,
     respondToNotification,
     createSession,
     switchSession,
     switchLLM,
+    createThread,
   }
 }

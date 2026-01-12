@@ -6,15 +6,18 @@ import type { PromptObject, Message, ToolCall } from '../types'
 interface ChatPanelProps {
   po: PromptObject
   sendMessage: (target: string, content: string) => void
+  createThread?: (target: string, name?: string) => void
 }
 
-export function ChatPanel({ po, sendMessage }: ChatPanelProps) {
+export function ChatPanel({ po, sendMessage, createThread }: ChatPanelProps) {
   const [input, setInput] = useState('')
+  const [continueThread, setContinueThread] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { streamingContent, addMessageToPO } = useStore()
 
   const messages = po.current_session?.messages || []
   const streaming = streamingContent[po.name]
+  const hasMessages = messages.length > 0
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -26,15 +29,24 @@ export function ChatPanel({ po, sendMessage }: ChatPanelProps) {
 
     const content = input.trim()
 
-    // Add user message immediately (optimistic update)
-    addMessageToPO(po.name, {
-      role: 'user',
-      content,
-      from: 'human',
-    })
-
-    // Send to server
-    sendMessage(po.name, content)
+    // If not continuing and there are existing messages, create a new thread first
+    if (!continueThread && hasMessages && createThread) {
+      // Create new thread - the server will switch to it and send updated state
+      createThread(po.name)
+      // Small delay to let the thread be created before sending
+      setTimeout(() => {
+        sendMessage(po.name, content)
+      }, 100)
+    } else {
+      // Add user message immediately (optimistic update)
+      addMessageToPO(po.name, {
+        role: 'user',
+        content,
+        from: 'human',
+      })
+      // Send to server
+      sendMessage(po.name, content)
+    }
     setInput('')
   }
 
@@ -90,6 +102,39 @@ export function ChatPanel({ po, sendMessage }: ChatPanelProps) {
             Send
           </button>
         </div>
+
+        {/* Thread toggle - only show when there are existing messages */}
+        {hasMessages && (
+          <div className="flex items-center gap-3 mt-2 text-xs">
+            <button
+              type="button"
+              onClick={() => setContinueThread(false)}
+              className={`px-2 py-1 rounded transition-colors ${
+                !continueThread
+                  ? 'bg-po-accent/20 text-po-accent border border-po-accent'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              New thread
+            </button>
+            <button
+              type="button"
+              onClick={() => setContinueThread(true)}
+              className={`px-2 py-1 rounded transition-colors ${
+                continueThread
+                  ? 'bg-po-accent/20 text-po-accent border border-po-accent'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Continue thread
+            </button>
+            <span className="text-gray-500">
+              {continueThread
+                ? 'Will add to current conversation'
+                : 'Will start a fresh conversation'}
+            </span>
+          </div>
+        )}
       </form>
     </div>
   )

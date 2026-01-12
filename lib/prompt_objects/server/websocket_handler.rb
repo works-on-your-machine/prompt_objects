@@ -170,6 +170,10 @@ module PromptObjects
           handle_create_session(message["payload"])
         when "switch_session"
           handle_switch_session(message["payload"])
+        when "create_thread"
+          handle_create_thread(message["payload"])
+        when "get_thread_tree"
+          handle_get_thread_tree(message["payload"])
         when "get_llm_config"
           handle_get_llm_config
         when "switch_llm"
@@ -326,6 +330,47 @@ module PromptObjects
         end
       end
 
+      def handle_create_thread(payload)
+        po_name = payload["target"]
+        thread_name = payload["name"]
+        thread_type = payload["thread_type"] || "root"
+
+        po = @runtime.registry.get(po_name)
+        return send_error("Unknown prompt object: #{po_name}") unless po.is_a?(PromptObject)
+
+        thread_id = po.new_thread(name: thread_name)
+
+        send_message(
+          type: "thread_created",
+          payload: {
+            target: po_name,
+            thread_id: thread_id,
+            name: thread_name,
+            thread_type: thread_type
+          }
+        )
+
+        # Also send updated PO state
+        send_message(
+          type: "po_state",
+          payload: { name: po_name, state: po_state_hash(po) }
+        )
+      end
+
+      def handle_get_thread_tree(payload)
+        session_id = payload["session_id"]
+        return send_error("Session ID required") unless session_id
+        return send_error("No session store available") unless @runtime.session_store
+
+        tree = @runtime.session_store.get_thread_tree(session_id)
+        return send_error("Session not found: #{session_id}") unless tree
+
+        send_message(
+          type: "thread_tree",
+          payload: { tree: serialize_thread_tree(tree) }
+        )
+      end
+
       def handle_get_llm_config
         config = @runtime.llm_config
 
@@ -419,7 +464,21 @@ module PromptObjects
           id: session[:id],
           name: session[:name],
           message_count: session[:message_count] || 0,
-          updated_at: session[:updated_at]&.iso8601
+          updated_at: session[:updated_at]&.iso8601,
+          # Thread fields
+          parent_session_id: session[:parent_session_id],
+          parent_po: session[:parent_po],
+          thread_type: session[:thread_type] || "root"
+        }
+      end
+
+      # Recursively serialize a thread tree for JSON
+      def serialize_thread_tree(tree)
+        return nil unless tree
+
+        {
+          session: session_summary(tree[:session]),
+          children: (tree[:children] || []).map { |child| serialize_thread_tree(child) }
         }
       end
 

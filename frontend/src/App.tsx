@@ -8,7 +8,7 @@ import { MessageBus } from './components/MessageBus'
 import { NotificationPanel } from './components/NotificationPanel'
 
 export default function App() {
-  const { sendMessage, respondToNotification, createSession, switchSession, switchLLM } =
+  const { sendMessage, respondToNotification, createSession, switchSession, switchLLM, createThread } =
     useWebSocket()
   const { selectedPO, busOpen, notifications } = useStore()
   const [splitView, setSplitView] = useState(true) // Default to split view
@@ -55,6 +55,7 @@ export default function App() {
               sendMessage={sendMessage}
               createSession={createSession}
               switchSession={switchSession}
+              createThread={createThread}
             />
           ) : (
             <Dashboard />

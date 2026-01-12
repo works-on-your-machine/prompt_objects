@@ -118,7 +118,11 @@ module PromptObjects
             id: s[:id],
             name: s[:name],
             message_count: s[:message_count] || 0,
-            updated_at: s[:updated_at]&.iso8601
+            updated_at: s[:updated_at]&.iso8601,
+            # Thread fields
+            parent_session_id: s[:parent_session_id],
+            parent_po: s[:parent_po],
+            thread_type: s[:thread_type] || "root"
           }
         end,
         prompt: po.body,

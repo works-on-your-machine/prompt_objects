@@ -19,11 +19,22 @@ export interface ToolResult {
   content: string
 }
 
+export type ThreadType = 'root' | 'continuation' | 'delegation' | 'fork'
+
 export interface Session {
   id: string
   name: string | null
   message_count: number
   updated_at?: string
+  // Thread fields
+  parent_session_id?: string
+  parent_po?: string
+  thread_type: ThreadType
+}
+
+export interface ThreadTree {
+  session: Session
+  children: ThreadTree[]
 }
 
 export interface CurrentSession {
@@ -94,6 +105,8 @@ export type WSMessageType =
   | 'session_created'
   | 'session_switched'
   | 'session_updated'
+  | 'thread_created'
+  | 'thread_tree'
   | 'llm_config'
   | 'llm_switched'
   | 'error'
@@ -123,4 +136,10 @@ export interface CreateSessionPayload {
 export interface SwitchSessionPayload {
   target: string
   session_id: string
+}
+
+export interface CreateThreadPayload {
+  target: string
+  name?: string
+  thread_type?: ThreadType
 }

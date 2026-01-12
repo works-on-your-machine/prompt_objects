@@ -8,12 +8,14 @@ interface PODetailProps {
   sendMessage: (target: string, content: string) => void
   createSession: (target: string, name?: string) => void
   switchSession: (target: string, sessionId: string) => void
+  createThread: (target: string, name?: string) => void
 }
 
 export function PODetail({
   sendMessage,
   createSession,
   switchSession,
+  createThread,
 }: PODetailProps) {
   const { activeTab, setActiveTab, selectPO } = useStore()
   const po = useSelectedPO()
@@ -29,7 +31,7 @@ export function PODetail({
 
   const tabs = [
     { id: 'chat' as const, label: 'Chat' },
-    { id: 'sessions' as const, label: `Sessions (${po.sessions?.length || 0})` },
+    { id: 'sessions' as const, label: `Threads (${po.sessions?.length || 0})` },
     { id: 'capabilities' as const, label: `Capabilities (${po.capabilities?.length || 0})` },
     { id: 'prompt' as const, label: 'Prompt' },
   ]
@@ -82,13 +84,14 @@ export function PODetail({
       {/* Tab content */}
       <div className="flex-1 overflow-hidden">
         {activeTab === 'chat' && (
-          <ChatPanel po={po} sendMessage={sendMessage} />
+          <ChatPanel po={po} sendMessage={sendMessage} createThread={createThread} />
         )}
         {activeTab === 'sessions' && (
           <SessionsPanel
             po={po}
             createSession={createSession}
             switchSession={switchSession}
+            createThread={createThread}
           />
         )}
         {activeTab === 'capabilities' && <CapabilitiesPanel po={po} />}

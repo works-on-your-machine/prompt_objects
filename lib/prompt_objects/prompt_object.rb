@@ -145,6 +145,65 @@ module PromptObjects
       session_store&.clear_messages(@session_id) if @session_id
     end
 
+    # --- Thread/Delegation Support ---
+
+    # Create a delegation thread for handling a call from another PO.
+    # @param parent_po [String] Name of the PO that initiated the call
+    # @param parent_session_id [String] Session ID in the parent PO
+    # @param parent_message_id [Integer, nil] Message ID that triggered the delegation
+    # @return [String, nil] New thread ID or nil if no session store
+    def create_delegation_thread(parent_po:, parent_session_id:, parent_message_id: nil)
+      return nil unless session_store
+
+      session_store.create_thread(
+        po_name: name,
+        parent_po: parent_po,
+        parent_session_id: parent_session_id,
+        parent_message_id: parent_message_id,
+        thread_type: "delegation",
+        source: "delegation"
+      )
+    end
+
+    # Execute a message in a specific thread, then restore the original session.
+    # @param message [String, Hash] The message to process
+    # @param context [Context] Execution context
+    # @param thread_id [String] Thread ID to execute in
+    # @return [String] The response
+    def receive_in_thread(message, context:, thread_id:)
+      original_session = @session_id
+      original_history = @history.dup
+
+      # Switch to delegation thread
+      @session_id = thread_id
+      @history = []
+      reload_history_from_session
+
+      begin
+        result = receive(message, context: context)
+        result
+      ensure
+        # Restore original session
+        @session_id = original_session
+        @history = original_history
+      end
+    end
+
+    # Create a new root thread and switch to it.
+    # @param name [String, nil] Optional thread name
+    # @return [String] New thread ID
+    def new_thread(name: nil)
+      return nil unless session_store
+
+      @session_id = session_store.create_thread(
+        po_name: self.name,
+        name: name,
+        thread_type: "root"
+      )
+      @history = []
+      @session_id
+    end
+
     private
 
     def normalize_message(message)
@@ -206,7 +265,13 @@ module PromptObjects
           context.calling_po = name
           context.current_capability = tc.name
 
-          result = capability.receive(tc.arguments, context: context)
+          result = if capability.is_a?(PromptObject)
+                     # PO-to-PO call: create isolated delegation thread
+                     execute_po_delegation(capability, tc, context)
+                   else
+                     # Primitive call: execute directly
+                     capability.receive(tc.arguments, context: context)
+                   end
 
           # Restore context
           context.current_capability = previous_capability
@@ -220,6 +285,37 @@ module PromptObjects
           { tool_call_id: tc.id, name: tc.name, content: "Unknown capability: #{tc.name}" }
         end
       end
+    end
+
+    # Execute a delegation to another PO in an isolated thread.
+    # @param target_po [PromptObject] The PO to delegate to
+    # @param tool_call [ToolCall] The tool call details
+    # @param context [Context] Execution context
+    # @return [String] The response
+    def execute_po_delegation(target_po, tool_call, context)
+      # Create a delegation thread in the target PO
+      delegation_thread = target_po.create_delegation_thread(
+        parent_po: name,
+        parent_session_id: @session_id,
+        parent_message_id: get_last_message_id
+      )
+
+      if delegation_thread
+        # Execute in isolated thread
+        target_po.receive_in_thread(tool_call.arguments, context: context, thread_id: delegation_thread)
+      else
+        # Fallback: execute in target's current session (no session store)
+        target_po.receive(tool_call.arguments, context: context)
+      end
+    end
+
+    # Get the ID of the last message in the current session.
+    # @return [Integer, nil]
+    def get_last_message_id
+      return nil unless session_store && @session_id
+
+      messages = session_store.get_messages(@session_id)
+      messages.last&.dig(:id)
     end
 
     # --- Session Persistence Helpers ---

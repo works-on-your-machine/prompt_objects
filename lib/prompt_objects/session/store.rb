@@ -9,7 +9,10 @@ module PromptObjects
     # SQLite-based session storage for conversation history.
     # Each environment has its own sessions.db file (gitignored for privacy).
     class Store
-      SCHEMA_VERSION = 3
+      SCHEMA_VERSION = 4
+
+      # Thread types for conversation branching
+      THREAD_TYPES = %w[root continuation delegation fork].freeze
 
       # Valid source values for session tracking
       SOURCES = %w[tui mcp api web cli].freeze
@@ -34,25 +37,49 @@ module PromptObjects
         @db.close if @db
       end
 
-      # --- Session CRUD ---
+      # --- Session/Thread CRUD ---
 
-      # Create a new session for a PO.
+      # Create a new session (thread) for a PO.
       # @param po_name [String] Name of the prompt object
       # @param name [String, nil] Optional session name
       # @param source [String] Source interface (tui, mcp, api, web, cli)
       # @param source_client [String, nil] Client identifier (e.g., "claude-desktop", "cursor")
       # @param metadata [Hash] Optional metadata
+      # @param parent_session_id [String, nil] Parent thread ID (for branching)
+      # @param parent_message_id [Integer, nil] Message ID that spawned this thread
+      # @param parent_po [String, nil] PO that created this thread (for cross-PO delegation)
+      # @param thread_type [String] Type of thread: root, continuation, delegation, fork
       # @return [String] Session ID
-      def create_session(po_name:, name: nil, source: "tui", source_client: nil, metadata: {})
+      def create_session(po_name:, name: nil, source: "tui", source_client: nil, metadata: {},
+                         parent_session_id: nil, parent_message_id: nil, parent_po: nil, thread_type: "root")
         id = SecureRandom.uuid
         now = Time.now.utc.iso8601
 
-        @db.execute(<<~SQL, [id, po_name, name, source, source_client, source, now, now, metadata.to_json])
-          INSERT INTO sessions (id, po_name, name, source, source_client, last_message_source, created_at, updated_at, metadata)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        @db.execute(<<~SQL, [id, po_name, name, source, source_client, source, now, now, metadata.to_json, parent_session_id, parent_message_id, parent_po, thread_type])
+          INSERT INTO sessions (id, po_name, name, source, source_client, last_message_source, created_at, updated_at, metadata, parent_session_id, parent_message_id, parent_po, thread_type)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         SQL
 
         id
+      end
+
+      # Create a new thread (alias for create_session with thread semantics).
+      # @param po_name [String] Name of the prompt object
+      # @param parent_session_id [String, nil] Parent thread ID
+      # @param parent_message_id [Integer, nil] Message ID that spawned this thread
+      # @param parent_po [String, nil] PO that created this thread
+      # @param thread_type [String] Type: root, continuation, delegation, fork
+      # @param opts [Hash] Additional options passed to create_session
+      # @return [String] Thread/Session ID
+      def create_thread(po_name:, parent_session_id: nil, parent_message_id: nil, parent_po: nil, thread_type: "root", **opts)
+        create_session(
+          po_name: po_name,
+          parent_session_id: parent_session_id,
+          parent_message_id: parent_message_id,
+          parent_po: parent_po,
+          thread_type: thread_type,
+          **opts
+        )
       end
 
       # Get a session by ID.
@@ -136,6 +163,92 @@ module PromptObjects
 
         rows = @db.execute(sql, params)
         rows.map { |row| parse_session_row(row, include_count: true) }
+      end
+
+      # --- Thread Navigation ---
+
+      # Get all child threads of a session.
+      # @param session_id [String] Parent session ID
+      # @return [Array<Hash>] Child session data with message counts
+      def get_child_threads(session_id)
+        rows = @db.execute(<<~SQL, [session_id])
+          SELECT s.*, COUNT(m.id) as message_count
+          FROM sessions s
+          LEFT JOIN messages m ON m.session_id = s.id
+          WHERE s.parent_session_id = ?
+          GROUP BY s.id
+          ORDER BY s.created_at ASC
+        SQL
+
+        rows.map { |row| parse_session_row(row, include_count: true) }
+      end
+
+      # Get the lineage (path from root) for a thread.
+      # @param session_id [String] Session ID
+      # @return [Array<Hash>] Ancestors from root to current (inclusive)
+      def get_thread_lineage(session_id)
+        lineage = []
+        current_id = session_id
+
+        while current_id
+          session = get_session(current_id)
+          break unless session
+
+          lineage.unshift(session)
+          current_id = session[:parent_session_id]
+        end
+
+        lineage
+      end
+
+      # Get the full thread tree starting from a session.
+      # @param session_id [String] Root session ID
+      # @param max_depth [Integer] Maximum recursion depth
+      # @return [Hash] Tree structure with session and children
+      def get_thread_tree(session_id, max_depth: 10)
+        return nil if max_depth <= 0
+
+        session = get_session(session_id)
+        return nil unless session
+
+        # Add message count
+        session[:message_count] = message_count(session_id)
+
+        children = get_child_threads(session_id)
+        child_trees = children.map { |child| get_thread_tree(child[:id], max_depth: max_depth - 1) }.compact
+
+        {
+          session: session,
+          children: child_trees
+        }
+      end
+
+      # Get root threads for a PO (threads with no parent).
+      # @param po_name [String] Name of the prompt object
+      # @return [Array<Hash>] Root session data with message counts
+      def get_root_threads(po_name:)
+        rows = @db.execute(<<~SQL, [po_name])
+          SELECT s.*, COUNT(m.id) as message_count
+          FROM sessions s
+          LEFT JOIN messages m ON m.session_id = s.id
+          WHERE s.po_name = ? AND s.parent_session_id IS NULL
+          GROUP BY s.id
+          ORDER BY s.updated_at DESC
+        SQL
+
+        rows.map { |row| parse_session_row(row, include_count: true) }
+      end
+
+      # Auto-generate a name for a thread from its first message.
+      # @param session_id [String] Session ID
+      # @param first_message [String] First message content
+      # @param max_length [Integer] Maximum name length
+      def auto_name_thread(session_id, first_message, max_length: 40)
+        return unless first_message
+
+        auto_name = first_message.to_s.gsub(/\s+/, " ").strip[0, max_length]
+        auto_name += "..." if first_message.to_s.length > max_length
+        update_session(session_id, name: auto_name)
       end
 
       # Search sessions by message content using full-text search.
@@ -574,12 +687,18 @@ module PromptObjects
             last_message_source TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
-            metadata TEXT DEFAULT '{}'
+            metadata TEXT DEFAULT '{}',
+            -- Thread/branching support (v4)
+            parent_session_id TEXT,
+            parent_message_id INTEGER,
+            parent_po TEXT,
+            thread_type TEXT DEFAULT 'root'
           );
 
           CREATE INDEX IF NOT EXISTS idx_sessions_po_name ON sessions(po_name);
           CREATE INDEX IF NOT EXISTS idx_sessions_updated_at ON sessions(updated_at);
           CREATE INDEX IF NOT EXISTS idx_sessions_source ON sessions(source);
+          CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_session_id);
 
           CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -656,6 +775,17 @@ module PromptObjects
           # Populate FTS with existing messages
           @db.execute("INSERT INTO messages_fts(rowid, content) SELECT id, content FROM messages WHERE content IS NOT NULL")
         end
+
+        if from_version < 4
+          # Add thread/branching support columns
+          @db.execute_batch(<<~SQL)
+            ALTER TABLE sessions ADD COLUMN parent_session_id TEXT;
+            ALTER TABLE sessions ADD COLUMN parent_message_id INTEGER;
+            ALTER TABLE sessions ADD COLUMN parent_po TEXT;
+            ALTER TABLE sessions ADD COLUMN thread_type TEXT DEFAULT 'root';
+            CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_session_id);
+          SQL
+        end
       end
 
       def parse_session_row(row, include_count: false)
@@ -668,7 +798,12 @@ module PromptObjects
           last_message_source: row["last_message_source"],
           created_at: row["created_at"] ? Time.parse(row["created_at"]) : nil,
           updated_at: row["updated_at"] ? Time.parse(row["updated_at"]) : nil,
-          metadata: row["metadata"] ? JSON.parse(row["metadata"], symbolize_names: true) : {}
+          metadata: row["metadata"] ? JSON.parse(row["metadata"], symbolize_names: true) : {},
+          # Thread fields (v4)
+          parent_session_id: row["parent_session_id"],
+          parent_message_id: row["parent_message_id"],
+          parent_po: row["parent_po"],
+          thread_type: row["thread_type"] || "root"
         }
         result[:message_count] = row["message_count"] if include_count && row["message_count"]
         result
