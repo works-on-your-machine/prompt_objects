@@ -104,12 +104,14 @@ module PromptObjects
         )
 
         # Send state of all POs
+        # Always send "idle" status for initial state - from this connection's
+        # perspective, no work is pending (even if another connection has a request)
         @runtime.registry.prompt_objects.each do |po|
           send_message(
             type: "po_state",
             payload: {
               name: po.name,
-              state: po_state_hash(po)
+              state: po_state_hash(po).merge(status: "idle")
             }
           )
         end
@@ -119,6 +121,19 @@ module PromptObjects
           send_message(
             type: "notification",
             payload: request_to_hash(request)
+          )
+        end
+
+        # Send recent bus messages (last 50)
+        @runtime.bus.log.last(50).each do |entry|
+          send_message(
+            type: "bus_message",
+            payload: {
+              from: entry[:from],
+              to: entry[:to],
+              content: entry[:message],
+              timestamp: entry[:timestamp].iso8601
+            }
           )
         end
       end

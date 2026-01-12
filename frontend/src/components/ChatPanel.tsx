@@ -150,6 +150,7 @@ function MessageBubble({ message }: { message: Message }) {
 }
 
 function ToolCallDisplay({ toolCall }: { toolCall: ToolCall }) {
+  const [expanded, setExpanded] = useState(false)
   const { notifications } = useStore()
 
   // Special display for ask_human
@@ -193,13 +194,26 @@ function ToolCallDisplay({ toolCall }: { toolCall: ToolCall }) {
     )
   }
 
-  // Default display for other tool calls
+  // Default display for other tool calls - expandable
   return (
-    <div className="text-xs bg-po-bg/50 rounded px-2 py-1 font-mono">
-      <span className="text-po-accent">{toolCall.name}</span>
-      <span className="text-gray-500">
-        ({Object.keys(toolCall.arguments).join(', ')})
-      </span>
+    <div className="text-xs bg-po-bg/50 rounded overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full px-2 py-1 text-left font-mono flex items-center gap-1 hover:bg-po-bg/70 transition-colors"
+      >
+        <span className="text-gray-500">{expanded ? '▼' : '▶'}</span>
+        <span className="text-po-accent">{toolCall.name}</span>
+        <span className="text-gray-500">
+          ({Object.keys(toolCall.arguments).length} args)
+        </span>
+      </button>
+      {expanded && (
+        <div className="px-2 pb-2 border-t border-po-border/50">
+          <pre className="text-gray-400 whitespace-pre-wrap break-all mt-1 text-[10px] leading-relaxed">
+            {JSON.stringify(toolCall.arguments, null, 2)}
+          </pre>
+        </div>
+      )}
     </div>
   )
 }
