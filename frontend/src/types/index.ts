@@ -38,6 +38,8 @@ export interface PromptObject {
   capabilities: string[]
   current_session: CurrentSession | null
   sessions: Session[]
+  prompt?: string  // The markdown body/prompt
+  config?: Record<string, unknown>  // The YAML frontmatter config
 }
 
 export interface BusMessage {

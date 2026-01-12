@@ -297,7 +297,10 @@ module PromptObjects
           description: po.description,
           capabilities: po.config["capabilities"] || [],
           current_session: current_session_hash(po),
-          sessions: po.list_sessions.map { |s| session_summary(s) }
+          sessions: po.list_sessions.map { |s| session_summary(s) },
+          # Include full prompt for inspection
+          prompt: po.body,
+          config: po.config
         }
       end
 

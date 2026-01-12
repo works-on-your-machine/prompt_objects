@@ -2,6 +2,7 @@ import { useStore, useSelectedPO, usePONotifications } from '../store'
 import { ChatPanel } from './ChatPanel'
 import { SessionsPanel } from './SessionsPanel'
 import { CapabilitiesPanel } from './CapabilitiesPanel'
+import { PromptPanel } from './PromptPanel'
 
 interface PODetailProps {
   sendMessage: (target: string, content: string) => void
@@ -30,6 +31,7 @@ export function PODetail({
     { id: 'chat' as const, label: 'Chat' },
     { id: 'sessions' as const, label: `Sessions (${po.sessions?.length || 0})` },
     { id: 'capabilities' as const, label: `Capabilities (${po.capabilities?.length || 0})` },
+    { id: 'prompt' as const, label: 'Prompt' },
   ]
 
   return (
@@ -90,6 +92,7 @@ export function PODetail({
           />
         )}
         {activeTab === 'capabilities' && <CapabilitiesPanel po={po} />}
+        {activeTab === 'prompt' && <PromptPanel po={po} />}
       </div>
     </div>
   )

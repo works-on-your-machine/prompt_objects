@@ -11,7 +11,7 @@ interface ChatPanelProps {
 export function ChatPanel({ po, sendMessage }: ChatPanelProps) {
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const { streamingContent } = useStore()
+  const { streamingContent, addMessageToPO } = useStore()
 
   const messages = po.current_session?.messages || []
   const streaming = streamingContent[po.name]
@@ -24,7 +24,17 @@ export function ChatPanel({ po, sendMessage }: ChatPanelProps) {
     e.preventDefault()
     if (!input.trim()) return
 
-    sendMessage(po.name, input.trim())
+    const content = input.trim()
+
+    // Add user message immediately (optimistic update)
+    addMessageToPO(po.name, {
+      role: 'user',
+      content,
+      from: 'human',
+    })
+
+    // Send to server
+    sendMessage(po.name, content)
     setInput('')
   }
 

@@ -5,6 +5,7 @@ import type {
   BusMessage,
   Notification,
   Environment,
+  Message,
 } from '../types'
 
 interface Store {
@@ -20,11 +21,12 @@ interface Store {
   promptObjects: Record<string, PromptObject>
   setPromptObject: (name: string, state: Partial<PromptObject>) => void
   updatePromptObjectStatus: (name: string, status: PromptObject['status']) => void
+  addMessageToPO: (poName: string, message: Message) => void
 
   // Navigation
   selectedPO: string | null
   selectPO: (name: string | null) => void
-  activeTab: 'chat' | 'sessions' | 'capabilities' | 'edit'
+  activeTab: 'chat' | 'sessions' | 'capabilities' | 'prompt'
   setActiveTab: (tab: Store['activeTab']) => void
 
   // Message Bus
@@ -81,6 +83,23 @@ export const useStore = create<Store>((set) => ({
         },
       },
     })),
+  addMessageToPO: (poName, message) =>
+    set((s) => {
+      const po = s.promptObjects[poName]
+      if (!po || !po.current_session) return s
+      return {
+        promptObjects: {
+          ...s.promptObjects,
+          [poName]: {
+            ...po,
+            current_session: {
+              ...po.current_session,
+              messages: [...po.current_session.messages, message],
+            },
+          },
+        },
+      }
+    }),
 
   // Navigation
   selectedPO: null,
