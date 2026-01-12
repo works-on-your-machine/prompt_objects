@@ -1,13 +1,13 @@
+---
+version: 1
 name: minimal
 description: A basic starting point with just a coordinator
-icon: "🎯"
+created_at: '2026-01-12T10:32:37-05:00'
+updated_at: '2026-01-12T10:32:37-05:00'
+last_opened: '2026-01-12T10:32:37-05:00'
+icon: "\U0001F3AF"
 color: "#6B7280"
-
-# Objects included in this template
-objects:
-  - assistant
-
-# Suggested stdlib objects to add
-suggestions:
-  - greeter
-  - reader
+stats:
+  total_messages: 0
+  total_sessions: 0
+  po_count: 0
