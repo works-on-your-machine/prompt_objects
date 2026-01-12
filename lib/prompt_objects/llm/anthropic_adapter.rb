@@ -116,11 +116,12 @@ module PromptObjects
         tool_calls = []
 
         # Raw response is an Anthropic::Message object with content array
+        # Note: SDK returns type as Symbol (:text, :tool_use), not String
         raw.content.each do |block|
-          case block.type
-          when "text"
+          case block.type.to_sym
+          when :text
             content += block.text
-          when "tool_use"
+          when :tool_use
             tool_calls << ToolCall.new(
               id: block.id,
               name: block.name,

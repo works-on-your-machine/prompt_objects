@@ -112,7 +112,7 @@ module PromptObjects
         status: po.instance_variable_get(:@state) || "idle",
         description: po.description,
         capabilities: po.config["capabilities"] || [],
-        current_session: nil, # New POs don't have sessions yet
+        current_session: current_session_hash(po),
         sessions: po.list_sessions.map do |s|
           {
             id: s[:id],
@@ -124,6 +124,39 @@ module PromptObjects
         prompt: po.body,
         config: po.config
       }
+    end
+
+    # Helper to get current session data for a PO.
+    def self.current_session_hash(po)
+      return nil unless po.session_id
+
+      {
+        id: po.session_id,
+        messages: po.history.map { |m| message_to_hash(m) }
+      }
+    end
+
+    # Helper to convert a message to JSON-serializable hash.
+    def self.message_to_hash(msg)
+      case msg[:role]
+      when :user
+        { role: "user", content: msg[:content], from: msg[:from] }
+      when :assistant
+        hash = { role: "assistant", content: msg[:content] }
+        if msg[:tool_calls]
+          hash[:tool_calls] = msg[:tool_calls].map do |tc|
+            tc_id = tc.respond_to?(:id) ? tc.id : (tc[:id] || tc["id"])
+            tc_name = tc.respond_to?(:name) ? tc.name : (tc[:name] || tc["name"])
+            tc_args = tc.respond_to?(:arguments) ? tc.arguments : (tc[:arguments] || tc["arguments"] || {})
+            { id: tc_id, name: tc_name, arguments: tc_args }
+          end
+        end
+        hash
+      when :tool
+        { role: "tool", results: msg[:results] }
+      else
+        { role: msg[:role].to_s, content: msg[:content] }
+      end
     end
   end
 end

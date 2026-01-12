@@ -101,15 +101,18 @@ export const useStore = create<Store>((set) => ({
   addMessageToPO: (poName, message) =>
     set((s) => {
       const po = s.promptObjects[poName]
-      if (!po || !po.current_session) return s
+      if (!po) return s
+
+      // Handle case where current_session doesn't exist yet (new POs)
+      const currentMessages = po.current_session?.messages || []
       return {
         promptObjects: {
           ...s.promptObjects,
           [poName]: {
             ...po,
             current_session: {
-              ...po.current_session,
-              messages: [...po.current_session.messages, message],
+              id: po.current_session?.id || 'pending',
+              messages: [...currentMessages, message],
             },
           },
         },
@@ -120,15 +123,16 @@ export const useStore = create<Store>((set) => ({
       const po = s.promptObjects[poName]
       if (!po) return s
 
-      // Update current_session if it matches the sessionId
-      if (po.current_session?.id === sessionId) {
+      // Update current_session if it matches the sessionId, OR if current_session is null
+      // (handles newly created POs that didn't have session info yet)
+      if (po.current_session?.id === sessionId || !po.current_session) {
         return {
           promptObjects: {
             ...s.promptObjects,
             [poName]: {
               ...po,
               current_session: {
-                ...po.current_session,
+                id: sessionId,
                 messages,
               },
             },
