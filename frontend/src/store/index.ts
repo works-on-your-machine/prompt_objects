@@ -6,6 +6,7 @@ import type {
   Notification,
   Environment,
   Message,
+  LLMConfig,
 } from '../types'
 
 interface Store {
@@ -51,6 +52,11 @@ interface Store {
   pendingResponse: Record<string, string>
   setPendingResponse: (poName: string, content: string) => void
   clearPendingResponse: (poName: string) => void
+
+  // LLM Config
+  llmConfig: LLMConfig | null
+  setLLMConfig: (config: LLMConfig) => void
+  updateCurrentLLM: (provider: string, model: string) => void
 }
 
 export const useStore = create<Store>((set) => ({
@@ -190,6 +196,16 @@ export const useStore = create<Store>((set) => ({
       const { [poName]: _, ...rest } = s.pendingResponse
       return { pendingResponse: rest }
     }),
+
+  // LLM Config
+  llmConfig: null,
+  setLLMConfig: (config) => set({ llmConfig: config }),
+  updateCurrentLLM: (provider, model) =>
+    set((s) => ({
+      llmConfig: s.llmConfig
+        ? { ...s.llmConfig, current_provider: provider, current_model: model }
+        : null,
+    })),
 }))
 
 // Selectors - use useShallow to prevent infinite re-renders with derived arrays

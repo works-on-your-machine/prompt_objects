@@ -7,6 +7,7 @@ import type {
   Notification,
   Environment,
   Message,
+  LLMConfig,
   SendMessagePayload,
   RespondToNotificationPayload,
   CreateSessionPayload,
@@ -30,6 +31,8 @@ export function useWebSocket() {
     clearStream,
     setPendingResponse,
     clearPendingResponse,
+    setLLMConfig,
+    updateCurrentLLM,
   } = useStore()
 
   const connect = useCallback(() => {
@@ -174,6 +177,19 @@ export function useWebSocket() {
           break
         }
 
+        case 'llm_config':
+          setLLMConfig(message.payload as LLMConfig)
+          break
+
+        case 'llm_switched': {
+          const { provider, model } = message.payload as {
+            provider: string
+            model: string
+          }
+          updateCurrentLLM(provider, model)
+          break
+        }
+
         case 'error': {
           const { message: errorMsg } = message.payload as { message: string }
           console.error('Server error:', errorMsg)
@@ -200,6 +216,8 @@ export function useWebSocket() {
       addBusMessage,
       addNotification,
       removeNotification,
+      setLLMConfig,
+      updateCurrentLLM,
     ]
   )
 
@@ -279,10 +297,26 @@ export function useWebSocket() {
     )
   }, [])
 
+  // Switch LLM provider/model
+  const switchLLM = useCallback((provider: string, model?: string) => {
+    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket not connected')
+      return
+    }
+
+    ws.current.send(
+      JSON.stringify({
+        type: 'switch_llm',
+        payload: { provider, model },
+      })
+    )
+  }, [])
+
   return {
     sendMessage,
     respondToNotification,
     createSession,
     switchSession,
+    switchLLM,
   }
 }

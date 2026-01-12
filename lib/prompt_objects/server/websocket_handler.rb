@@ -103,6 +103,9 @@ module PromptObjects
           }
         )
 
+        # Send LLM config
+        handle_get_llm_config
+
         # Send state of all POs
         # Always send "idle" status for initial state - from this connection's
         # perspective, no work is pending (even if another connection has a request)
@@ -167,6 +170,10 @@ module PromptObjects
           handle_create_session(message["payload"])
         when "switch_session"
           handle_switch_session(message["payload"])
+        when "get_llm_config"
+          handle_get_llm_config
+        when "switch_llm"
+          handle_switch_llm(message["payload"])
         when "ping"
           send_message(type: "pong", payload: {})
         else
@@ -316,6 +323,58 @@ module PromptObjects
           )
         else
           send_error("Could not switch to session: #{session_id}")
+        end
+      end
+
+      def handle_get_llm_config
+        config = @runtime.llm_config
+
+        # Get models for each provider
+        providers_info = LLM::Factory.providers.map do |provider|
+          info = LLM::Factory.provider_info(provider)
+          {
+            name: provider,
+            models: info[:models],
+            default_model: info[:default_model],
+            available: LLM::Factory.available_providers[provider]
+          }
+        end
+
+        send_message(
+          type: "llm_config",
+          payload: {
+            current_provider: config[:provider],
+            current_model: config[:model],
+            providers: providers_info
+          }
+        )
+      end
+
+      def handle_switch_llm(payload)
+        provider = payload["provider"]
+        model = payload["model"]
+
+        begin
+          result = @runtime.switch_llm(provider: provider, model: model)
+
+          send_message(
+            type: "llm_switched",
+            payload: {
+              provider: result[:provider],
+              model: result[:model]
+            }
+          )
+
+          # Broadcast to all connected clients via app
+          @app&.broadcast(
+            type: "llm_switched",
+            payload: {
+              provider: result[:provider],
+              model: result[:model]
+            }
+          )
+        rescue PromptObjects::Error => e
+          send_error("Failed to switch LLM: #{e.message}")
         end
       end
 

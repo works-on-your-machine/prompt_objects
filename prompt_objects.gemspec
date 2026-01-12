@@ -29,6 +29,7 @@ Gem::Specification.new do |spec|
 
   # Runtime dependencies
   spec.add_dependency "ruby-openai", "~> 7.0"
+  spec.add_dependency "anthropic", "~> 1.0"
   spec.add_dependency "front_matter_parser"
   spec.add_dependency "sqlite3", "~> 2.0"
 

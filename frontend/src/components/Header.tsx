@@ -1,7 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useStore, useNotificationCount } from '../store'
+import { ModelSelector } from './ModelSelector'
 
-export function Header() {
+interface Props {
+  switchLLM: (provider: string, model?: string) => void
+}
+
+export function Header({ switchLLM }: Props) {
   const { connected, environment, selectedPO, selectPO, toggleBus, busOpen, notifications } =
     useStore()
   const notificationCount = useNotificationCount()
@@ -49,6 +54,9 @@ export function Header() {
       )}
 
       <div className="flex-1" />
+
+      {/* Model selector */}
+      <ModelSelector switchLLM={switchLLM} />
 
       {/* Connection status */}
       <div className="flex items-center gap-2 text-sm">

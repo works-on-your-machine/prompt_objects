@@ -37,15 +37,18 @@ module PromptObjects
   # - A simple objects directory (legacy/development mode)
   class Runtime
     attr_reader :llm, :registry, :objects_dir, :bus, :primitives_dir, :human_queue,
-                :manifest, :env_path, :auto_commit, :session_store
+                :manifest, :env_path, :auto_commit, :session_store,
+                :current_provider, :current_model
 
     # Initialize from an environment path (with manifest) or objects directory.
     # @param env_path [String, nil] Path to environment directory (preferred)
     # @param objects_dir [String, nil] Legacy: path to objects directory
     # @param primitives_dir [String, nil] Path to primitives directory
-    # @param llm [LLM::OpenAIAdapter, nil] LLM adapter
+    # @param llm [Object, nil] LLM adapter (deprecated, use provider/model instead)
+    # @param provider [String, nil] LLM provider (openai, anthropic, gemini)
+    # @param model [String, nil] Model name
     # @param auto_commit [Boolean] Auto-commit changes to git (default: true for env_path)
-    def initialize(env_path: nil, objects_dir: nil, primitives_dir: nil, llm: nil, auto_commit: nil)
+    def initialize(env_path: nil, objects_dir: nil, primitives_dir: nil, llm: nil, provider: nil, model: nil, auto_commit: nil)
       if env_path
         # Environment-based initialization
         @env_path = env_path
@@ -69,7 +72,17 @@ module PromptObjects
         @session_store = nil  # No persistent sessions in legacy mode
       end
 
-      @llm = llm || LLM::OpenAIAdapter.new
+      # Initialize LLM - prefer explicit llm, then use factory with provider/model
+      if llm
+        @llm = llm
+        @current_provider = nil
+        @current_model = nil
+      else
+        @current_provider = provider || LLM::Factory::DEFAULT_PROVIDER
+        @current_model = model || LLM::Factory.default_model(@current_provider)
+        @llm = LLM::Factory.create(provider: @current_provider, model: @current_model)
+      end
+
       @registry = Registry.new
       @bus = MessageBus.new
       @human_queue = HumanQueue.new
@@ -116,6 +129,34 @@ module PromptObjects
       return false unless environment?
 
       Env::Git.dirty?(@env_path)
+    end
+
+    # Switch to a different LLM provider/model.
+    # @param provider [String] Provider name (openai, anthropic, gemini)
+    # @param model [String, nil] Model name (defaults to provider's default)
+    # @return [Hash] New provider/model info
+    def switch_llm(provider:, model: nil)
+      @current_provider = provider
+      @current_model = model || LLM::Factory.default_model(provider)
+      @llm = LLM::Factory.create(provider: @current_provider, model: @current_model)
+
+      # Update all loaded POs to use the new LLM
+      @registry.prompt_objects.each do |po|
+        po.instance_variable_set(:@llm, @llm)
+      end
+
+      { provider: @current_provider, model: @current_model }
+    end
+
+    # Get current LLM configuration.
+    # @return [Hash]
+    def llm_config
+      {
+        provider: @current_provider,
+        model: @current_model,
+        providers: LLM::Factory.providers,
+        available: LLM::Factory.available_providers
+      }
     end
 
     # Update manifest stats from current state.

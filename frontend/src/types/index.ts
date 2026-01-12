@@ -64,6 +64,20 @@ export interface Environment {
   primitive_count: number
 }
 
+// LLM Provider configuration
+export interface LLMProvider {
+  name: string
+  models: string[]
+  default_model: string
+  available: boolean
+}
+
+export interface LLMConfig {
+  current_provider: string
+  current_model: string
+  providers: LLMProvider[]
+}
+
 // WebSocket message types
 export type WSMessageType =
   | 'environment'
@@ -80,6 +94,8 @@ export type WSMessageType =
   | 'session_created'
   | 'session_switched'
   | 'session_updated'
+  | 'llm_config'
+  | 'llm_switched'
   | 'error'
   | 'pong'
 

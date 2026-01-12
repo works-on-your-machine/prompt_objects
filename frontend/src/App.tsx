@@ -8,14 +8,14 @@ import { MessageBus } from './components/MessageBus'
 import { NotificationPanel } from './components/NotificationPanel'
 
 export default function App() {
-  const { sendMessage, respondToNotification, createSession, switchSession } =
+  const { sendMessage, respondToNotification, createSession, switchSession, switchLLM } =
     useWebSocket()
   const { selectedPO, busOpen, notifications } = useStore()
   const [splitView, setSplitView] = useState(true) // Default to split view
 
   return (
     <div className="h-screen flex flex-col bg-po-bg">
-      <Header />
+      <Header switchLLM={switchLLM} />
 
       <div className="flex-1 flex overflow-hidden">
         {/* Split view: Dashboard sidebar on left when PO selected */}
