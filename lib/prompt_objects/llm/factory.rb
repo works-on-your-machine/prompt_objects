@@ -21,8 +21,8 @@ module PromptObjects
         "gemini" => {
           adapter: "GeminiAdapter",
           env_key: "GEMINI_API_KEY",
-          default_model: "gemini-3-flash",
-          models: %w[gemini-3-flash gemini-2.5-pro gemini-2.5-flash]
+          default_model: "gemini-3-flash-preview",
+          models: %w[gemini-3-flash-preview gemini-2.5-pro gemini-2.5-flash]
         }
       }.freeze
 

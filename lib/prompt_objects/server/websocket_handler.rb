@@ -410,7 +410,7 @@ module PromptObjects
       def session_messages(po, session_id)
         return [] unless @runtime.session_store
 
-        messages = @runtime.session_store.get_messages(session_id: session_id)
+        messages = @runtime.session_store.get_messages(session_id)
         messages.map { |m| message_to_hash(m) }
       end
 

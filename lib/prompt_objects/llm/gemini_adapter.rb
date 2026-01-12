@@ -10,7 +10,7 @@ module PromptObjects
     # Google Gemini API adapter for LLM calls.
     # Uses direct HTTP calls to the Gemini REST API.
     class GeminiAdapter
-      DEFAULT_MODEL = "gemini-3-flash"
+      DEFAULT_MODEL = "gemini-3-flash-preview"
       API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
       def initialize(api_key: nil, model: nil)
