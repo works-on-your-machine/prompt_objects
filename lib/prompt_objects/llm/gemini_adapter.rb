@@ -51,6 +51,8 @@ module PromptObjects
 
       def build_contents(messages)
         result = []
+        # Track tool calls from the last assistant message for name lookup
+        last_tool_calls = {}
 
         messages.each do |msg|
           case msg[:role]
@@ -63,7 +65,10 @@ module PromptObjects
             parts = []
             parts << { text: msg[:content] } if msg[:content] && !msg[:content].empty?
             if msg[:tool_calls]
+              # Store tool calls for potential name lookup in tool results
+              last_tool_calls = {}
               msg[:tool_calls].each do |tc|
+                last_tool_calls[tc.id] = tc.name
                 parts << {
                   functionCall: {
                     name: tc.name,
@@ -76,9 +81,11 @@ module PromptObjects
           when :tool
             # Tool results go back as a user message with functionResponse parts
             parts = msg[:results].map do |tool_result|
+              # Get name from result, or look it up from the previous assistant's tool_calls
+              name = tool_result[:name] || last_tool_calls[tool_result[:tool_call_id]] || "unknown"
               {
                 functionResponse: {
-                  name: tool_result[:name],
+                  name: name,
                   response: parse_tool_response_content(tool_result[:content])
                 }
               }

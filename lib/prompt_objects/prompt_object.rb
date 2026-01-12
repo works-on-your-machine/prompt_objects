@@ -215,9 +215,9 @@ module PromptObjects
           # Log the response
           @env.bus.publish(from: tc.name, to: name, message: result)
 
-          { tool_call_id: tc.id, content: result }
+          { tool_call_id: tc.id, name: tc.name, content: result }
         else
-          { tool_call_id: tc.id, content: "Unknown capability: #{tc.name}" }
+          { tool_call_id: tc.id, name: tc.name, content: "Unknown capability: #{tc.name}" }
         end
       end
     end
