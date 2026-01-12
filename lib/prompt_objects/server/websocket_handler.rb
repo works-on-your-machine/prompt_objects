@@ -8,9 +8,10 @@ module PromptObjects
     # Handles WebSocket connections for real-time communication with the frontend.
     # Subscribes to MessageBus for state updates and handles client messages.
     class WebSocketHandler
-      def initialize(runtime:, connection:)
+      def initialize(runtime:, connection:, app: nil)
         @runtime = runtime
         @connection = connection
+        @app = app
         @subscribed = false
         @bus_subscription = nil
       end
@@ -21,6 +22,15 @@ module PromptObjects
         read_loop
       ensure
         unsubscribe_from_bus
+      end
+
+      # Send a message to this client (public for broadcasting).
+      def send_message(data)
+        json = JSON.generate(data)
+        @connection.write(json)
+        @connection.flush
+      rescue => e
+        puts "WebSocket write error: #{e.message}" if ENV["DEBUG"]
       end
 
       private
@@ -278,14 +288,6 @@ module PromptObjects
       end
 
       # === Helpers ===
-
-      def send_message(data)
-        json = JSON.generate(data)
-        @connection.write(json)
-        @connection.flush
-      rescue => e
-        puts "WebSocket write error: #{e.message}" if ENV["DEBUG"]
-      end
 
       def send_error(message)
         send_message(type: "error", payload: { message: message })

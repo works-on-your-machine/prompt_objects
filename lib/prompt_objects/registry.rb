@@ -16,6 +16,13 @@ module PromptObjects
       capability
     end
 
+    # Unregister a capability by name.
+    # @param name [String] The capability name
+    # @return [Capability, nil] The removed capability or nil
+    def unregister(name)
+      @capabilities.delete(name.to_s)
+    end
+
     # Get a capability by name.
     # @param name [String] The capability name
     # @return [Capability, nil] The capability or nil if not found

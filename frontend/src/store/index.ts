@@ -20,6 +20,7 @@ interface Store {
   // Prompt Objects
   promptObjects: Record<string, PromptObject>
   setPromptObject: (name: string, state: Partial<PromptObject>) => void
+  removePromptObject: (name: string) => void
   updatePromptObjectStatus: (name: string, status: PromptObject['status']) => void
   addMessageToPO: (poName: string, message: Message) => void
 
@@ -73,6 +74,13 @@ export const useStore = create<Store>((set) => ({
         } as PromptObject,
       },
     })),
+  removePromptObject: (name) =>
+    set((s) => {
+      const { [name]: _, ...rest } = s.promptObjects
+      // If we're viewing this PO, deselect it
+      const selectedPO = s.selectedPO === name ? null : s.selectedPO
+      return { promptObjects: rest, selectedPO }
+    }),
   updatePromptObjectStatus: (name, status) =>
     set((s) => ({
       promptObjects: {

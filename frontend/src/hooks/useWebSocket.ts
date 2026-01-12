@@ -20,6 +20,7 @@ export function useWebSocket() {
     setConnected,
     setEnvironment,
     setPromptObject,
+    removePromptObject,
     addBusMessage,
     addNotification,
     removeNotification,
@@ -133,6 +134,34 @@ export function useWebSocket() {
           break
         }
 
+        // Live file updates
+        case 'po_added': {
+          const { name, state } = message.payload as {
+            name: string
+            state: Partial<PromptObject>
+          }
+          console.log('PO added:', name)
+          setPromptObject(name, state)
+          break
+        }
+
+        case 'po_modified': {
+          const { name, state } = message.payload as {
+            name: string
+            state: Partial<PromptObject>
+          }
+          console.log('PO modified:', name)
+          setPromptObject(name, state)
+          break
+        }
+
+        case 'po_removed': {
+          const { name } = message.payload as { name: string }
+          console.log('PO removed:', name)
+          removePromptObject(name)
+          break
+        }
+
         case 'error': {
           const { message: errorMsg } = message.payload as { message: string }
           console.error('Server error:', errorMsg)
@@ -150,6 +179,7 @@ export function useWebSocket() {
     [
       setEnvironment,
       setPromptObject,
+      removePromptObject,
       setPendingResponse,
       clearPendingResponse,
       appendStreamChunk,

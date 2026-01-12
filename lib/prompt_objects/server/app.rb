@@ -11,10 +11,14 @@ module PromptObjects
     class App
       STATIC_EXTENSIONS = %w[.html .js .css .png .svg .ico .woff .woff2 .map .json].freeze
 
+      attr_reader :connections
+
       def initialize(runtime)
         @runtime = runtime
         @api = API::Routes.new(runtime)
         @public_path = File.expand_path("public", __dir__)
+        @connections = []
+        @connections_mutex = Mutex.new
       end
 
       def call(env)
@@ -31,6 +35,32 @@ module PromptObjects
         end
       end
 
+      # Broadcast a message to all connected WebSocket clients.
+      # @param message [Hash] Message to broadcast
+      def broadcast(message)
+        @connections_mutex.synchronize do
+          @connections.each do |handler|
+            handler.send_message(message)
+          rescue StandardError => e
+            puts "Broadcast error: #{e.message}" if ENV["DEBUG"]
+          end
+        end
+      end
+
+      # Register a connection handler.
+      def register_connection(handler)
+        @connections_mutex.synchronize do
+          @connections << handler
+        end
+      end
+
+      # Unregister a connection handler.
+      def unregister_connection(handler)
+        @connections_mutex.synchronize do
+          @connections.delete(handler)
+        end
+      end
+
       private
 
       def websocket_request?(env)
@@ -41,9 +71,16 @@ module PromptObjects
         Async::WebSocket::Adapters::Rack.open(env, protocols: ["json"]) do |connection|
           handler = WebSocketHandler.new(
             runtime: @runtime,
-            connection: connection
+            connection: connection,
+            app: self
           )
-          handler.run
+
+          register_connection(handler)
+          begin
+            handler.run
+          ensure
+            unregister_connection(handler)
+          end
         end
       end
 

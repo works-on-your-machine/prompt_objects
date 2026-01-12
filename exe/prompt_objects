@@ -480,7 +480,8 @@ def run_serve(args)
     PromptObjects::Server.start(
       runtime: runtime,
       host: options[:host],
-      port: options[:port]
+      port: options[:port],
+      env_path: env_path
     )
   end
 end

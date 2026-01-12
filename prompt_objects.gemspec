@@ -36,6 +36,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "falcon", "~> 0.47"
   spec.add_dependency "async-websocket", "~> 0.26"
   spec.add_dependency "rack", "~> 3.0"
+  spec.add_dependency "listen", "~> 3.9"  # File system watching
 
   # TUI dependencies
   # Note: We use charm-native (specified in Gemfile) which provides unified
