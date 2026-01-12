@@ -57,6 +57,14 @@ module PromptObjects
 
       def handle_po_added(path)
         name = File.basename(path, ".md")
+
+        # Skip if already loaded (e.g., by create_capability)
+        # The on_po_registered callback will have already broadcast
+        if @runtime.registry.exists?(name)
+          puts "FileWatcher: PO already loaded - #{name} (skipping)"
+          return
+        end
+
         puts "FileWatcher: PO added - #{name}"
 
         begin

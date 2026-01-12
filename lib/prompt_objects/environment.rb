@@ -39,6 +39,7 @@ module PromptObjects
     attr_reader :llm, :registry, :objects_dir, :bus, :primitives_dir, :human_queue,
                 :manifest, :env_path, :auto_commit, :session_store,
                 :current_provider, :current_model
+    attr_accessor :on_po_registered  # Callback for when a PO is registered
 
     # Initialize from an environment path (with manifest) or objects directory.
     # @param env_path [String, nil] Path to environment directory (preferred)
@@ -198,6 +199,10 @@ module PromptObjects
       )
 
       @registry.register(po)
+
+      # Notify callback if registered (for live updates in web UI)
+      @on_po_registered&.call(po)
+
       po
     end
 

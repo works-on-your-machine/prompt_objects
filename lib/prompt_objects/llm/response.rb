@@ -21,6 +21,8 @@ module PromptObjects
     end
 
     # Represents a single tool call from the LLM.
+    # Supports both method access (.id) and hash access ([:id]) for compatibility
+    # with code that may receive either ToolCall objects or Hashes from the DB.
     class ToolCall
       attr_reader :id, :name, :arguments
 
@@ -28,6 +30,31 @@ module PromptObjects
         @id = id
         @name = name
         @arguments = arguments
+      end
+
+      # Allow hash-style access for compatibility with code expecting Hashes
+      def [](key)
+        case key.to_sym
+        when :id then @id
+        when :name then @name
+        when :arguments then @arguments
+        end
+      end
+
+      # Convert to a plain Hash (for serialization)
+      def to_h
+        { id: @id, name: @name, arguments: @arguments }
+      end
+
+      # Create a ToolCall from a Hash (for deserialization)
+      def self.from_hash(hash)
+        return hash if hash.is_a?(ToolCall)
+
+        new(
+          id: hash[:id] || hash["id"],
+          name: hash[:name] || hash["name"],
+          arguments: hash[:arguments] || hash["arguments"] || {}
+        )
       end
     end
   end

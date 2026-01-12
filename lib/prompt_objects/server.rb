@@ -33,7 +33,20 @@ module PromptObjects
       puts "Press Ctrl+C to stop"
       puts ""
 
-      # Start file watcher for live updates
+      # Register callback for immediate PO registration notifications
+      # This fires when create_capability creates a new PO programmatically
+      runtime.on_po_registered = ->(po) {
+        app.broadcast(
+          type: "po_added",
+          payload: {
+            name: po.name,
+            state: po_state_hash(po)
+          }
+        )
+        puts "Broadcast: PO registered - #{po.name}"
+      }
+
+      # Start file watcher for live updates (manual file edits)
       file_watcher = nil
       if env_path
         file_watcher = FileWatcher.new(runtime: runtime, env_path: env_path)

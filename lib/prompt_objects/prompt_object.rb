@@ -280,9 +280,9 @@ module PromptObjects
       when :assistant
         msg = { role: :assistant, content: db_msg[:content] }
         if db_msg[:tool_calls]
-          # Reconstruct tool call objects
+          # Reconstruct tool call objects from Hashes
           msg[:tool_calls] = db_msg[:tool_calls].map do |tc|
-            LLM::ToolCall.new(id: tc[:id], name: tc[:name], arguments: tc[:arguments])
+            LLM::ToolCall.from_hash(tc)
           end
         end
         msg
