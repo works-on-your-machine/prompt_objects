@@ -49,10 +49,15 @@ module PromptObjects
             assistant_msg[:content] = msg[:content] if msg[:content]
             if msg[:tool_calls]
               assistant_msg[:tool_calls] = msg[:tool_calls].map do |tc|
+                # Handle both ToolCall objects and Hashes (from database)
+                tc_id = tc.respond_to?(:id) ? tc.id : (tc[:id] || tc["id"])
+                tc_name = tc.respond_to?(:name) ? tc.name : (tc[:name] || tc["name"])
+                tc_args = tc.respond_to?(:arguments) ? tc.arguments : (tc[:arguments] || tc["arguments"] || {})
+
                 {
-                  id: tc.id,
+                  id: tc_id,
                   type: "function",
-                  function: { name: tc.name, arguments: tc.arguments.to_json }
+                  function: { name: tc_name, arguments: tc_args.to_json }
                 }
               end
             end

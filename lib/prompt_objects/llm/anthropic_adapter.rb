@@ -58,11 +58,16 @@ module PromptObjects
             # Add tool_use blocks if present
             if msg[:tool_calls]
               msg[:tool_calls].each do |tc|
+                # Handle both ToolCall objects and Hashes (from database)
+                tc_id = tc.respond_to?(:id) ? tc.id : (tc[:id] || tc["id"])
+                tc_name = tc.respond_to?(:name) ? tc.name : (tc[:name] || tc["name"])
+                tc_args = tc.respond_to?(:arguments) ? tc.arguments : (tc[:arguments] || tc["arguments"] || {})
+
                 content_blocks << {
                   type: "tool_use",
-                  id: tc.id,
-                  name: tc.name,
-                  input: tc.arguments
+                  id: tc_id,
+                  name: tc_name,
+                  input: tc_args
                 }
               end
             end

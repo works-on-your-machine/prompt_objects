@@ -68,11 +68,16 @@ module PromptObjects
               # Store tool calls for potential name lookup in tool results
               last_tool_calls = {}
               msg[:tool_calls].each do |tc|
-                last_tool_calls[tc.id] = tc.name
+                # Handle both ToolCall objects and Hashes (from database)
+                tc_id = tc.respond_to?(:id) ? tc.id : (tc[:id] || tc["id"])
+                tc_name = tc.respond_to?(:name) ? tc.name : (tc[:name] || tc["name"])
+                tc_args = tc.respond_to?(:arguments) ? tc.arguments : (tc[:arguments] || tc["arguments"] || {})
+
+                last_tool_calls[tc_id] = tc_name
                 parts << {
                   functionCall: {
-                    name: tc.name,
-                    args: tc.arguments
+                    name: tc_name,
+                    args: tc_args
                   }
                 }
               end

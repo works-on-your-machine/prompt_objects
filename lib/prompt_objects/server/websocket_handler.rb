@@ -431,7 +431,11 @@ module PromptObjects
           hash = { role: "assistant", content: msg[:content] }
           if msg[:tool_calls]
             hash[:tool_calls] = msg[:tool_calls].map do |tc|
-              { id: tc.id, name: tc.name, arguments: tc.arguments }
+              # Handle both ToolCall objects and Hashes
+              tc_id = tc.respond_to?(:id) ? tc.id : (tc[:id] || tc["id"])
+              tc_name = tc.respond_to?(:name) ? tc.name : (tc[:name] || tc["name"])
+              tc_args = tc.respond_to?(:arguments) ? tc.arguments : (tc[:arguments] || tc["arguments"] || {})
+              { id: tc_id, name: tc_name, arguments: tc_args }
             end
           end
           hash
