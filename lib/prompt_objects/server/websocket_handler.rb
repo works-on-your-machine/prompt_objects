@@ -48,20 +48,23 @@ module PromptObjects
       end
 
       def on_human_queue_event(event, request)
+        puts "HumanQueue event: #{event} for request #{request.id}" # Debug
         case event
         when :added
+          puts "Sending notification to WebSocket: #{request.question}" # Debug
           send_message(
             type: "notification",
             payload: request_to_hash(request)
           )
         when :resolved
+          puts "Sending notification_resolved to WebSocket: #{request.id}" # Debug
           send_message(
             type: "notification_resolved",
             payload: { id: request.id }
           )
         end
       rescue => e
-        puts "WebSocket notification error: #{e.message}" if ENV["DEBUG"]
+        puts "WebSocket notification error: #{e.message}"
       end
 
       def on_bus_message(entry)
@@ -344,10 +347,10 @@ module PromptObjects
       def request_to_hash(request)
         {
           id: request.id,
-          po_name: request.po_name,
-          type: request.type,
-          message: request.message,
-          options: request.options
+          po_name: request.capability,  # capability is the PO name
+          type: "ask_human",            # hardcode type since it's always ask_human
+          message: request.question,    # question is the message
+          options: request.options || []
         }
       end
     end
