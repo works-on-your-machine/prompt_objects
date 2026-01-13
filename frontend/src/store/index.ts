@@ -25,6 +25,7 @@ interface Store {
   updatePromptObjectStatus: (name: string, status: PromptObject['status']) => void
   addMessageToPO: (poName: string, message: Message) => void
   updateSessionMessages: (poName: string, sessionId: string, messages: Message[]) => void
+  switchPOSession: (poName: string, sessionId: string) => void
 
   // Navigation
   selectedPO: string | null
@@ -143,6 +144,25 @@ export const useStore = create<Store>((set) => ({
       // Otherwise, just update the session in the sessions list (message count)
       // The full messages will be loaded when the user switches to that session
       return s
+    }),
+  switchPOSession: (poName, sessionId) =>
+    set((s) => {
+      const po = s.promptObjects[poName]
+      if (!po) return s
+
+      // Switch to a new session - clear messages until session_updated arrives
+      return {
+        promptObjects: {
+          ...s.promptObjects,
+          [poName]: {
+            ...po,
+            current_session: {
+              id: sessionId,
+              messages: [], // Will be populated by session_updated
+            },
+          },
+        },
+      }
     }),
 
   // Navigation

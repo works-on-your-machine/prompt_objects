@@ -26,6 +26,7 @@ export function useWebSocket() {
     setPromptObject,
     removePromptObject,
     updateSessionMessages,
+    switchPOSession,
     addBusMessage,
     addNotification,
     removeNotification,
@@ -187,7 +188,9 @@ export function useWebSocket() {
             thread_type: ThreadType
           }
           console.log('Thread created:', target, thread_id, thread_type)
-          // State will be updated by the subsequent po_state message
+          // IMMEDIATELY switch to the new thread so user sees their message
+          // This ensures session_updated messages for this thread are displayed
+          switchPOSession(target, thread_id)
           break
         }
 
@@ -229,6 +232,7 @@ export function useWebSocket() {
       setPromptObject,
       removePromptObject,
       updateSessionMessages,
+      switchPOSession,
       setPendingResponse,
       clearPendingResponse,
       appendStreamChunk,

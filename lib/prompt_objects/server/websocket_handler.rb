@@ -7,6 +7,47 @@ module PromptObjects
   module Server
     # Handles WebSocket connections for real-time communication with the frontend.
     # Subscribes to MessageBus for state updates and handles client messages.
+    #
+    # == Real-time UI Feedback Pattern ==
+    #
+    # IMPORTANT: All user actions must provide immediate visual feedback BEFORE
+    # async operations complete. This makes the UI feel "alive" and responsive.
+    #
+    # When implementing new features, follow this pattern:
+    #
+    # 1. SWITCH CONTEXT FIRST
+    #    When creating/switching threads, sessions, etc., send the context switch
+    #    message FIRST so the frontend displays the new context immediately.
+    #    Example: thread_created → frontend switches to new thread
+    #
+    # 2. UPDATE NAVIGATION
+    #    Send updated lists (sessions, threads) immediately so sidebars reflect
+    #    the change without waiting for async work to complete.
+    #    Example: po_state with sessions list → ThreadsSidebar shows new thread
+    #
+    # 3. SHOW USER INPUT
+    #    Send the user's input back immediately so they see it in the UI.
+    #    Don't wait for the AI to respond before showing what the user typed.
+    #    Example: session_updated with user message → chat shows "You: ..."
+    #
+    # 4. SHOW PROGRESS
+    #    Update status indicators during work (thinking, calling_tool, etc.).
+    #    Use streaming for incremental content when supported.
+    #    Example: po_state status "thinking" → spinner/animation shown
+    #
+    # 5. CONFIRM COMPLETION
+    #    Send final authoritative state after async work completes.
+    #    Example: session_updated with full messages → final chat state
+    #
+    # Message flow for "send message with new thread":
+    #   thread_created       → switch to new thread
+    #   po_state (sessions)  → update sidebar
+    #   session_updated      → show user message
+    #   po_state (thinking)  → show progress indicator
+    #   [stream chunks]      → incremental AI response
+    #   po_response          → complete AI response
+    #   session_updated      → final messages
+    #   po_state (idle)      → clear progress indicator
     class WebSocketHandler
       def initialize(runtime:, connection:, app: nil)
         @runtime = runtime
@@ -213,6 +254,14 @@ module PromptObjects
               target: po_name,
               thread_id: thread_id,
               thread_type: "root"
+            }
+          )
+          # Also send updated sessions list so ThreadsSidebar shows it immediately
+          send_message(
+            type: "po_state",
+            payload: {
+              name: po_name,
+              state: { sessions: po.list_sessions.map { |s| session_summary(s) } }
             }
           )
         end
