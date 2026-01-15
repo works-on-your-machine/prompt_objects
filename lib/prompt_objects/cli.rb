@@ -360,10 +360,11 @@ module PromptObjects
             prompt_objects env delete <name> --permanent  Delete archived env
 
           Available templates:
-            minimal    - Basic assistant PO
+            basic      - No capabilities, learns as needed (great for demos!)
+            minimal    - Basic assistant with file reading
             developer  - Code review, debugging, testing specialists
             writer     - Editor, researcher for content creation
-            empty      - No objects, full control
+            empty      - Bootstrap assistant only
         HELP
       end
     end

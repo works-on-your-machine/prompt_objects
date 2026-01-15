@@ -277,12 +277,15 @@ module PromptObjects
 
         # Send immediate session update showing the user's message
         # This gives instant feedback before the AI responds
+        # Include existing messages so we don't clear the chat when continuing a thread
+        existing_messages = session_messages(po, request_session_id)
+        new_user_message = { role: "user", content: content, from: "human" }
         send_message(
           type: "session_updated",
           payload: {
             target: po_name,
             session_id: request_session_id,
-            messages: [{ role: "user", content: content, from: "human" }]
+            messages: existing_messages + [new_user_message]
           }
         )
 

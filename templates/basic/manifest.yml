@@ -1,0 +1,7 @@
+name: basic
+description: Basic assistant with no capabilities - great for demos
+icon: "\U0001F331"
+color: "#10B981"
+
+objects:
+  - basic

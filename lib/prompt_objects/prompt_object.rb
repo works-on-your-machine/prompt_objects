@@ -4,18 +4,20 @@ module PromptObjects
   # A Prompt Object is a capability backed by an LLM.
   # It interprets messages semantically using its markdown "soul" as the system prompt.
   class PromptObject < Capability
-    attr_reader :config, :body, :history, :session_id
+    attr_reader :config, :body, :history, :session_id, :path
 
     # @param config [Hash] Parsed frontmatter (name, description, capabilities)
     # @param body [String] Markdown body (the "soul" - becomes system prompt)
     # @param env [Environment] Reference to the environment
     # @param llm [LLM::OpenAIAdapter] LLM adapter for making calls
-    def initialize(config:, body:, env:, llm:)
+    # @param path [String, nil] Path to the source .md file (for persistence)
+    def initialize(config:, body:, env:, llm:, path: nil)
       super()
       @config = config
       @body = body
       @env = env
       @llm = llm
+      @path = path
       @history = []
       @session_id = nil
 
@@ -143,6 +145,27 @@ module PromptObjects
     def clear_history
       @history = []
       session_store&.clear_messages(@session_id) if @session_id
+    end
+
+    # --- File Persistence ---
+
+    # Save the current config and body back to the source file.
+    # This persists any runtime changes (like added capabilities) to disk.
+    # @return [Boolean] True if saved successfully, false if no path or error
+    def save
+      return false unless @path
+
+      # Build YAML frontmatter with proper formatting
+      yaml_content = @config.to_yaml
+
+      # Combine frontmatter and body
+      content = "#{yaml_content}---\n\n#{@body}\n"
+
+      File.write(@path, content, encoding: "UTF-8")
+      true
+    rescue => e
+      puts "Error saving PO #{name} to #{@path}: #{e.message}" if ENV["DEBUG"]
+      false
     end
 
     # --- Thread/Delegation Support ---

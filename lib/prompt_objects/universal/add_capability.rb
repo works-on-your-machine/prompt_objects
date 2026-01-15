@@ -62,7 +62,12 @@ module PromptObjects
         target_po.config["capabilities"] ||= []
         target_po.config["capabilities"] << capability
 
-        "Added '#{capability}' to '#{target}'. It can now use this capability."
+        # Persist to file so it's available on restart
+        if target_po.save
+          "Added '#{capability}' to '#{target}' and saved to file. It can now use this capability."
+        else
+          "Added '#{capability}' to '#{target}' (in-memory only, could not save to file). It can now use this capability."
+        end
       end
     end
   end

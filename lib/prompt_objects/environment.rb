@@ -195,7 +195,8 @@ module PromptObjects
         config: data[:config],
         body: data[:body],
         env: self,
-        llm: @llm
+        llm: @llm,
+        path: data[:path]
       )
 
       @registry.register(po)

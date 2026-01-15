@@ -108,7 +108,9 @@ module PromptObjects
         creator_po.config["capabilities"] ||= []
         unless creator_po.config["capabilities"].include?(cap_name)
           creator_po.config["capabilities"] << cap_name
-          return "Also added '#{cap_name}' to #{creator_name}'s capabilities."
+          # Persist the change to file
+          saved = creator_po.save ? " and saved" : ""
+          return "Also added '#{cap_name}' to #{creator_name}'s capabilities#{saved}."
         end
 
         nil

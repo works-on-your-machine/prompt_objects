@@ -211,11 +211,15 @@ module PromptObjects
         end
 
         # Auto-add to the requesting PO
+        saved = false
         if context.calling_po
           caller_po = context.env.registry.get(context.calling_po)
           if caller_po.is_a?(PromptObject)
             caller_po.config["capabilities"] ||= []
-            caller_po.config["capabilities"] << prim_name unless caller_po.config["capabilities"].include?(prim_name)
+            unless caller_po.config["capabilities"].include?(prim_name)
+              caller_po.config["capabilities"] << prim_name
+              saved = caller_po.save
+            end
           end
         end
 
@@ -226,7 +230,8 @@ module PromptObjects
           message: "[approved] Created primitive '#{prim_name}'"
         )
 
-        "Primitive '#{prim_name}' created and added to your capabilities."
+        save_msg = saved ? " and saved to file" : ""
+        "Primitive '#{prim_name}' created and added to your capabilities#{save_msg}."
       end
 
       def generate_ruby_class(class_name, prim_name, description, params_schema, code)

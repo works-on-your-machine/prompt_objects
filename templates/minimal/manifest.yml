@@ -1,13 +1,7 @@
----
-version: 1
 name: minimal
-description: A basic starting point with just a coordinator
-created_at: '2026-01-12T10:32:37-05:00'
-updated_at: '2026-01-12T10:32:37-05:00'
-last_opened: '2026-01-12T10:32:37-05:00'
+description: Basic assistant with file reading capabilities
 icon: "\U0001F3AF"
 color: "#6B7280"
-stats:
-  total_messages: 0
-  total_sessions: 0
-  po_count: 0
+
+objects:
+  - assistant

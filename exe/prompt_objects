@@ -6,6 +6,7 @@ $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 
 require "bundler/setup"
 require "prompt_objects"
+require "prompt_objects/cli"
 require "fileutils"
 require "tmpdir"
 
@@ -279,15 +280,18 @@ def print_main_help
     Usage: prompt_objects <command> [options]
 
     Commands:
-      repl [name] [objects_dir]   Start interactive REPL with a prompt object
-      serve                        Run environment as a server (MCP, API, etc.)
+      env                          Manage environments (create, list, export, etc.)
+      serve <env>                  Run environment as a web server
+      repl [name] [objects_dir]    Start interactive REPL with a prompt object
       help                         Show this help message
 
     Run 'prompt_objects <command> --help' for command-specific help.
 
     Examples:
-      prompt_objects repl greeter              # Start REPL with 'greeter' PO
-      prompt_objects serve --mcp my-assistant  # Run as MCP server
+      prompt_objects env list                     # List all environments
+      prompt_objects env create demo --template demo  # Create from template
+      prompt_objects serve my-env                 # Start web UI
+      prompt_objects serve my-env --open          # Start and open browser
   HELP
 end
 
@@ -535,6 +539,11 @@ end
 
 # === Main Entry Point ===
 
+def run_env(args)
+  cmd = PromptObjects::CLI::EnvCommand.new
+  cmd.run(args)
+end
+
 def main
   if ARGV.empty?
     print_main_help
@@ -545,6 +554,8 @@ def main
   args = ARGV[1..]
 
   case command
+  when "env"
+    run_env(args)
   when "repl"
     run_repl(args)
   when "serve"

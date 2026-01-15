@@ -159,7 +159,8 @@ module PromptObjects
         caller_po.config["capabilities"] ||= []
         unless caller_po.config["capabilities"].include?(prim_name)
           caller_po.config["capabilities"] << prim_name
-          return "Added '#{prim_name}' to your capabilities."
+          saved = caller_po.save ? " and saved to file" : ""
+          return "Added '#{prim_name}' to your capabilities#{saved}."
         end
 
         nil
