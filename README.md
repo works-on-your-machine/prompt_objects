@@ -69,5 +69,5 @@ Extras
 ======
 
 - **License**: MIT
-- **Ruby**: >= 3.1.0
-- **Repository**: https://github.com/sublayerapp/prompt_objects
+- **Ruby**: >= 3.2.0
+- **Repository**: https://github.com/works-on-your-machine/prompt_objects

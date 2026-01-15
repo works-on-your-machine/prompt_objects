@@ -8,7 +8,7 @@ Gem::Specification.new do |spec|
 
   spec.summary       = "LLM-backed entities as first-class autonomous objects"
   spec.description   = "A framework where markdown files with LLM-backed behavior act as first-class autonomous entities. Features inter-object communication and environment management."
-  spec.homepage      = "https://github.com/sublayerapp/prompt_objects"
+  spec.homepage      = "https://github.com/works-on-your-machine/prompt_objects"
   spec.license       = "MIT"
   spec.required_ruby_version = ">= 3.2.0"
 
