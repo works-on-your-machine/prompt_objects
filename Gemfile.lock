@@ -1,18 +1,13 @@
 PATH
-  remote: ../charm-native
-  specs:
-    charm-native (0.1.0)
-
-PATH
   remote: .
   specs:
     prompt_objects (0.1.0)
       anthropic (~> 1.0)
-      async-websocket (~> 0.26)
-      falcon (~> 0.47)
-      front_matter_parser
+      async-websocket (~> 0.28)
+      falcon (~> 0.50)
+      front_matter_parser (~> 1.0)
       listen (~> 3.9)
-      mcp
+      mcp (~> 0.4)
       rack (~> 3.0)
       ruby-openai (~> 7.0)
       sqlite3 (~> 2.0)
@@ -136,8 +131,7 @@ GEM
       msgpack
     memory-leak (0.7.0)
     metrics (0.15.0)
-    minitest (6.0.1)
-      prism (~> 1.5)
+    minitest (5.27.0)
     msgpack (1.8.0)
     multipart-post (2.4.1)
     net-http (0.9.1)
@@ -224,12 +218,11 @@ PLATFORMS
 
 DEPENDENCIES
   base64
-  charm-native!
-  debug
-  minitest
+  debug (~> 1.0)
+  minitest (~> 5.0)
   prompt_objects!
-  rake
-  rubocop
+  rake (~> 13.0)
+  rubocop (~> 1.50)
 
 BUNDLED WITH
    2.7.2
