@@ -1,10 +1,11 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Add lib to load path
+# Add lib to load path for development (harmless when gem is installed)
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 
-require "bundler/setup"
+# Note: Do NOT require "bundler/setup" here - it would conflict with
+# the user's project Gemfile if they run this from within a Rails app, etc.
 require "prompt_objects"
 require "prompt_objects/cli"
 require "fileutils"
