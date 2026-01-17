@@ -282,6 +282,7 @@ module PromptObjects
       @registry.register(Universal::VerifyPrimitive.new)
       @registry.register(Universal::ModifyPrimitive.new)
       @registry.register(Universal::RequestPrimitive.new)
+      @registry.register(Universal::ModifyPrompt.new)
     end
   end
 
