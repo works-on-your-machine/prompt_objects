@@ -11,7 +11,7 @@ module PromptObjects
   class Error < StandardError; end
 
   # Universal capabilities available to all prompt objects (don't need to be declared)
-  UNIVERSAL_CAPABILITIES = %w[ask_human think create_capability add_capability list_capabilities list_primitives add_primitive create_primitive verify_primitive modify_primitive request_primitive modify_prompt].freeze
+  UNIVERSAL_CAPABILITIES = %w[ask_human think create_capability add_capability remove_capability list_capabilities list_primitives add_primitive create_primitive delete_primitive verify_primitive modify_primitive request_primitive modify_prompt].freeze
 end
 
 require_relative "prompt_objects/capability"
@@ -49,10 +49,12 @@ require_relative "prompt_objects/universal/ask_human"
 require_relative "prompt_objects/universal/think"
 require_relative "prompt_objects/universal/create_capability"
 require_relative "prompt_objects/universal/add_capability"
+require_relative "prompt_objects/universal/remove_capability"
 require_relative "prompt_objects/universal/list_capabilities"
 require_relative "prompt_objects/universal/list_primitives"
 require_relative "prompt_objects/universal/add_primitive"
 require_relative "prompt_objects/universal/create_primitive"
+require_relative "prompt_objects/universal/delete_primitive"
 require_relative "prompt_objects/universal/verify_primitive"
 require_relative "prompt_objects/universal/modify_primitive"
 require_relative "prompt_objects/universal/request_primitive"
