@@ -9,6 +9,7 @@ interface PODetailProps {
   createSession: (target: string, name?: string) => void
   switchSession: (target: string, sessionId: string) => void
   createThread: (target: string, name?: string) => void
+  updatePrompt: (target: string, prompt: string) => void
 }
 
 export function PODetail({
@@ -16,6 +17,7 @@ export function PODetail({
   createSession,
   switchSession,
   createThread,
+  updatePrompt,
 }: PODetailProps) {
   const { activeTab, setActiveTab, selectPO } = useStore()
   const po = useSelectedPO()
@@ -95,7 +97,12 @@ export function PODetail({
           />
         )}
         {activeTab === 'capabilities' && <CapabilitiesPanel po={po} />}
-        {activeTab === 'prompt' && <PromptPanel po={po} />}
+        {activeTab === 'prompt' && (
+          <PromptPanel
+            po={po}
+            onSave={(prompt) => updatePrompt(po.name, prompt)}
+          />
+        )}
       </div>
     </div>
   )

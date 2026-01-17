@@ -9,7 +9,7 @@ import { NotificationPanel } from './components/NotificationPanel'
 import { ThreadsSidebar } from './components/ThreadsSidebar'
 
 export default function App() {
-  const { sendMessage, respondToNotification, createSession, switchSession, switchLLM, createThread } =
+  const { sendMessage, respondToNotification, createSession, switchSession, switchLLM, createThread, updatePrompt } =
     useWebSocket()
   const { selectedPO, busOpen, notifications } = useStore()
   const selectedPOData = useSelectedPO()
@@ -72,6 +72,7 @@ export default function App() {
               createSession={createSession}
               switchSession={switchSession}
               createThread={createThread}
+              updatePrompt={updatePrompt}
             />
           ) : (
             <Dashboard />

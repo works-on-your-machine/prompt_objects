@@ -219,6 +219,8 @@ module PromptObjects
           handle_get_llm_config
         when "switch_llm"
           handle_switch_llm(message["payload"])
+        when "update_prompt"
+          handle_update_prompt(message["payload"])
         when "ping"
           send_message(type: "pong", payload: {})
         else
@@ -520,6 +522,30 @@ module PromptObjects
           )
         rescue PromptObjects::Error => e
           send_error("Failed to switch LLM: #{e.message}")
+        end
+      end
+
+      def handle_update_prompt(payload)
+        po_name = payload["target"]
+        new_prompt = payload["prompt"]
+
+        po = @runtime.registry.get(po_name)
+        return send_error("Unknown prompt object: #{po_name}") unless po.is_a?(PromptObject)
+
+        # Update the body in memory
+        po.instance_variable_set(:@body, new_prompt)
+
+        # Persist to file
+        if po.save
+          # Notify for real-time UI update (broadcasts to all clients)
+          @runtime.notify_po_modified(po)
+
+          send_message(
+            type: "prompt_updated",
+            payload: { target: po_name, success: true }
+          )
+        else
+          send_error("Failed to save prompt for #{po_name}")
         end
       end
 

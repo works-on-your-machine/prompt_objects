@@ -352,6 +352,21 @@ export function useWebSocket() {
     )
   }, [])
 
+  // Update a PO's prompt (markdown body)
+  const updatePrompt = useCallback((target: string, prompt: string) => {
+    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket not connected')
+      return
+    }
+
+    ws.current.send(
+      JSON.stringify({
+        type: 'update_prompt',
+        payload: { target, prompt },
+      })
+    )
+  }, [])
+
   return {
     sendMessage,
     respondToNotification,
@@ -359,5 +374,6 @@ export function useWebSocket() {
     switchSession,
     switchLLM,
     createThread,
+    updatePrompt,
   }
 }
