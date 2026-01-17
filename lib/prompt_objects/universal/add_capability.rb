@@ -63,7 +63,12 @@ module PromptObjects
         target_po.config["capabilities"] << capability
 
         # Persist to file so it's available on restart
-        if target_po.save
+        saved = target_po.save
+
+        # Notify for real-time UI update (don't wait for file watcher)
+        context.env.notify_po_modified(target_po)
+
+        if saved
           "Added '#{capability}' to '#{target}' and saved to file. It can now use this capability."
         else
           "Added '#{capability}' to '#{target}' (in-memory only, could not save to file). It can now use this capability."

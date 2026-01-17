@@ -46,6 +46,19 @@ module PromptObjects
         puts "Broadcast: PO registered - #{po.name}"
       }
 
+      # Register callback for PO modification notifications
+      # This fires when capabilities are added/removed programmatically
+      runtime.on_po_modified = ->(po) {
+        app.broadcast(
+          type: "po_modified",
+          payload: {
+            name: po.name,
+            state: po_state_hash(po)
+          }
+        )
+        puts "Broadcast: PO modified (programmatic) - #{po.name}"
+      }
+
       # Start file watcher for live updates (manual file edits)
       file_watcher = nil
       if env_path

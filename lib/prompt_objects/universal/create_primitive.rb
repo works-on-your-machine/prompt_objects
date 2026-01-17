@@ -160,6 +160,10 @@ module PromptObjects
         unless caller_po.config["capabilities"].include?(prim_name)
           caller_po.config["capabilities"] << prim_name
           saved = caller_po.save ? " and saved to file" : ""
+
+          # Notify for real-time UI update
+          context.env.notify_po_modified(caller_po)
+
           return "Added '#{prim_name}' to your capabilities#{saved}."
         end
 

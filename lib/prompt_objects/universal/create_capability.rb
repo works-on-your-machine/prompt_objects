@@ -110,6 +110,10 @@ module PromptObjects
           creator_po.config["capabilities"] << cap_name
           # Persist the change to file
           saved = creator_po.save ? " and saved" : ""
+
+          # Notify for real-time UI update
+          context.env.notify_po_modified(creator_po)
+
           return "Also added '#{cap_name}' to #{creator_name}'s capabilities#{saved}."
         end
 

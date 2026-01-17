@@ -40,6 +40,7 @@ module PromptObjects
                 :manifest, :env_path, :auto_commit, :session_store,
                 :current_provider, :current_model
     attr_accessor :on_po_registered  # Callback for when a PO is registered
+    attr_accessor :on_po_modified    # Callback for when a PO is modified (capabilities changed, etc.)
 
     # Initialize from an environment path (with manifest) or objects directory.
     # @param env_path [String, nil] Path to environment directory (preferred)
@@ -205,6 +206,13 @@ module PromptObjects
       @on_po_registered&.call(po)
 
       po
+    end
+
+    # Notify that a PO has been modified (for live updates in web UI).
+    # Call this after modifying a PO's config/capabilities programmatically.
+    # @param po [PromptObject] The modified PO
+    def notify_po_modified(po)
+      @on_po_modified&.call(po)
     end
 
     # Load a prompt object by name from the objects directory.
