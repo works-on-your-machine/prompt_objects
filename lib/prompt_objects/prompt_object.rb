@@ -5,6 +5,7 @@ module PromptObjects
   # It interprets messages semantically using its markdown "soul" as the system prompt.
   class PromptObject < Capability
     attr_reader :config, :body, :history, :session_id, :path
+    attr_accessor :on_history_updated  # Callback for real-time updates during receive loop
 
     # @param config [Hash] Parsed frontmatter (name, description, capabilities)
     # @param body [String] Markdown body (the "soul" - becomes system prompt)
@@ -95,6 +96,9 @@ module PromptObjects
           tool_msg = { role: :tool, results: results }
           @history << tool_msg
           persist_message(tool_msg)
+
+          # Notify callback for real-time UI updates (tool calls as they happen)
+          notify_history_updated
         else
           # No tool calls - we have our final response
           assistant_msg = { role: :assistant, content: response.content }
@@ -339,6 +343,12 @@ module PromptObjects
 
       messages = session_store.get_messages(@session_id)
       messages.last&.dig(:id)
+    end
+
+    # Notify the history updated callback if registered.
+    # Used for real-time UI updates during the receive loop.
+    def notify_history_updated
+      @on_history_updated&.call(self, @session_id, @history)
     end
 
     # --- Session Persistence Helpers ---

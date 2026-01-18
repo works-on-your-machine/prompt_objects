@@ -297,9 +297,20 @@ module PromptObjects
           context = @runtime.context(tui_mode: true)
           context.current_capability = "human"
 
+          # Set up callback for real-time tool call updates
+          # This fires after each tool call iteration in the receive loop
+          po.on_history_updated = ->(po_obj, session_id, history) {
+            send_message(
+              type: "session_updated",
+              payload: {
+                target: po_obj.name,
+                session_id: session_id,
+                messages: history.map { |m| message_to_hash(m) }
+              }
+            )
+          }
+
           begin
-            # TODO: Add streaming support to receive()
-            # For now, just get the full response
             response = po.receive(content, context: context)
 
             # Auto-name the thread if it doesn't have a name yet
@@ -339,6 +350,9 @@ module PromptObjects
           rescue => e
             send_error("Error from #{po_name}: #{e.message}")
           ensure
+            # Clean up the callback
+            po.on_history_updated = nil
+
             # Update PO state back to idle (status only, not session data)
             send_message(
               type: "po_state",
@@ -560,12 +574,23 @@ module PromptObjects
           status: po.instance_variable_get(:@state) || "idle",
           description: po.description,
           capabilities: po.config["capabilities"] || [],
+          universal_capabilities: universal_capabilities_info,
           current_session: current_session_hash(po),
           sessions: po.list_sessions.map { |s| session_summary(s) },
           # Include full prompt for inspection
           prompt: po.body,
           config: po.config
         }
+      end
+
+      def universal_capabilities_info
+        UNIVERSAL_CAPABILITIES.map do |name|
+          cap = @runtime.registry.get(name)
+          {
+            name: name,
+            description: cap&.description || "Universal capability"
+          }
+        end
       end
 
       def current_session_hash(po)

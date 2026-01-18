@@ -42,11 +42,17 @@ export interface CurrentSession {
   messages: Message[]
 }
 
+export interface UniversalCapability {
+  name: string
+  description: string
+}
+
 export interface PromptObject {
   name: string
   description: string
   status: 'idle' | 'thinking' | 'calling_tool'
   capabilities: string[]
+  universal_capabilities?: UniversalCapability[]
   current_session: CurrentSession | null
   sessions: Session[]
   prompt?: string  // The markdown body/prompt
