@@ -573,7 +573,7 @@ module PromptObjects
         {
           status: po.instance_variable_get(:@state) || "idle",
           description: po.description,
-          capabilities: po.config["capabilities"] || [],
+          capabilities: declared_capabilities_info(po),
           universal_capabilities: universal_capabilities_info,
           current_session: current_session_hash(po),
           sessions: po.list_sessions.map { |s| session_summary(s) },
@@ -583,12 +583,25 @@ module PromptObjects
         }
       end
 
+      def declared_capabilities_info(po)
+        declared = po.config["capabilities"] || []
+        declared.map do |name|
+          cap = @runtime.registry.get(name)
+          {
+            name: name,
+            description: cap&.description || "Capability not found",
+            parameters: cap&.parameters
+          }
+        end
+      end
+
       def universal_capabilities_info
         UNIVERSAL_CAPABILITIES.map do |name|
           cap = @runtime.registry.get(name)
           {
             name: name,
-            description: cap&.description || "Universal capability"
+            description: cap&.description || "Universal capability",
+            parameters: cap&.parameters
           }
         end
       end

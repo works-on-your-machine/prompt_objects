@@ -133,13 +133,15 @@ function MessageBubble({ message }: { message: Message }) {
   const isTool = message.role === 'tool'
 
   if (isTool) {
+    // Tool messages contain results from tool calls
+    const results = message.results || []
+    if (results.length === 0) return null
+
     return (
-      <div className="text-xs text-gray-500 bg-po-bg rounded p-2 font-mono">
-        <div className="text-gray-400 mb-1">Tool Result:</div>
-        <div className="whitespace-pre-wrap break-all">
-          {message.content?.slice(0, 500)}
-          {message.content && message.content.length > 500 && '...'}
-        </div>
+      <div className="space-y-2 ml-11">
+        {results.map((result, idx) => (
+          <ToolResultDisplay key={result.tool_call_id || idx} result={result} />
+        ))}
       </div>
     )
   }
@@ -244,6 +246,41 @@ function ToolCallDisplay({ toolCall }: { toolCall: ToolCall }) {
           <pre className="text-gray-400 whitespace-pre-wrap break-all mt-1 text-[10px] leading-relaxed">
             {JSON.stringify(toolCall.arguments, null, 2)}
           </pre>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ToolResultDisplay({ result }: { result: { tool_call_id: string; name?: string; content: string } }) {
+  const [expanded, setExpanded] = useState(false)
+  const content = result.content || ''
+  const truncatedContent = content.slice(0, 200)
+  const isTruncated = content.length > 200
+
+  return (
+    <div className="text-xs bg-po-surface/50 border border-po-border/30 rounded overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full px-2 py-1 text-left font-mono flex items-center gap-1 hover:bg-po-surface transition-colors"
+      >
+        <span className="text-gray-500">{expanded ? '▼' : '▶'}</span>
+        <span className="text-gray-400">↳ Result</span>
+        {result.name && <span className="text-po-accent/70">from {result.name}</span>}
+      </button>
+      {expanded && (
+        <div className="px-2 pb-2 border-t border-po-border/30">
+          <pre className="text-gray-400 whitespace-pre-wrap break-all mt-1 text-[10px] leading-relaxed">
+            {content}
+          </pre>
+        </div>
+      )}
+      {!expanded && (
+        <div className="px-2 pb-1 text-gray-500">
+          <span className="whitespace-pre-wrap break-all">
+            {truncatedContent}
+            {isTruncated && '...'}
+          </span>
         </div>
       )}
     </div>

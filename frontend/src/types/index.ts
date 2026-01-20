@@ -16,6 +16,7 @@ export interface ToolCall {
 
 export interface ToolResult {
   tool_call_id: string
+  name?: string  // Name of the tool that was called
   content: string
 }
 
@@ -42,17 +43,21 @@ export interface CurrentSession {
   messages: Message[]
 }
 
-export interface UniversalCapability {
+export interface CapabilityInfo {
   name: string
   description: string
+  parameters?: Record<string, unknown>
 }
+
+// Alias for backwards compatibility
+export type UniversalCapability = CapabilityInfo
 
 export interface PromptObject {
   name: string
   description: string
   status: 'idle' | 'thinking' | 'calling_tool'
-  capabilities: string[]
-  universal_capabilities?: UniversalCapability[]
+  capabilities: CapabilityInfo[]
+  universal_capabilities?: CapabilityInfo[]
   current_session: CurrentSession | null
   sessions: Session[]
   prompt?: string  // The markdown body/prompt

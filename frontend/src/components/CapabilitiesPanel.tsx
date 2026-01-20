@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { PromptObject, UniversalCapability } from '../types'
+import type { PromptObject, CapabilityInfo } from '../types'
 
 interface CapabilitiesPanelProps {
   po: PromptObject
@@ -23,14 +23,9 @@ export function CapabilitiesPanel({ po }: CapabilitiesPanelProps) {
             No capabilities declared. This PO can only use universal capabilities.
           </div>
         ) : (
-          <div className="space-y-2">
-            {capabilities.map((cap, index) => (
-              <div
-                key={index}
-                className="bg-po-surface border border-po-border rounded-lg p-3"
-              >
-                <div className="font-mono text-sm text-po-accent">{cap}</div>
-              </div>
+          <div className="space-y-1">
+            {capabilities.map((cap) => (
+              <CapabilityItem key={cap.name} capability={cap} accent />
             ))}
           </div>
         )}
@@ -48,7 +43,7 @@ export function CapabilitiesPanel({ po }: CapabilitiesPanelProps) {
 
         <div className="space-y-1">
           {universalCapabilities.map((cap) => (
-            <UniversalCapabilityItem key={cap.name} capability={cap} />
+            <CapabilityItem key={cap.name} capability={cap} />
           ))}
         </div>
       </div>
@@ -56,7 +51,12 @@ export function CapabilitiesPanel({ po }: CapabilitiesPanelProps) {
   )
 }
 
-function UniversalCapabilityItem({ capability }: { capability: UniversalCapability }) {
+interface CapabilityItemProps {
+  capability: CapabilityInfo
+  accent?: boolean  // Use accent color for name (for declared caps)
+}
+
+function CapabilityItem({ capability, accent }: CapabilityItemProps) {
   const [expanded, setExpanded] = useState(false)
 
   return (
@@ -65,14 +65,77 @@ function UniversalCapabilityItem({ capability }: { capability: UniversalCapabili
         onClick={() => setExpanded(!expanded)}
         className="w-full px-3 py-2 flex items-center justify-between hover:bg-po-surface transition-colors"
       >
-        <span className="font-mono text-sm text-gray-300">{capability.name}</span>
+        <span className={`font-mono text-sm ${accent ? 'text-po-accent' : 'text-gray-300'}`}>
+          {capability.name}
+        </span>
         <span className="text-gray-500 text-xs">{expanded ? '▼' : '▶'}</span>
       </button>
       {expanded && (
-        <div className="px-3 py-2 border-t border-po-border bg-po-surface">
+        <div className="px-3 py-2 border-t border-po-border bg-po-surface space-y-3">
           <p className="text-xs text-gray-400">{capability.description}</p>
+
+          {capability.parameters && (
+            <ParametersDisplay parameters={capability.parameters} />
+          )}
         </div>
       )}
+    </div>
+  )
+}
+
+interface ParametersDisplayProps {
+  parameters: Record<string, unknown>
+}
+
+function ParametersDisplay({ parameters }: ParametersDisplayProps) {
+  const properties = (parameters.properties as Record<string, unknown>) || {}
+  const required = (parameters.required as string[]) || []
+
+  const propertyNames = Object.keys(properties)
+
+  if (propertyNames.length === 0) {
+    return null
+  }
+
+  return (
+    <div>
+      <div className="text-xs text-gray-500 mb-2 font-medium">Parameters</div>
+      <div className="space-y-2">
+        {propertyNames.map((propName) => {
+          const prop = properties[propName] as Record<string, unknown>
+          const isRequired = required.includes(propName)
+
+          const propType = prop.type ? String(prop.type) : null
+          const propDescription = prop.description ? String(prop.description) : null
+          const propEnum = prop.enum as string[] | undefined
+
+          return (
+            <div key={propName} className="bg-po-bg rounded p-2">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs text-po-accent">{propName}</span>
+                {propType && (
+                  <span className="text-xs text-gray-600">({propType})</span>
+                )}
+                {isRequired && (
+                  <span className="text-xs text-red-400">required</span>
+                )}
+              </div>
+              {propDescription && (
+                <p className="text-xs text-gray-500 mt-1">{propDescription}</p>
+              )}
+              {propEnum && propEnum.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {propEnum.map((val) => (
+                    <span key={val} className="text-xs bg-po-surface px-1.5 py-0.5 rounded text-gray-400">
+                      {val}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
