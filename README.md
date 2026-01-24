@@ -45,8 +45,8 @@ gem install prompt_objects
 # Create an environment from a template
 prompt_objects env create my-project --template basic
 
-# Run the web interface
-prompt_objects --env my-project
+# Run and open the web interface
+prompt_objects serve my-project --open
 ```
 
 ### Environment Commands
