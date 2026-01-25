@@ -18,39 +18,32 @@
 
 require "bundler/setup"
 require_relative "../lib/prompt_objects"
-require "tmpdir"
-require "fileutils"
 
-# Use the poop directory which contains our prompt objects
 objects_dir = File.join(__dir__, "poop")
+data_dir = File.join(__dir__, "data")
 
-# Create sample files in a temp directory for the assistant to work with
-sample_dir = Dir.mktmpdir("prompt_objects_sample_")
-File.write(File.join(sample_dir, "greeting.txt"), "Hello from PromptObjects!")
-File.write(File.join(sample_dir, "info.txt"), "PromptObjects is a framework where markdown files act as autonomous LLM-backed entities.")
+puts <<~HEADER
+  #{'=' * 60}
+  PromptObjects Basic Example
+  #{'=' * 60}
 
-puts "=" * 60
-puts "PromptObjects Basic Example"
-puts "=" * 60
-puts
-puts "Objects directory: #{objects_dir}"
-puts "Sample files: #{sample_dir}"
-puts "Provider: ollama"
-puts "Model: gpt-oss:latest"
-puts
+  Objects directory: #{objects_dir}
+  Data directory: #{data_dir}
+  Provider: ollama
+  Model: gpt-oss:latest
+
+HEADER
 
 begin
-  # Create the runtime using the objects directory
   runtime = PromptObjects::Runtime.new(
     objects_dir: objects_dir,
     provider: "ollama",
     model: "gpt-oss:latest"
   )
 
-  # Load our assistant prompt object
   assistant = runtime.load_by_name("assistant")
 
-  puts "Loaded prompt object: #{assistant.name}"
+  puts "Loaded: #{assistant.name}"
   puts "Description: #{assistant.description}"
   puts "Capabilities: #{assistant.config['capabilities'].join(', ')}"
   puts
@@ -59,34 +52,42 @@ begin
   puts "-" * 60
   puts
 
-  # Create an execution context
   context = runtime.context
 
   # Example 1: Simple greeting
   puts "User: Hello! What can you help me with?"
+
   response = assistant.receive("Hello! What can you help me with?", context: context)
+
   puts "Assistant: #{response}"
   puts
 
-  # Example 2: Ask to list files (uses list_files primitive)
-  puts "User: Can you list the files in #{sample_dir}?"
-  response = assistant.receive("Can you list the files in #{sample_dir}?", context: context)
+  # Example 2: List files (uses list_files primitive)
+  puts "User: Can you list the files in #{data_dir}?"
+
+  response = assistant.receive("Can you list the files in #{data_dir}?", context: context)
+
   puts "Assistant: #{response}"
   puts
 
-  # Example 3: Ask to read a file (uses read_file primitive)
-  puts "User: What's in the greeting.txt file?"
-  response = assistant.receive("What's in the file #{File.join(sample_dir, 'greeting.txt')}?", context: context)
+  # Example 3: Read a file (uses read_file primitive)
+  greeting_file = File.join(data_dir, "greeting.txt")
+  puts "User: What's in #{greeting_file}?"
+
+  response = assistant.receive("What's in the file #{greeting_file}?", context: context)
+
   puts "Assistant: #{response}"
   puts
 
   puts "-" * 60
   puts "Conversation history:"
   puts "-" * 60
+
   assistant.history.each_with_index do |msg, i|
     role = msg[:role].to_s.capitalize
     content = msg[:content]&.to_s&.slice(0, 100)
     content += "..." if msg[:content]&.to_s&.length.to_i > 100
+
     puts "#{i + 1}. [#{role}] #{content || '(tool calls)'}"
   end
 
@@ -96,9 +97,4 @@ rescue PromptObjects::Error => e
   puts "Make sure Ollama is running and gpt-oss:latest is available:"
   puts "  ollama pull gpt-oss:latest"
   puts "  ollama serve"
-ensure
-  # Clean up sample files
-  FileUtils.rm_rf(sample_dir) if sample_dir && Dir.exist?(sample_dir)
-  puts
-  puts "Cleaned up sample files."
 end

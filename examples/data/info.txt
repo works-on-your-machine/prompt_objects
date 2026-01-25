@@ -1,0 +1,1 @@
+PromptObjects is a framework where markdown files act as autonomous LLM-backed entities.

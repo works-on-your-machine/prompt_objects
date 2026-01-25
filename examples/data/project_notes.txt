@@ -1,0 +1,16 @@
+Project: PromptObjects Framework Analysis
+
+Key Concepts:
+- Everything is a capability (unified interface)
+- Prompt objects are markdown files with LLM-backed behavior
+- Primitives are Ruby code with deterministic execution
+- Message bus tracks all inter-capability communication
+- Human-in-the-loop for confirmation and clarification
+
+Technical Stack:
+- Ruby for core implementation
+- RubyLLM for LLM adapters (OpenAI, Anthropic, Gemini, Ollama)
+- YAML frontmatter for configuration
+- Markdown body becomes system prompt
+
+Status: Active development
