@@ -5,13 +5,14 @@ require_relative "../../test_helper"
 class MCPToolsTest < PromptObjectsTest
   def setup
     super
+    skip_unless_ollama
     @temp_dir = track_temp_dir(create_temp_env(name: "mcp_test"))
 
     # Create test POs
     create_test_po_file(@temp_dir, name: "greeter", description: "A friendly greeter", capabilities: ["read_file"])
     create_test_po_file(@temp_dir, name: "helper", description: "A helpful assistant", capabilities: [])
 
-    @runtime = PromptObjects::Runtime.new(env_path: @temp_dir, llm: MockLLM.new)
+    @runtime = create_test_runtime(env_path: @temp_dir)
 
     # Load the POs
     Dir.glob(File.join(@temp_dir, "objects", "*.md")).each do |path|
@@ -67,6 +68,7 @@ class MCPToolsTest < PromptObjectsTest
 
     data = JSON.parse(result.content.first[:text])
     assert data["response"], "Should include response"
+    assert data["response"].length > 0, "Response should not be empty"
     assert_equal "greeter", data["po_name"]
   end
 
@@ -97,8 +99,9 @@ class MCPToolsTest < PromptObjectsTest
   end
 
   def test_send_message_uses_existing_session
+    # First, ensure the PO has a session
     po = @runtime.registry.get("greeter")
-    existing_session_id = po.instance_variable_get(:@session_id)
+    existing_session_id = po.session_id
 
     result = PromptObjects::Connectors::MCP::Tools::SendMessage.call(
       po_name: "greeter",

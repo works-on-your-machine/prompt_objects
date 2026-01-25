@@ -5,11 +5,29 @@ require "minitest/autorun"
 require "minitest/pride"
 require "fileutils"
 require "tmpdir"
+require "net/http"
 
 # Load the library
 require_relative "../lib/prompt_objects"
 
+# Test model for Ollama - use a model that supports tool calling
+TEST_OLLAMA_MODEL = ENV.fetch("TEST_OLLAMA_MODEL", "mistral:latest")
+
 module TestHelpers
+  # Check if Ollama is available for testing
+  def ollama_available?
+    uri = URI("http://localhost:11434/api/tags")
+    response = Net::HTTP.get_response(uri)
+    response.is_a?(Net::HTTPSuccess)
+  rescue Errno::ECONNREFUSED, Errno::ECONNRESET, SocketError
+    false
+  end
+
+  # Skip test if Ollama is not available
+  def skip_unless_ollama
+    skip "Ollama not available - skipping LLM integration test" unless ollama_available?
+  end
+
   # Create an in-memory session store for fast, isolated tests
   def create_memory_store
     PromptObjects::Session::Store.new(":memory:")
@@ -50,7 +68,8 @@ module TestHelpers
 
       # #{name.capitalize}
 
-      You are a test prompt object.
+      You are a test prompt object. Keep your responses extremely brief - one sentence max.
+      When asked to read a file, just acknowledge the request briefly.
     MD
 
     path = File.join(dir, "objects", "#{name}.md")
@@ -58,15 +77,17 @@ module TestHelpers
     path
   end
 
-  # Create a runtime with mock LLM for testing
+  # Create a runtime with real Ollama LLM for testing
   def create_test_runtime(env_path: nil, objects_dir: nil)
+    llm = PromptObjects::LLM::Client.new(provider: "ollama", model: TEST_OLLAMA_MODEL)
+
     if env_path
-      PromptObjects::Runtime.new(env_path: env_path, llm: MockLLM.new)
+      PromptObjects::Runtime.new(env_path: env_path, llm: llm)
     elsif objects_dir
-      PromptObjects::Runtime.new(objects_dir: objects_dir, llm: MockLLM.new)
+      PromptObjects::Runtime.new(objects_dir: objects_dir, llm: llm)
     else
       dir = create_temp_env
-      PromptObjects::Runtime.new(env_path: dir, llm: MockLLM.new)
+      PromptObjects::Runtime.new(env_path: dir, llm: llm)
     end
   end
 
@@ -77,43 +98,6 @@ module TestHelpers
       context: runtime.context(tui_mode: true),
       connector: connector
     }
-  end
-end
-
-# Mock LLM adapter that returns predictable responses without API calls
-class MockLLM
-  attr_reader :calls
-
-  def initialize(responses: [])
-    @responses = responses
-    @calls = []
-    @call_index = 0
-  end
-
-  # Record the call and return a mock response
-  # Matches the signature of LLM::Client#chat (returns a hash)
-  def chat(system:, messages:, tools: [])
-    @calls << { system: system, messages: messages, tools: tools }
-    response = @responses[@call_index] || default_response
-    @call_index += 1
-    response
-  end
-
-  # Queue a specific response for the next call
-  def queue_response(content: nil, tool_calls: [])
-    @responses << { content: content, tool_calls: tool_calls }
-  end
-
-  # Reset call history
-  def reset!
-    @calls = []
-    @call_index = 0
-  end
-
-  private
-
-  def default_response
-    { content: "Mock response from LLM", tool_calls: [] }
   end
 end
 
