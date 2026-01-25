@@ -34,8 +34,8 @@ lib/prompt_objects/
 ├── loader.rb               # Markdown file loader
 ├── cli.rb                  # CLI commands
 ├── llm/
-│   ├── openai_adapter.rb   # OpenAI API client
-│   └── response.rb         # Normalized LLM response
+│   ├── client.rb           # Unified LLM client (via ruby_llm gem)
+│   └── tool_call.rb        # Tool call representation
 ├── primitives/             # Built-in primitives
 ├── universal/              # Universal capabilities
 ├── environment/

@@ -141,7 +141,7 @@ Clean and modern. Works well with both keyboard and mouse. Not overly dense (web
 │                     Core Runtime                             │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
 │  │ Capability  │  │ Message     │  │ LLM                 │  │
-│  │ Registry    │  │ Bus         │  │ Adapters            │  │
+│  │ Registry    │  │ Bus         │  │ Client              │  │
 │  └─────────────┘  └──────┬──────┘  └─────────────────────┘  │
 │  ┌─────────────┐         │         ┌─────────────────────┐  │
 │  │ Environment │         │         │ Session             │  │
@@ -1168,7 +1168,7 @@ User types message
          │ Calls LLM with streaming
          ▼
 ┌─────────────────┐
-│   LLM Adapter   │  stream_completion(messages) { |chunk| ... }
+│   LLM Client    │  stream_completion(messages) { |chunk| ... }
 └────────┬────────┘
          │ Each chunk
          ▼

@@ -21,7 +21,7 @@ The **Ruby TUI** remains the primary interface using Charm gems directly (Bubble
 │  │  Registry   │  │ MessageBus  │  │ HumanQueue  │              │
 │  └─────────────┘  └─────────────┘  └─────────────┘              │
 │                           │                                      │
-│                    LLM Adapter (OpenAI)                          │
+│                    LLM Client (ruby_llm gem)                     │
 └─────────────────────────────────────────────────────────────────┘
                             │
                             │ (also exposed via)
