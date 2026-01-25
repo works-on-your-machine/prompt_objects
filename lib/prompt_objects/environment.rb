@@ -262,29 +262,31 @@ module PromptObjects
     private
 
     # Register built-in primitive capabilities.
+    # Primitives are RubyLLM::Tool classes - we register the class, not instances.
     def register_primitives
-      @registry.register(Primitives::ReadFile.new)
-      @registry.register(Primitives::ListFiles.new)
-      @registry.register(Primitives::WriteFile.new)
-      @registry.register(Primitives::HttpGet.new)
+      @registry.register(Primitives::ReadFile)
+      @registry.register(Primitives::ListFiles)
+      @registry.register(Primitives::WriteFile)
+      @registry.register(Primitives::HttpGet)
     end
 
     # Register universal capabilities (available to all prompt objects).
+    # Universal capabilities are RubyLLM::Tool classes - we register the class, not instances.
     def register_universal_capabilities
-      @registry.register(Universal::AskHuman.new)
-      @registry.register(Universal::Think.new)
-      @registry.register(Universal::CreateCapability.new)
-      @registry.register(Universal::AddCapability.new)
-      @registry.register(Universal::RemoveCapability.new)
-      @registry.register(Universal::ListCapabilities.new)
-      @registry.register(Universal::ListPrimitives.new)
-      @registry.register(Universal::AddPrimitive.new)
-      @registry.register(Universal::CreatePrimitive.new)
-      @registry.register(Universal::DeletePrimitive.new)
-      @registry.register(Universal::VerifyPrimitive.new)
-      @registry.register(Universal::ModifyPrimitive.new)
-      @registry.register(Universal::RequestPrimitive.new)
-      @registry.register(Universal::ModifyPrompt.new)
+      @registry.register(Universal::AskHuman)
+      @registry.register(Universal::Think)
+      @registry.register(Universal::CreateCapability)
+      @registry.register(Universal::AddCapability)
+      @registry.register(Universal::RemoveCapability)
+      @registry.register(Universal::ListCapabilities)
+      @registry.register(Universal::ListPrimitives)
+      @registry.register(Universal::AddPrimitive)
+      @registry.register(Universal::CreatePrimitive)
+      @registry.register(Universal::DeletePrimitive)
+      @registry.register(Universal::VerifyPrimitive)
+      @registry.register(Universal::ModifyPrimitive)
+      @registry.register(Universal::RequestPrimitive)
+      @registry.register(Universal::ModifyPrompt)
     end
   end
 

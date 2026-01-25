@@ -70,12 +70,14 @@ class LLMClientTest < PromptObjectsTest
     assert_includes providers, "openai"
     assert_includes providers, "anthropic"
     assert_includes providers, "gemini"
+    assert_includes providers, "ollama"
   end
 
   def test_client_default_models
     assert_equal "gpt-4.1", PromptObjects::LLM::Client.default_model("openai")
     assert_equal "claude-sonnet-4-5", PromptObjects::LLM::Client.default_model("anthropic")
     assert_equal "gemini-2.0-flash", PromptObjects::LLM::Client.default_model("gemini")
+    assert_equal "llama3.2", PromptObjects::LLM::Client.default_model("ollama")
   end
 
   def test_client_available_providers_returns_hash
@@ -84,6 +86,8 @@ class LLMClientTest < PromptObjectsTest
     assert available.key?("openai")
     assert available.key?("anthropic")
     assert available.key?("gemini")
+    assert available.key?("ollama")
+    assert_equal true, available["ollama"]  # Ollama is always available (local)
   end
 
   def test_client_raises_on_unknown_provider

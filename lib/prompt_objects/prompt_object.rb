@@ -10,7 +10,7 @@ module PromptObjects
     # @param config [Hash] Parsed frontmatter (name, description, capabilities)
     # @param body [String] Markdown body (the "soul" - becomes system prompt)
     # @param env [Environment] Reference to the environment
-    # @param llm [LLM::OpenAIAdapter] LLM adapter for making calls
+    # @param llm [LLM::Client] LLM client for making calls
     # @param path [String, nil] Path to the source .md file (for persistence)
     def initialize(config:, body:, env:, llm:, path: nil)
       super()
@@ -55,8 +55,9 @@ module PromptObjects
     end
 
     # Handle an incoming message by running the LLM conversation loop.
+    # RubyLLM handles tool execution automatically.
     # @param message [String, Hash] The incoming message
-    # @param context [Hash] Execution context
+    # @param context [Context] Execution context
     # @return [String] The response
     def receive(message, context:)
       # Normalize message to string
@@ -71,46 +72,66 @@ module PromptObjects
       persist_message(user_msg)
       @state = :working
 
-      # Conversation loop - keep going until LLM responds without tool calls
-      loop do
-        response = @llm.chat(
-          system: build_system_prompt,
-          messages: @history,
-          tools: available_tool_descriptors
-        )
+      # Get tool classes for this PO's capabilities
+      tool_classes = available_tool_classes(context)
 
-        tool_calls = response[:tool_calls] || []
+      # Set up callbacks for logging and history tracking
+      tool_calls_made = []
+      tool_results = []
 
-        if tool_calls.any?
-          # Execute tools and continue the loop
-          results = execute_tool_calls(tool_calls, context)
-          assistant_msg = {
-            role: :assistant,
-            # Don't include content when there are tool calls - force LLM to
-            # wait for tool results before generating a response. This prevents
-            # the model from "hedging" by generating both a response AND a tool call.
-            content: nil,
-            tool_calls: tool_calls
+      on_tool_call = ->(tc) {
+        @env.bus.publish(from: name, to: tc.name, message: tc.arguments)
+        tool_calls_made << tc
+      }
+
+      on_tool_result = ->(result) {
+        tool_results << result
+        @env.bus.publish(from: tool_calls_made.last&.name || "tool", to: name, message: result)
+      }
+
+      # Make the LLM call - RubyLLM handles the full tool execution loop
+      response = @llm.chat(
+        system: build_system_prompt,
+        messages: @history,
+        tools: tool_classes,
+        context: context,
+        on_tool_call: on_tool_call,
+        on_tool_result: on_tool_result
+      )
+
+      # Persist any tool interactions that occurred
+      if tool_calls_made.any?
+        # Record assistant message with tool calls
+        assistant_tool_msg = {
+          role: :assistant,
+          content: nil,
+          tool_calls: tool_calls_made.map { |tc|
+            LLM::ToolCall.new(id: tc.id, name: tc.name, arguments: tc.arguments)
           }
-          @history << assistant_msg
-          persist_message(assistant_msg)
+        }
+        @history << assistant_tool_msg
+        persist_message(assistant_tool_msg)
 
-          tool_msg = { role: :tool, results: results }
-          @history << tool_msg
-          persist_message(tool_msg)
+        # Record tool results
+        results_for_history = tool_calls_made.zip(tool_results).map { |tc, result|
+          { tool_call_id: tc.id, name: tc.name, content: result.to_s }
+        }
+        tool_msg = { role: :tool, results: results_for_history }
+        @history << tool_msg
+        persist_message(tool_msg)
 
-          # Notify callback for real-time UI updates (tool calls as they happen)
-          notify_history_updated
-        else
-          # No tool calls - we have our final response
-          content = response[:content] || ""
-          assistant_msg = { role: :assistant, content: content }
-          @history << assistant_msg
-          persist_message(assistant_msg)
-          @state = :idle
-          return content
-        end
+        # Notify callback for real-time UI updates
+        notify_history_updated
       end
+
+      # Record final assistant response
+      final_content = response[:content] || ""
+      assistant_msg = { role: :assistant, content: final_content }
+      @history << assistant_msg
+      persist_message(assistant_msg)
+      @state = :idle
+
+      final_content
     end
 
     # --- Session Management ---
@@ -247,17 +268,16 @@ module PromptObjects
       end
     end
 
-    def available_tool_descriptors
+    # Get RubyLLM::Tool classes for this PO's available capabilities.
+    def available_tool_classes(context)
       # Get declared capabilities from config
       declared = @config["capabilities"] || []
 
       # Add universal capabilities (available to all POs)
       all_caps = declared + UNIVERSAL_CAPABILITIES
 
-      all_caps.filter_map do |cap_name|
-        cap = @env.registry&.get(cap_name)
-        cap&.descriptor
-      end
+      # Get tool classes from registry
+      @env.registry.tool_classes_for(all_caps, context: context)
     end
 
     def build_system_prompt
@@ -276,76 +296,6 @@ module PromptObjects
       CONTEXT
 
       "#{@body}\n\n#{context_block}"
-    end
-
-    def execute_tool_calls(tool_calls, context)
-      # Track the caller for nested calls
-      previous_capability = context.current_capability
-      previous_calling_po = context.calling_po
-
-      tool_calls.map do |tc|
-        capability = @env.registry&.get(tc.name)
-
-        if capability
-          # Log the outgoing message
-          @env.bus.publish(from: name, to: tc.name, message: tc.arguments)
-
-          # Set context for the tool call
-          # calling_po tracks which PO is making the call (for "self" resolution)
-          context.calling_po = name
-          context.current_capability = tc.name
-
-          result = if capability.is_a?(PromptObject)
-                     # PO-to-PO call: create isolated delegation thread
-                     execute_po_delegation(capability, tc, context)
-                   else
-                     # Primitive call: execute directly
-                     capability.receive(tc.arguments, context: context)
-                   end
-
-          # Restore context
-          context.current_capability = previous_capability
-          context.calling_po = previous_calling_po
-
-          # Log the response
-          @env.bus.publish(from: tc.name, to: name, message: result)
-
-          { tool_call_id: tc.id, name: tc.name, content: result }
-        else
-          { tool_call_id: tc.id, name: tc.name, content: "Unknown capability: #{tc.name}" }
-        end
-      end
-    end
-
-    # Execute a delegation to another PO in an isolated thread.
-    # @param target_po [PromptObject] The PO to delegate to
-    # @param tool_call [ToolCall] The tool call details
-    # @param context [Context] Execution context
-    # @return [String] The response
-    def execute_po_delegation(target_po, tool_call, context)
-      # Create a delegation thread in the target PO
-      delegation_thread = target_po.create_delegation_thread(
-        parent_po: name,
-        parent_session_id: @session_id,
-        parent_message_id: get_last_message_id
-      )
-
-      if delegation_thread
-        # Execute in isolated thread
-        target_po.receive_in_thread(tool_call.arguments, context: context, thread_id: delegation_thread)
-      else
-        # Fallback: execute in target's current session (no session store)
-        target_po.receive(tool_call.arguments, context: context)
-      end
-    end
-
-    # Get the ID of the last message in the current session.
-    # @return [Integer, nil]
-    def get_last_message_id
-      return nil unless session_store && @session_id
-
-      messages = session_store.get_messages(@session_id)
-      messages.last&.dig(:id)
     end
 
     # Notify the history updated callback if registered.

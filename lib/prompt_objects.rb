@@ -34,7 +34,8 @@ require_relative "prompt_objects/environment"
 # Session storage
 require_relative "prompt_objects/session/store"
 
-# Built-in primitives
+# Built-in primitives (Base must be loaded first)
+require_relative "prompt_objects/primitives/base"
 require_relative "prompt_objects/primitives/read_file"
 require_relative "prompt_objects/primitives/list_files"
 require_relative "prompt_objects/primitives/write_file"

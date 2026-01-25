@@ -4,39 +4,18 @@ module PromptObjects
   module Universal
     # Universal capability to list all available capabilities in the registry.
     # This helps POs discover what tools exist.
-    class ListCapabilities < Primitive
-      def name
-        "list_capabilities"
-      end
+    class ListCapabilities < Primitives::Base
+      description "List all available capabilities (primitives and prompt objects) in the system. Useful for discovering what tools exist before creating new ones."
+      param :type, desc: "Filter by type: 'all', 'primitives', or 'prompt_objects'. Default is 'all'."
 
-      def description
-        "List all available capabilities (primitives and prompt objects) in the system. Useful for discovering what tools exist before creating new ones."
-      end
-
-      def parameters
-        {
-          type: "object",
-          properties: {
-            type: {
-              type: "string",
-              enum: ["all", "primitives", "prompt_objects"],
-              description: "Filter by type. Default is 'all'."
-            }
-          },
-          required: []
-        }
-      end
-
-      def receive(message, context:)
-        filter = message[:type] || message["type"] || "all"
-
-        capabilities = case filter
+      def execute(type: "all")
+        capabilities = case type.to_s
         when "primitives"
-          context.env.registry.primitives
+          registry.primitives
         when "prompt_objects"
-          context.env.registry.prompt_objects
+          registry.prompt_objects
         else
-          context.env.registry.all
+          registry.all
         end
 
         if capabilities.empty?
@@ -44,11 +23,27 @@ module PromptObjects
         end
 
         lines = capabilities.map do |cap|
-          type_label = cap.is_a?(PromptObject) ? "[PO]" : "[Primitive]"
-          "- #{cap.name} #{type_label}: #{cap.description}"
+          if cap.is_a?(Class)
+            # RubyLLM::Tool class
+            "[Primitive] #{extract_name(cap)}: #{cap.description}"
+          elsif cap.is_a?(PromptObject)
+            "[PO] #{cap.name}: #{cap.description}"
+          else
+            "[Primitive] #{cap.name}: #{cap.description}"
+          end
         end
 
-        "Available capabilities:\n#{lines.join("\n")}"
+        "Available capabilities:\n#{lines.map { |l| "- #{l}" }.join("\n")}"
+      end
+
+      private
+
+      def extract_name(cap)
+        if cap.respond_to?(:tool_name)
+          cap.tool_name
+        else
+          cap.name.split("::").last.gsub(/([a-z])([A-Z])/, '\1_\2').downcase
+        end
       end
     end
   end

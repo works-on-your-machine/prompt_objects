@@ -5,59 +5,45 @@ module PromptObjects
     # Universal capability to pause and ask the human a question.
     # For now this is synchronous (blocking). In Phase 5 with the TUI,
     # this will become async with a notification queue.
-    class AskHuman < Primitive
-      def name
-        "ask_human"
-      end
+    class AskHuman < Primitives::Base
+      description "Pause and ask the human a question. Use this when you need confirmation, clarification, or input."
+      param :question, desc: "The question to ask the human"
+      param :options, desc: "Optional list of choices to present (comma-separated)"
 
-      def description
-        "Pause and ask the human a question. Use this when you need confirmation, clarification, or input."
-      end
-
-      def parameters
-        {
-          type: "object",
-          properties: {
-            question: {
-              type: "string",
-              description: "The question to ask the human"
-            },
-            options: {
-              type: "array",
-              items: { type: "string" },
-              description: "Optional list of choices to present"
-            }
-          },
-          required: ["question"]
-        }
-      end
-
-      def receive(message, context:)
-        question = message[:question] || message["question"]
-        options = message[:options] || message["options"]
+      def execute(question:, options: nil)
+        # Parse options if provided as string
+        options_array = parse_options(options)
 
         # In TUI mode, use the human queue (non-blocking for UI)
-        if context.tui_mode && context.human_queue
-          return receive_tui(question, options, context)
+        if context&.tui_mode && human_queue
+          return execute_tui(question, options_array)
         end
 
         # REPL mode - use stdin directly
-        receive_repl(question, options, context)
+        execute_repl(question, options_array)
       end
 
       private
 
-      def receive_tui(question, options, context)
+      def parse_options(options)
+        return nil if options.nil?
+        return options if options.is_a?(Array)
+
+        # Parse comma-separated string
+        options.to_s.split(",").map(&:strip)
+      end
+
+      def execute_tui(question, options)
         # Queue the request and wait for response
-        request = context.human_queue.enqueue(
-          capability: context.current_capability,
+        request = human_queue.enqueue(
+          capability: current_capability,
           question: question,
           options: options
         )
 
         # Log to message bus
-        context.bus.publish(
-          from: context.current_capability,
+        message_bus&.publish(
+          from: current_capability,
           to: "human",
           message: "[waiting] #{question}"
         )
@@ -66,18 +52,20 @@ module PromptObjects
         response = request.wait_for_response
 
         # Log the response
-        context.bus.publish(
+        message_bus&.publish(
           from: "human",
-          to: context.current_capability,
+          to: current_capability,
           message: response
         )
 
         response
       end
 
-      def receive_repl(question, options, context)
+      def execute_repl(question, options)
+        cap_name = current_capability || "assistant"
+
         puts
-        puts "┌─ #{context.current_capability} asks ──────────────────────────────────┐"
+        puts "┌─ #{cap_name} asks ──────────────────────────────────┐"
         puts "│"
         puts "│  #{question}"
         puts "│"
