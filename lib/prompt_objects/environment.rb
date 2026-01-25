@@ -74,15 +74,15 @@ module PromptObjects
         @session_store = nil  # No persistent sessions in legacy mode
       end
 
-      # Initialize LLM - prefer explicit llm, then use factory with provider/model
+      # Initialize LLM - prefer explicit llm, then create client with provider/model
       if llm
         @llm = llm
         @current_provider = nil
         @current_model = nil
       else
-        @current_provider = provider || LLM::Factory::DEFAULT_PROVIDER
-        @current_model = model || LLM::Factory.default_model(@current_provider)
-        @llm = LLM::Factory.create(provider: @current_provider, model: @current_model)
+        @current_provider = provider || "anthropic"
+        @current_model = model || LLM::Client.default_model(@current_provider)
+        @llm = LLM::Client.new(provider: @current_provider, model: @current_model)
       end
 
       @registry = Registry.new
@@ -139,8 +139,8 @@ module PromptObjects
     # @return [Hash] New provider/model info
     def switch_llm(provider:, model: nil)
       @current_provider = provider
-      @current_model = model || LLM::Factory.default_model(provider)
-      @llm = LLM::Factory.create(provider: @current_provider, model: @current_model)
+      @current_model = model || LLM::Client.default_model(provider)
+      @llm = LLM::Client.new(provider: @current_provider, model: @current_model)
 
       # Update all loaded POs to use the new LLM
       @registry.prompt_objects.each do |po|
@@ -156,8 +156,8 @@ module PromptObjects
       {
         provider: @current_provider,
         model: @current_model,
-        providers: LLM::Factory.providers,
-        available: LLM::Factory.available_providers
+        providers: LLM::Client.providers,
+        available: LLM::Client.available_providers
       }
     end
 

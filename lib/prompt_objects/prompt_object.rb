@@ -79,16 +79,18 @@ module PromptObjects
           tools: available_tool_descriptors
         )
 
-        if response.tool_calls?
+        tool_calls = response[:tool_calls] || []
+
+        if tool_calls.any?
           # Execute tools and continue the loop
-          results = execute_tool_calls(response.tool_calls, context)
+          results = execute_tool_calls(tool_calls, context)
           assistant_msg = {
             role: :assistant,
             # Don't include content when there are tool calls - force LLM to
             # wait for tool results before generating a response. This prevents
             # the model from "hedging" by generating both a response AND a tool call.
             content: nil,
-            tool_calls: response.tool_calls
+            tool_calls: tool_calls
           }
           @history << assistant_msg
           persist_message(assistant_msg)
@@ -101,11 +103,12 @@ module PromptObjects
           notify_history_updated
         else
           # No tool calls - we have our final response
-          assistant_msg = { role: :assistant, content: response.content }
+          content = response[:content] || ""
+          assistant_msg = { role: :assistant, content: content }
           @history << assistant_msg
           persist_message(assistant_msg)
           @state = :idle
-          return response.content
+          return content
         end
       end
     end

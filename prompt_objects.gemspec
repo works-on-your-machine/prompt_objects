@@ -28,8 +28,7 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   # Runtime dependencies
-  spec.add_dependency "ruby-openai", "~> 7.0"
-  spec.add_dependency "anthropic", "~> 1.0"
+  spec.add_dependency "ruby_llm", "~> 1.2"
   spec.add_dependency "front_matter_parser", "~> 1.0"
   spec.add_dependency "sqlite3", "~> 2.0"
 

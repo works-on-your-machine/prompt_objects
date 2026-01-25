@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-require "openai"
-require "anthropic"
+require "ruby_llm"
 require "front_matter_parser"
 require "json"
 
@@ -20,11 +19,8 @@ require_relative "prompt_objects/registry"
 require_relative "prompt_objects/message_bus"
 require_relative "prompt_objects/human_queue"
 require_relative "prompt_objects/loader"
-require_relative "prompt_objects/llm/response"
-require_relative "prompt_objects/llm/openai_adapter"
-require_relative "prompt_objects/llm/anthropic_adapter"
-require_relative "prompt_objects/llm/gemini_adapter"
-require_relative "prompt_objects/llm/factory"
+require_relative "prompt_objects/llm/tool_call"
+require_relative "prompt_objects/llm/client"
 require_relative "prompt_objects/prompt_object"
 
 # Environment module (must be loaded before environment.rb which uses them)
