@@ -3,6 +3,7 @@ name: writer
 description: Transforms research into well-structured documents and reports
 capabilities:
   - read_file
+  - write_file
   - think
   - ask_human
 ---

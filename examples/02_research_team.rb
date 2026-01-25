@@ -3,90 +3,39 @@
 
 # Research Team Example
 #
-# This example demonstrates advanced PromptObjects capabilities:
+# Demonstrates:
 # - Multiple prompt objects with different specializations
-# - Human-in-the-loop via ask_human capability
-# - Internal reasoning via think capability
-# - Message bus tracking all inter-capability communication
-# - Multiple primitives: read_file, list_files
-#
-# Prerequisites:
-#   - Ollama running locally (http://localhost:11434)
-#   - The gpt-oss:latest model pulled: ollama pull gpt-oss:latest
-#
-# Run with:
-#   ./examples/02_research_team.rb
+# - Message bus tracking inter-capability communication
+# - Chaining PO outputs (research -> writing)
 
-require "bundler/setup"
-require_relative "../lib/prompt_objects"
+require_relative "setup"
+include Examples
 
-objects_dir = File.join(__dir__, "poop/research_team")
-data_dir = File.join(__dir__, "data")
+box "PromptObjects Research Team Example"
 
-puts <<~HEADER
-  #{'=' * 70}
-  PromptObjects Research Team Example
-  #{'=' * 70}
-
-  This demo shows multiple prompt objects collaborating:
-  - RESEARCHER: Gathers information from files
-  - WRITER: Creates structured documents
-
-  Objects directory: #{objects_dir}
-  Data directory: #{data_dir}
-  Provider: ollama
-  Model: gpt-oss:latest
-
-HEADER
-
-begin
-  runtime = PromptObjects::Runtime.new(
-    objects_dir: objects_dir,
-    provider: "ollama",
-    model: "gpt-oss:latest"
-  )
-
-  # Load team members
-  puts "Loading team members..."
+run_demo do
+  runtime = create_runtime(objects: objects_dir("research_team"))
 
   researcher = runtime.load_by_name("researcher")
   writer = runtime.load_by_name("writer")
 
-  puts "  - #{researcher.name}: #{researcher.description}"
-  puts "  - #{writer.name}: #{writer.description}"
-  puts
+  show_loaded_pos(runtime)
 
-  # Subscribe to message bus
-  puts "-" * 70
-  puts "Message Bus (live):"
-  puts "-" * 70
-
-  runtime.bus.subscribe do |entry|
-    time = entry[:timestamp].strftime("%H:%M:%S")
-    from = entry[:from].to_s.split("--").last || entry[:from]
-    to = entry[:to].to_s.split("--").last || entry[:to]
-    msg = entry[:message].to_s[0, 60]
-    msg += "..." if entry[:message].to_s.length > 60
-    puts "  [#{time}] #{from} -> #{to}: #{msg}"
-  end
-
+  divider "Message Bus (live)"
+  subscribe_to_bus(runtime, compact: true)
   puts
 
   context = runtime.context
 
-  # Demo 1: Researcher gathering information
-  puts "=" * 70
-  puts "DEMO 1: Researcher gathering information"
-  puts "=" * 70
-  puts
+  # Researcher gathers information
+  box "DEMO 1: Researcher gathering information"
 
-  puts "User: Please examine the files in #{data_dir} and summarize what you find."
+  project_file = File.join(data_dir, "project.json")
+  puts "User: Please read #{project_file} and summarize."
   puts
 
   response = researcher.receive(
-    "Please examine the files in #{data_dir} and summarize what you find. " \
-    "Use your think capability to reason about what you're looking for, " \
-    "then read the files and provide a summary.",
+    "Please read the file #{project_file} and summarize the project information.",
     context: context
   )
 
@@ -94,17 +43,16 @@ begin
   puts "Researcher: #{response}"
   puts
 
-  # Demo 2: Writer creating a document
-  puts "=" * 70
-  puts "DEMO 2: Writer creating a document"
-  puts "=" * 70
+  # Writer creates a document using write_file
+  box "DEMO 2: Writer creating a document"
+
+  output_file = File.join(data_dir, "generated_summary.md")
+  puts "User: Create a summary document and save it to #{output_file}."
   puts
 
-  puts "User: Create a summary document based on the research findings."
-  puts
-
-  research_context = <<~CONTEXT
-    Based on the following research findings, create a markdown summary document:
+  writer_response = writer.receive(<<~TASK, context: context)
+    Based on the following research findings, create a markdown summary document
+    and save it to: #{output_file}
 
     The PromptObjects framework is a Ruby system where markdown files with
     LLM-backed behavior act as first-class autonomous entities. Key features:
@@ -114,50 +62,28 @@ begin
     - Message bus tracks all communication
     - Human-in-the-loop for confirmations
 
-    Return the complete markdown document. Keep it concise (under 200 words).
-  CONTEXT
-
-  summary_content = writer.receive(research_context, context: context)
+    Use write_file to save the document. Keep it concise (under 200 words).
+  TASK
 
   puts
-  puts "Writer: #{summary_content}"
+  puts "Writer: #{writer_response}"
   puts
 
-  # Save the generated document
-  output_file = File.join(data_dir, "generated_summary.md")
-  File.write(output_file, summary_content)
-  puts "Saved summary to: #{output_file}"
-  puts
+  # Verify the file was created
+  if File.exist?(output_file)
+    box "Generated Summary"
+    puts File.read(output_file)
+  end
 
   # Show message bus history
-  puts "=" * 70
-  puts "Message Bus History (last 10 entries):"
-  puts "=" * 70
+  box "Message Bus History"
   puts runtime.bus.format_log(10)
   puts
 
   # Show conversation histories
-  puts "=" * 70
-  puts "Conversation Histories:"
-  puts "=" * 70
-
+  box "Conversation Histories"
   [researcher, writer].each do |po|
+    show_history(po)
     puts
-    puts "#{po.name.upcase} (#{po.history.length} messages):"
-
-    po.history.each_with_index do |msg, i|
-      role = msg[:role].to_s.capitalize.ljust(10)
-      content = msg[:content]&.to_s&.slice(0, 60) || "(tool calls)"
-      content += "..." if (msg[:content]&.to_s&.length || 0) > 60
-
-      puts "  #{i + 1}. [#{role}] #{content}"
-    end
   end
-
-rescue PromptObjects::Error => e
-  puts "Error: #{e.message}"
-  puts
-  puts "Make sure Ollama is running and gpt-oss:latest is available:"
-  puts "  ollama pull gpt-oss:latest"
-  puts "  ollama serve"
 end
