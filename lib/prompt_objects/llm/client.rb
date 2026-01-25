@@ -140,14 +140,18 @@ module PromptObjects
 
       def add_assistant_message(chat_instance, msg)
         if msg[:tool_calls]&.any?
-          tool_calls_data = msg[:tool_calls].map do |tc|
-            {
-              id: extract_field(tc, :id),
+          # Convert tool calls to Hash format expected by RubyLLM
+          # RubyLLM's format_tool_calls expects: { call_id => ToolCall }
+          tool_calls_hash = msg[:tool_calls].each_with_object({}) do |tc, hash|
+            tc_id = extract_field(tc, :id)
+            tool_call = RubyLLM::ToolCall.new(
+              id: tc_id,
               name: extract_field(tc, :name),
               arguments: extract_field(tc, :arguments) || {}
-            }
+            )
+            hash[tc_id] = tool_call
           end
-          chat_instance.add_message(role: :assistant, content: msg[:content] || "", tool_calls: tool_calls_data)
+          chat_instance.add_message(role: :assistant, content: msg[:content] || "", tool_calls: tool_calls_hash)
         else
           chat_instance.add_message(role: :assistant, content: msg[:content] || "")
         end
@@ -193,16 +197,48 @@ module PromptObjects
           base = { role: msg.role.to_sym, content: msg.content }
 
           if msg.respond_to?(:tool_calls) && msg.tool_calls&.any?
-            base[:tool_calls] = msg.tool_calls.map do |tc|
-              ToolCall.new(
-                id: tc.id || generate_call_id(tc.name),
-                name: tc.name,
-                arguments: tc.arguments || {}
-              )
+            # RubyLLM returns tool_calls as a Hash: { call_id => ToolCall }
+            tool_calls_collection = msg.tool_calls.is_a?(Hash) ? msg.tool_calls.values : msg.tool_calls
+
+            base[:tool_calls] = tool_calls_collection.map do |tc|
+              if tc.is_a?(RubyLLM::ToolCall)
+                ToolCall.new(
+                  id: tc.id.to_s,
+                  name: tc.name.to_s,
+                  arguments: tc.arguments.is_a?(Hash) ? tc.arguments : {}
+                )
+              else
+                # Fallback for other formats
+                tc_id = extract_tool_call_field(tc, :id)
+                tc_name = extract_tool_call_field(tc, :name)
+                tc_args = extract_tool_call_field(tc, :arguments) || {}
+
+                ToolCall.new(
+                  id: tc_id || generate_call_id(tc_name),
+                  name: tc_name.to_s,
+                  arguments: tc_args.is_a?(Hash) ? tc_args : {}
+                )
+              end
             end
           end
 
           base
+        end
+      end
+
+      # Extract a field from a tool call, handling different formats
+      def extract_tool_call_field(tc, field)
+        if tc.respond_to?(field)
+          tc.send(field)
+        elsif tc.is_a?(Hash)
+          tc[field] || tc[field.to_s]
+        elsif tc.is_a?(Array)
+          # Some providers return [id, name, arguments] format
+          case field
+          when :id then tc[0]
+          when :name then tc[1]
+          when :arguments then tc[2]
+          end
         end
       end
 
