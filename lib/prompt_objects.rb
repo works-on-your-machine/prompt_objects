@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-require "openai"
-require "anthropic"
+require "ruby_llm"
 require "front_matter_parser"
 require "json"
 
@@ -14,17 +13,16 @@ module PromptObjects
   UNIVERSAL_CAPABILITIES = %w[ask_human think create_capability add_capability remove_capability list_capabilities list_primitives add_primitive create_primitive delete_primitive verify_primitive modify_primitive request_primitive modify_prompt].freeze
 end
 
+require_relative "prompt_objects/version"
+
 require_relative "prompt_objects/capability"
 require_relative "prompt_objects/primitive"
 require_relative "prompt_objects/registry"
 require_relative "prompt_objects/message_bus"
 require_relative "prompt_objects/human_queue"
 require_relative "prompt_objects/loader"
-require_relative "prompt_objects/llm/response"
-require_relative "prompt_objects/llm/openai_adapter"
-require_relative "prompt_objects/llm/anthropic_adapter"
-require_relative "prompt_objects/llm/gemini_adapter"
-require_relative "prompt_objects/llm/factory"
+require_relative "prompt_objects/llm/tool_call"
+require_relative "prompt_objects/llm/client"
 require_relative "prompt_objects/prompt_object"
 
 # Environment module (must be loaded before environment.rb which uses them)
@@ -38,7 +36,8 @@ require_relative "prompt_objects/environment"
 # Session storage
 require_relative "prompt_objects/session/store"
 
-# Built-in primitives
+# Built-in primitives (Base must be loaded first)
+require_relative "prompt_objects/primitives/base"
 require_relative "prompt_objects/primitives/read_file"
 require_relative "prompt_objects/primitives/list_files"
 require_relative "prompt_objects/primitives/write_file"

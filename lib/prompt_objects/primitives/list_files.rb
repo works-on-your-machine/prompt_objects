@@ -3,46 +3,28 @@
 module PromptObjects
   module Primitives
     # Primitive capability to list files in a directory.
-    class ListFiles < Primitive
-      def name
-        "list_files"
-      end
+    class ListFiles < Base
+      description "List files and directories in a given path"
+      param :path, desc: "The directory path to list (defaults to current directory)"
 
-      def description
-        "List files and directories in a given path"
-      end
-
-      def parameters
-        {
-          type: "object",
-          properties: {
-            path: {
-              type: "string",
-              description: "The directory path to list (defaults to current directory)"
-            }
-          },
-          required: []
-        }
-      end
-
-      def receive(message, context:)
-        path = extract_path(message)
+      def execute(path: ".")
         path = "." if path.nil? || path.empty?
-
         safe_path = File.expand_path(path)
 
         unless File.exist?(safe_path)
-          return "Error: Path not found: #{path}"
+          return { error: "Path not found: #{path}" }
         end
 
         unless File.directory?(safe_path)
-          return "Error: Not a directory: #{path}"
+          return { error: "Not a directory: #{path}" }
         end
 
         entries = Dir.entries(safe_path)
-          .reject { |e| e.start_with?(".") } # Hide hidden files
+          .reject { |e| e.start_with?(".") }
           .sort
           .map { |entry| format_entry(safe_path, entry) }
+
+        log("Listed #{entries.length} entries in #{path}")
 
         if entries.empty?
           "Directory is empty: #{path}"
@@ -50,25 +32,12 @@ module PromptObjects
           entries.join("\n")
         end
       rescue Errno::EACCES
-        "Error: Permission denied: #{path}"
+        { error: "Permission denied: #{path}" }
       rescue StandardError => e
-        "Error listing directory: #{e.message}"
+        { error: "Error listing directory: #{e.message}" }
       end
 
       private
-
-      def extract_path(message)
-        case message
-        when Hash
-          message[:path] || message["path"]
-        when String
-          message
-        when NilClass
-          "."
-        else
-          message.to_s
-        end
-      end
 
       def format_entry(base_path, entry)
         full_path = File.join(base_path, entry)

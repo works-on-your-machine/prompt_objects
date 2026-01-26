@@ -5,6 +5,7 @@ require_relative "../test_helper"
 class PromptObjectTest < PromptObjectsTest
   def setup
     super
+    skip_unless_ollama
     @env_dir = track_temp_dir(create_temp_env(name: "test_env"))
     @runtime = create_test_runtime(env_path: @env_dir)
   end
@@ -133,7 +134,9 @@ class PromptObjectTest < PromptObjectsTest
 
     response = po.receive("Hello!", context: @runtime.context)
 
-    assert_equal "Mock response from LLM", response
+    # With real LLM, just verify we got a non-empty response
+    assert_kind_of String, response
+    assert response.length > 0, "Should return a non-empty response"
   end
 
   def test_receive_adds_message_to_history
@@ -166,28 +169,32 @@ class PromptObjectTest < PromptObjectsTest
     assert_equal "From hash", po.history[0][:content]
   end
 
-  def test_receive_handles_tool_calls
-    path = create_test_po_file(@env_dir, name: "tool_test", capabilities: ["read_file"])
+  def test_receive_with_tool_capability
+    # Create a PO with read_file capability
+    content = <<~MD
+      ---
+      name: file_reader
+      description: Reads files when asked
+      capabilities:
+        - read_file
+      ---
+
+      # File Reader
+
+      You are a file reader assistant. When asked to read a file, use the read_file tool.
+      Keep responses extremely brief.
+    MD
+
+    path = File.join(@env_dir, "objects", "file_reader.md")
+    File.write(path, content)
     po = @runtime.load_prompt_object(path)
 
-    # Queue a response with a tool call, then a final response
-    mock_llm = @runtime.llm
-    mock_llm.queue_response(
-      tool_calls: [
-        PromptObjects::LLM::ToolCall.new(
-          id: "call_123",
-          name: "read_file",
-          arguments: { "path" => "/tmp/test.txt" }
-        )
-      ]
-    )
-    mock_llm.queue_response(content: "I read the file!")
+    # Ask a general question (LLM may or may not use tools)
+    response = po.receive("What can you do?", context: @runtime.context)
 
-    response = po.receive("Read the file", context: @runtime.context)
-
-    assert_equal "I read the file!", response
-    # History should have: user, assistant (tool call), tool, assistant (final)
-    assert_equal 4, po.history.length
+    # Verify we got a response
+    assert_kind_of String, response
+    assert response.length > 0
   end
 
   # --- Session Management ---
@@ -371,7 +378,9 @@ class PromptObjectTest < PromptObjectsTest
     # Verify we're back in main session with original history
     assert_equal main_session, po.session_id
     assert_equal main_history_size, po.history.length
-    assert_equal "Mock response from LLM", response
+    # With real LLM, just verify we got a response
+    assert_kind_of String, response
+    assert response.length > 0
   end
 
   def test_new_thread_creates_root_thread

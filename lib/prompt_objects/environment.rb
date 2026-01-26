@@ -74,15 +74,15 @@ module PromptObjects
         @session_store = nil  # No persistent sessions in legacy mode
       end
 
-      # Initialize LLM - prefer explicit llm, then use factory with provider/model
+      # Initialize LLM - prefer explicit llm, then create client with provider/model
       if llm
         @llm = llm
         @current_provider = nil
         @current_model = nil
       else
-        @current_provider = provider || LLM::Factory::DEFAULT_PROVIDER
-        @current_model = model || LLM::Factory.default_model(@current_provider)
-        @llm = LLM::Factory.create(provider: @current_provider, model: @current_model)
+        @current_provider = provider || "anthropic"
+        @current_model = model || LLM::Client.default_model(@current_provider)
+        @llm = LLM::Client.new(provider: @current_provider, model: @current_model)
       end
 
       @registry = Registry.new
@@ -139,8 +139,8 @@ module PromptObjects
     # @return [Hash] New provider/model info
     def switch_llm(provider:, model: nil)
       @current_provider = provider
-      @current_model = model || LLM::Factory.default_model(provider)
-      @llm = LLM::Factory.create(provider: @current_provider, model: @current_model)
+      @current_model = model || LLM::Client.default_model(provider)
+      @llm = LLM::Client.new(provider: @current_provider, model: @current_model)
 
       # Update all loaded POs to use the new LLM
       @registry.prompt_objects.each do |po|
@@ -156,8 +156,8 @@ module PromptObjects
       {
         provider: @current_provider,
         model: @current_model,
-        providers: LLM::Factory.providers,
-        available: LLM::Factory.available_providers
+        providers: LLM::Client.providers,
+        available: LLM::Client.available_providers
       }
     end
 
@@ -262,29 +262,31 @@ module PromptObjects
     private
 
     # Register built-in primitive capabilities.
+    # Primitives are RubyLLM::Tool classes - we register the class, not instances.
     def register_primitives
-      @registry.register(Primitives::ReadFile.new)
-      @registry.register(Primitives::ListFiles.new)
-      @registry.register(Primitives::WriteFile.new)
-      @registry.register(Primitives::HttpGet.new)
+      @registry.register(Primitives::ReadFile)
+      @registry.register(Primitives::ListFiles)
+      @registry.register(Primitives::WriteFile)
+      @registry.register(Primitives::HttpGet)
     end
 
     # Register universal capabilities (available to all prompt objects).
+    # Universal capabilities are RubyLLM::Tool classes - we register the class, not instances.
     def register_universal_capabilities
-      @registry.register(Universal::AskHuman.new)
-      @registry.register(Universal::Think.new)
-      @registry.register(Universal::CreateCapability.new)
-      @registry.register(Universal::AddCapability.new)
-      @registry.register(Universal::RemoveCapability.new)
-      @registry.register(Universal::ListCapabilities.new)
-      @registry.register(Universal::ListPrimitives.new)
-      @registry.register(Universal::AddPrimitive.new)
-      @registry.register(Universal::CreatePrimitive.new)
-      @registry.register(Universal::DeletePrimitive.new)
-      @registry.register(Universal::VerifyPrimitive.new)
-      @registry.register(Universal::ModifyPrimitive.new)
-      @registry.register(Universal::RequestPrimitive.new)
-      @registry.register(Universal::ModifyPrompt.new)
+      @registry.register(Universal::AskHuman)
+      @registry.register(Universal::Think)
+      @registry.register(Universal::CreateCapability)
+      @registry.register(Universal::AddCapability)
+      @registry.register(Universal::RemoveCapability)
+      @registry.register(Universal::ListCapabilities)
+      @registry.register(Universal::ListPrimitives)
+      @registry.register(Universal::AddPrimitive)
+      @registry.register(Universal::CreatePrimitive)
+      @registry.register(Universal::DeletePrimitive)
+      @registry.register(Universal::VerifyPrimitive)
+      @registry.register(Universal::ModifyPrimitive)
+      @registry.register(Universal::RequestPrimitive)
+      @registry.register(Universal::ModifyPrompt)
     end
   end
 

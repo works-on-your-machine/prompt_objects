@@ -36,26 +36,26 @@ How
 ### Installation
 
 ```bash
-gem install prompt_objects
+gem install poop
 ```
 
 ### Quick Start
 
 ```bash
 # Create an environment from a template
-prompt_objects env create my-project --template basic
+poop env create my-project --template basic
 
 # Run and open the web interface
-prompt_objects serve my-project --open
+poop serve my-project --open
 ```
 
 ### Environment Commands
 
 ```bash
-prompt_objects env list              # List all environments
-prompt_objects env create <name>     # Create new environment
-prompt_objects env info <name>       # Show environment details
-prompt_objects env clone <src> <dst> # Clone an environment
+poop env list              # List all environments
+poop env create <name>     # Create new environment
+poop env info <name>       # Show environment details
+poop env clone <src> <dst> # Clone an environment
 ```
 
 ### Templates
@@ -70,4 +70,4 @@ Extras
 
 - **License**: MIT
 - **Ruby**: >= 3.2.0
-- **Repository**: https://github.com/works-on-your-machine/prompt_objects
+- **Repository**: https://github.com/works-on-your-machine/poop

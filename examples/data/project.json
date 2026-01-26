@@ -1,0 +1,13 @@
+{
+  "project": "PromptObjects",
+  "version": "0.1.0",
+  "features": [
+    "Unified capability interface",
+    "YAML frontmatter configuration",
+    "LLM-backed prompt objects",
+    "Deterministic primitives",
+    "Message bus logging",
+    "Human-in-the-loop support"
+  ],
+  "status": "alpha"
+}

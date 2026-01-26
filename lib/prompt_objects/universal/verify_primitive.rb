@@ -4,87 +4,50 @@ module PromptObjects
   module Universal
     # Universal capability to test primitives with sample inputs.
     # Helps POs verify their primitives work correctly before relying on them.
-    class VerifyPrimitive < Primitive
-      def name
-        "verify_primitive"
-      end
+    class VerifyPrimitive < Primitives::Base
+      description "Test a primitive with sample inputs to verify it works correctly. Useful after creating or modifying a primitive."
+      param :name, desc: "Name of the primitive to test"
+      param :tests, desc: "JSON array of test cases. Each test has 'input' (object of parameters), and optionally 'expected' (exact match), 'expected_error' (true if expecting error), or 'expected_contains' (string to find in output)"
 
-      def description
-        "Test a primitive with sample inputs to verify it works correctly. Useful after creating or modifying a primitive."
-      end
-
-      def parameters
-        {
-          type: "object",
-          properties: {
-            name: {
-              type: "string",
-              description: "Name of the primitive to test"
-            },
-            tests: {
-              type: "array",
-              description: "Array of test cases. Each test has 'input' (Hash of parameters), and optionally 'expected' (exact match) or 'expected_error' (true if expecting an error)",
-              items: {
-                type: "object",
-                properties: {
-                  input: {
-                    type: "object",
-                    description: "Input parameters to pass to the primitive"
-                  },
-                  expected: {
-                    description: "Expected output (for exact match)"
-                  },
-                  expected_error: {
-                    type: "boolean",
-                    description: "Set to true if this test should produce an error"
-                  },
-                  expected_contains: {
-                    type: "string",
-                    description: "String that should be contained in the output"
-                  }
-                }
-              }
-            }
-          },
-          required: ["name", "tests"]
-        }
-      end
-
-      def receive(message, context:)
-        prim_name = message[:name] || message["name"]
-        tests = message[:tests] || message["tests"] || []
+      def execute(name:, tests:)
+        # Parse tests if string
+        tests_array = tests.is_a?(String) ? (JSON.parse(tests) rescue []) : tests
 
         # Find the primitive
-        primitive = context.env.registry.get(prim_name)
+        primitive = registry.get(name)
         unless primitive
-          return "Error: Primitive '#{prim_name}' not found."
+          return { error: "Primitive '#{name}' not found." }
         end
 
-        unless primitive.is_a?(Primitive)
-          return "Error: '#{prim_name}' is not a primitive."
+        unless ruby_llm_tool_class?(primitive)
+          return { error: "'#{name}' is not a primitive." }
         end
 
-        if tests.empty?
-          return "Error: No test cases provided. Include at least one test with 'input' parameters."
+        if tests_array.empty?
+          return { error: "No test cases provided. Include at least one test with 'input' parameters." }
         end
 
         # Run tests
-        results = tests.map.with_index { |test, i| run_test(primitive, test, i, context) }
+        results = tests_array.map.with_index { |test, i| run_test(primitive, test, i) }
 
         # Summarize
         passed = results.count { |r| r[:passed] }
         failed = results.count { |r| !r[:passed] }
 
-        format_results(prim_name, passed, failed, results)
+        format_results(name, passed, failed, results)
       end
 
       private
 
-      def run_test(primitive, test, index, context)
-        input = normalize_hash(test[:input] || test["input"] || {})
-        expected = test[:expected] || test["expected"]
-        expected_error = test[:expected_error] || test["expected_error"]
-        expected_contains = test[:expected_contains] || test["expected_contains"]
+      def ruby_llm_tool_class?(cap)
+        cap.is_a?(Class) && defined?(RubyLLM::Tool) && cap < RubyLLM::Tool
+      end
+
+      def run_test(primitive_class, test, index)
+        input = normalize_hash(test["input"] || test[:input] || {})
+        expected = test["expected"] || test[:expected]
+        expected_error = test["expected_error"] || test[:expected_error]
+        expected_contains = test["expected_contains"] || test[:expected_contains]
 
         result = {
           test_num: index + 1,
@@ -93,7 +56,9 @@ module PromptObjects
         }
 
         begin
-          output = primitive.receive(input, context: context)
+          # Create instance and execute
+          instance = primitive_class.new
+          output = instance.execute(**input)
           result[:output] = output
 
           if expected_error
@@ -141,13 +106,13 @@ module PromptObjects
         lines << "## Verification Results for '#{prim_name}'"
         lines << ""
 
-        status = failed.zero? ? "✓ All tests passed" : "✗ #{failed} test(s) failed"
+        status = failed.zero? ? "All tests passed" : "#{failed} test(s) failed"
         lines << "**Status**: #{status} (#{passed}/#{results.length})"
         lines << ""
 
         lines << "### Test Details"
         results.each do |r|
-          icon = r[:passed] ? "✓" : "✗"
+          icon = r[:passed] ? "PASS" : "FAIL"
           lines << "#{icon} Test #{r[:test_num]}: input=#{r[:input].inspect}"
 
           if r[:passed]

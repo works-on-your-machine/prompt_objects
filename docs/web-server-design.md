@@ -141,7 +141,7 @@ Clean and modern. Works well with both keyboard and mouse. Not overly dense (web
 │                     Core Runtime                             │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
 │  │ Capability  │  │ Message     │  │ LLM                 │  │
-│  │ Registry    │  │ Bus         │  │ Adapters            │  │
+│  │ Registry    │  │ Bus         │  │ Client              │  │
 │  └─────────────┘  └──────┬──────┘  └─────────────────────┘  │
 │  ┌─────────────┐         │         ┌─────────────────────┐  │
 │  │ Environment │         │         │ Session             │  │
@@ -844,7 +844,7 @@ module PromptObjects
       puts
       puts "Next steps:"
       puts "  cd #{name}"
-      puts "  prompt_objects serve ."
+      puts "  poop serve ."
     end
 
     desc "export PATH", "Export environment as .poenv bundle"
@@ -1168,7 +1168,7 @@ User types message
          │ Calls LLM with streaming
          ▼
 ┌─────────────────┐
-│   LLM Adapter   │  stream_completion(messages) { |chunk| ... }
+│   LLM Client    │  stream_completion(messages) { |chunk| ... }
 └────────┬────────┘
          │ Each chunk
          ▼
@@ -1233,7 +1233,7 @@ User types message
 3. Test gem installation + serve flow
 4. Add `export`/`import` commands for .poenv bundles
 
-**Exit criteria**: `gem install prompt_objects && prompt_objects serve ./my-env` works.
+**Exit criteria**: `gem install prompt_objects && poop serve ./my-env` works.
 
 ### Future (Post-V1)
 

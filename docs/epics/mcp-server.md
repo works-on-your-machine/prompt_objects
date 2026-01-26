@@ -21,7 +21,7 @@ The **Ruby TUI** remains the primary interface using Charm gems directly (Bubble
 │  │  Registry   │  │ MessageBus  │  │ HumanQueue  │              │
 │  └─────────────┘  └─────────────┘  └─────────────┘              │
 │                           │                                      │
-│                    LLM Adapter (OpenAI)                          │
+│                    LLM Client (ruby_llm gem)                     │
 └─────────────────────────────────────────────────────────────────┘
                             │
                             │ (also exposed via)
@@ -86,17 +86,17 @@ notify "bus_message", { from: "...", to: "...", message: "..." }
 ### Ruby TUI (Primary)
 
 ```bash
-bundle exec ruby exe/prompt_objects_tui
+bundle exec ruby exe/poop_tui
 ```
 
 ### MCP Server (For External Clients)
 
 ```bash
 # Stdio transport
-bundle exec ruby exe/prompt_objects_mcp
+bundle exec ruby exe/poop_mcp
 
 # With custom objects directory
-PROMPT_OBJECTS_DIR=/path/to/objects bundle exec ruby exe/prompt_objects_mcp
+PROMPT_OBJECTS_DIR=/path/to/objects bundle exec ruby exe/poop_mcp
 ```
 
 ### Claude Desktop Configuration
@@ -108,7 +108,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "prompt-objects": {
       "command": "ruby",
-      "args": ["/path/to/prompt-objects/exe/prompt_objects_mcp"],
+      "args": ["/path/to/prompt-objects/exe/poop_mcp"],
       "env": {
         "PROMPT_OBJECTS_DIR": "/path/to/objects"
       }

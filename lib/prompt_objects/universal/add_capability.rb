@@ -4,52 +4,28 @@ module PromptObjects
   module Universal
     # Universal capability to add capabilities to a prompt object at runtime.
     # This allows dynamic extension of POs after primitives are created.
-    class AddCapability < Primitive
-      def name
-        "add_capability"
-      end
+    class AddCapability < Primitives::Base
+      description "Add a capability to a prompt object, allowing it to use new tools. Can target self or another PO."
+      param :target, desc: "Name of the prompt object to add the capability to. Use 'self' for the current PO."
+      param :capability, desc: "Name of the capability to add (must already exist in the registry)"
 
-      def description
-        "Add a capability to a prompt object, allowing it to use new tools. Can target self or another PO."
-      end
-
-      def parameters
-        {
-          type: "object",
-          properties: {
-            target: {
-              type: "string",
-              description: "Name of the prompt object to add the capability to. Use 'self' for the current PO."
-            },
-            capability: {
-              type: "string",
-              description: "Name of the capability to add (must already exist in the registry)"
-            }
-          },
-          required: ["target", "capability"]
-        }
-      end
-
-      def receive(message, context:)
-        target = message[:target] || message["target"]
-        capability = message[:capability] || message["capability"]
-
+      def execute(target:, capability:)
         # Resolve 'self' to the calling PO (not current_capability which is this tool)
-        target = context.calling_po if target == "self"
+        target = context&.calling_po if target == "self"
 
         # Find the target PO
-        target_po = context.env.registry.get(target)
+        target_po = registry.get(target)
         unless target_po
-          return "Error: Prompt object '#{target}' not found"
+          return { error: "Prompt object '#{target}' not found" }
         end
 
         unless target_po.is_a?(PromptObject)
-          return "Error: '#{target}' is not a prompt object (can only add capabilities to POs)"
+          return { error: "'#{target}' is not a prompt object (can only add capabilities to POs)" }
         end
 
         # Check if capability exists
-        unless context.env.registry.exists?(capability)
-          return "Error: Capability '#{capability}' does not exist"
+        unless registry.exists?(capability)
+          return { error: "Capability '#{capability}' does not exist" }
         end
 
         # Check if already has it
@@ -66,7 +42,7 @@ module PromptObjects
         saved = target_po.save
 
         # Notify for real-time UI update (don't wait for file watcher)
-        context.env.notify_po_modified(target_po)
+        environment&.notify_po_modified(target_po)
 
         if saved
           "Added '#{capability}' to '#{target}' and saved to file. It can now use this capability."

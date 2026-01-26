@@ -1,0 +1,7 @@
+Deliverable: Research Summary Document
+
+Requirements:
+1. Summary of the PromptObjects framework
+2. Key features and capabilities
+3. Example use cases
+4. Save output as markdown file

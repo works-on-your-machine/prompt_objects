@@ -49,7 +49,7 @@ module PromptObjects
 
         if envs.empty?
           puts "No environments found."
-          puts "Create one with: prompt_objects env create <name>"
+          puts "Create one with: poop env create <name>"
           return
         end
 
@@ -70,7 +70,7 @@ module PromptObjects
       def create(args)
         name = args.shift
         unless name
-          puts "Usage: prompt_objects env create <name> [--template <template>]"
+          puts "Usage: poop env create <name> [--template <template>]"
           exit 1
         end
 
@@ -96,7 +96,7 @@ module PromptObjects
       def info(args)
         name = args.shift || @manager.default_environment
         unless name
-          puts "Usage: prompt_objects env info <name>"
+          puts "Usage: poop env info <name>"
           exit 1
         end
 
@@ -146,7 +146,7 @@ module PromptObjects
         # Default to current directory name if no output specified
         name ||= @manager.default_environment
         unless name
-          puts "Usage: prompt_objects env export <name> [-o output.poenv]"
+          puts "Usage: poop env export <name> [-o output.poenv]"
           exit 1
         end
 
@@ -197,7 +197,7 @@ module PromptObjects
         end
 
         unless bundle_path
-          puts "Usage: prompt_objects env import <bundle.poenv> [--as <name>] [--trust]"
+          puts "Usage: poop env import <bundle.poenv> [--as <name>] [--trust]"
           puts
           puts "Options:"
           puts "  --as <name>   Import with a different name"
@@ -251,7 +251,7 @@ module PromptObjects
       def archive(args)
         name = args.shift
         unless name
-          puts "Usage: prompt_objects env archive <name>"
+          puts "Usage: poop env archive <name>"
           exit 1
         end
 
@@ -271,7 +271,7 @@ module PromptObjects
             puts "Archived environments:"
             archived.each { |name| puts "  - #{name}" }
             puts
-            puts "Usage: prompt_objects env restore <archived_name> [--as <new_name>]"
+            puts "Usage: poop env restore <archived_name> [--as <new_name>]"
           end
           return
         end
@@ -290,7 +290,7 @@ module PromptObjects
         target = args.shift
 
         unless source && target
-          puts "Usage: prompt_objects env clone <source> <target>"
+          puts "Usage: poop env clone <source> <target>"
           exit 1
         end
 
@@ -304,7 +304,7 @@ module PromptObjects
         permanent = args.include?("--permanent")
 
         unless name
-          puts "Usage: prompt_objects env delete <archived_name> --permanent"
+          puts "Usage: poop env delete <archived_name> --permanent"
           puts
           puts "Note: Only archived environments can be permanently deleted."
           puts "First archive an environment, then delete it."
@@ -331,7 +331,7 @@ module PromptObjects
             puts "No default environment set."
           end
           puts
-          puts "Usage: prompt_objects env default <name>"
+          puts "Usage: poop env default <name>"
           return
         end
 
@@ -343,21 +343,21 @@ module PromptObjects
         puts <<~HELP
           Environment management commands:
 
-            prompt_objects env list              List all environments
-            prompt_objects env create <name>    Create new environment
+            poop env list              List all environments
+            poop env create <name>    Create new environment
               --template, -t <template>         Use template (minimal, developer, writer, empty)
-            prompt_objects env info <name>      Show environment details
-            prompt_objects env export <name>    Export environment as .poenv bundle
+            poop env info <name>      Show environment details
+            poop env export <name>    Export environment as .poenv bundle
               -o, --output <file>               Output file path
-            prompt_objects env import <file>    Import environment from .poenv bundle
+            poop env import <file>    Import environment from .poenv bundle
               --as <name>                       Import with different name
               --trust                           Trust custom primitives
-            prompt_objects env archive <name>   Archive (soft delete) environment
-            prompt_objects env restore <name>   Restore archived environment
+            poop env archive <name>   Archive (soft delete) environment
+            poop env restore <name>   Restore archived environment
               --as <new_name>                   Restore with different name
-            prompt_objects env clone <src> <dest>  Clone environment
-            prompt_objects env default <name>   Set default environment
-            prompt_objects env delete <name> --permanent  Delete archived env
+            poop env clone <src> <dest>  Clone environment
+            poop env default <name>   Set default environment
+            poop env delete <name> --permanent  Delete archived env
 
           Available templates:
             basic      - No capabilities, learns as needed (great for demos!)

@@ -123,7 +123,7 @@ Full web interface with dashboard, detail views, and all features.
 
 ### Web Distribution (NEW)
 CLI integration and gem packaging for the web interface.
-- `prompt_objects serve` command
+- `poop serve` command
 - Frontend assets bundled with gem
 - Export/import .poenv bundles
 - See: [epics/web-distribution.md](epics/web-distribution.md)

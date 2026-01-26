@@ -170,35 +170,35 @@ Press Enter to start...
 
 ```bash
 # List environments
-prompt_objects env list
+poop env list
 
 # Create new environment
-prompt_objects env create personal --template minimal
+poop env create personal --template minimal
 
 # Open specific environment (or picker if not specified)
-prompt_objects                    # Interactive picker
-prompt_objects --env work         # Direct open
+poop                    # Interactive picker
+poop --env work         # Direct open
 
 # Environment info
-prompt_objects env info work
+poop env info work
 
 # Export for sharing (git bundle)
-prompt_objects env export work -o work.poenv
+poop env export work -o work.poenv
 
 # Import from bundle
-prompt_objects env import friend.poenv --as borrowed
+poop env import friend.poenv --as borrowed
 
 # Archive (soft delete)
-prompt_objects env archive old_project
+poop env archive old_project
 
 # Restore from archive
-prompt_objects env restore old_project
+poop env restore old_project
 
 # Permanent delete
-prompt_objects env delete old_project --permanent
+poop env delete old_project --permanent
 
 # Clone environment
-prompt_objects env clone work work_experimental
+poop env clone work work_experimental
 ```
 
 ### TUI Commands
@@ -217,13 +217,13 @@ Environments are designed to run simultaneously:
 
 ```bash
 # Terminal 1: Work coding assistant
-prompt_objects --env work
+poop --env work
 
 # Terminal 2: Personal PKM system
-prompt_objects --env personal
+poop --env personal
 
 # Terminal 3: Marketing content
-prompt_objects --env marketing
+poop --env marketing
 ```
 
 Each instance is completely isolated - no shared state, no cross-communication.
@@ -262,10 +262,10 @@ For framework development:
 
 ```bash
 # Use development environment (gitignored, isolated)
-prompt_objects --dev
+poop --dev
 
 # Or with environment variable
-PROMPT_OBJECTS_DEV=1 prompt_objects
+PROMPT_OBJECTS_DEV=1 poop
 ```
 
 The `--dev` flag:
@@ -302,7 +302,7 @@ Environments export as git bundles (`.poenv`):
 
 ```bash
 # Export creates a git bundle
-prompt_objects env export work -o work.poenv
+poop env export work -o work.poenv
 
 # Bundle contains:
 # - All commits (version history)
@@ -314,10 +314,10 @@ prompt_objects env export work -o work.poenv
 Import options:
 ```bash
 # Import as new environment
-prompt_objects env import work.poenv --as imported_work
+poop env import work.poenv --as imported_work
 
 # Merge into existing (advanced)
-prompt_objects env import work.poenv --merge-into personal
+poop env import work.poenv --merge-into personal
 ```
 
 ## Migration Path

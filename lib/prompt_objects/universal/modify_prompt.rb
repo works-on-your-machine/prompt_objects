@@ -5,58 +5,29 @@ module PromptObjects
     # Universal capability for POs to modify their own or other POs' markdown body (prompt).
     # This enables self-modification of behavior, learning, and identity.
     # Note: This does NOT modify the frontmatter (capabilities, etc.) - use add_capability for that.
-    class ModifyPrompt < Primitive
-      def name
-        "modify_prompt"
-      end
+    class ModifyPrompt < Primitives::Base
+      description "Modify a prompt object's markdown body (its identity/behavior prompt). Can append, prepend, replace sections, or do a full rewrite. Does NOT change capabilities - use add_capability for that."
+      param :target, desc: "Name of the prompt object to modify. Use 'self' for the current PO."
+      param :operation, desc: "Type of modification: 'append' adds to end, 'prepend' adds to beginning, 'replace_section' replaces a specific section, 'rewrite' replaces the entire prompt"
+      param :content, desc: "The new content to add or replace with"
+      param :section, desc: "(For replace_section only) The section heading to replace (e.g., '## Learnings', '## Behavior')"
 
-      def description
-        "Modify a prompt object's markdown body (its identity/behavior prompt). Can append, prepend, replace sections, or do a full rewrite. Does NOT change capabilities - use add_capability for that."
-      end
-
-      def parameters
-        {
-          type: "object",
-          properties: {
-            target: {
-              type: "string",
-              description: "Name of the prompt object to modify. Use 'self' for the current PO."
-            },
-            operation: {
-              type: "string",
-              enum: ["append", "prepend", "replace_section", "rewrite"],
-              description: "Type of modification: 'append' adds to end, 'prepend' adds to beginning, 'replace_section' replaces a specific section, 'rewrite' replaces the entire prompt"
-            },
-            content: {
-              type: "string",
-              description: "The new content to add or replace with"
-            },
-            section: {
-              type: "string",
-              description: "(For replace_section only) The section heading to replace (e.g., '## Learnings', '## Behavior'). The section and all content until the next heading of same or higher level will be replaced."
-            }
-          },
-          required: ["target", "operation", "content"]
-        }
-      end
-
-      def receive(message, context:)
-        target = message[:target] || message["target"]
-        operation = message[:operation] || message["operation"]
-        content = message[:content] || message["content"]
-        section = message[:section] || message["section"]
-
+      def execute(target:, operation:, content:, section: nil)
         # Resolve 'self' to the calling PO
-        target = context.calling_po if target == "self"
+        resolved_target = target == "self" ? context&.calling_po : target
+
+        unless resolved_target
+          return { error: "Cannot resolve target. No calling PO context available." }
+        end
 
         # Find the target PO
-        target_po = context.env.registry.get(target)
+        target_po = registry.get(resolved_target)
         unless target_po
-          return "Error: Prompt object '#{target}' not found"
+          return { error: "Prompt object '#{resolved_target}' not found" }
         end
 
         unless target_po.is_a?(PromptObject)
-          return "Error: '#{target}' is not a prompt object"
+          return { error: "'#{resolved_target}' is not a prompt object" }
         end
 
         # Get current body
@@ -70,13 +41,13 @@ module PromptObjects
           prepend_content(current_body, content)
         when "replace_section"
           unless section
-            return "Error: 'section' parameter required for replace_section operation"
+            return { error: "'section' parameter required for replace_section operation" }
           end
           replace_section(current_body, section, content)
         when "rewrite"
           content
         else
-          return "Error: Unknown operation '#{operation}'. Use: append, prepend, replace_section, or rewrite"
+          return { error: "Unknown operation '#{operation}'. Use: append, prepend, replace_section, or rewrite" }
         end
 
         # Update the PO's body in memory
@@ -86,12 +57,15 @@ module PromptObjects
         saved = target_po.save
 
         # Notify for real-time UI update
-        context.env.notify_po_modified(target_po)
+        environment&.notify_po_modified(target_po)
+
+        # Log the change
+        log("Modified #{resolved_target} prompt: #{operation}")
 
         if saved
-          describe_change(operation, target, section)
+          describe_change(operation, resolved_target, section)
         else
-          "Modified '#{target}' prompt (in-memory only, could not save to file)."
+          "Modified '#{resolved_target}' prompt (in-memory only, could not save to file)."
         end
       end
 

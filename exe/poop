@@ -1,6 +1,8 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
-
+#
+# PromptObjects-oriented Programming (POOP)
+#
 # Add lib to load path for development (harmless when gem is installed)
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 
@@ -182,7 +184,7 @@ class REPL
   def header
     <<~HEADER
 
-      PromptObjects v0.1.0
+      PromptObjects-oriented Programming (POoP) v#{PromptObjects::VERSION}
 
     HEADER
   end
@@ -278,7 +280,10 @@ end
 
 def print_main_help
   puts <<~HELP
-    Usage: prompt_objects <command> [options]
+
+    PromptObjects-oriented Programming (POoP) v#{PromptObjects::VERSION}
+
+    Usage: poop <command> [options]
 
     Commands:
       env                          Manage environments (create, list, export, etc.)
@@ -286,19 +291,23 @@ def print_main_help
       repl [name] [objects_dir]    Start interactive REPL with a prompt object
       help                         Show this help message
 
-    Run 'prompt_objects <command> --help' for command-specific help.
+    Run 'poop <command> --help' for command-specific help.
 
     Examples:
-      prompt_objects env list                     # List all environments
-      prompt_objects env create demo --template demo  # Create from template
-      prompt_objects serve my-env                 # Start web UI
-      prompt_objects serve my-env --open          # Start and open browser
+      poop env list                     # List all environments
+      poop env create demo --template demo  # Create from template
+      poop serve my-env                 # Start web UI
+      poop serve my-env --open          # Start and open browser
+
   HELP
 end
 
 def print_repl_help
   puts <<~HELP
-    Usage: prompt_objects repl [options] [name] [objects_dir]
+
+    PromptObjects-oriented Programming (POoP) v#{PromptObjects::VERSION}
+
+    Usage: poop repl [options] [name] [objects_dir]
 
     Arguments:
       name         Prompt object to load (default: greeter)
@@ -312,12 +321,16 @@ def print_repl_help
       When running with --sandbox, all new capabilities and prompt objects
       created during the session are stored in a temporary directory.
       On exit, you'll be prompted to copy changes back to the main project.
+
   HELP
 end
 
 def print_serve_help
   puts <<~HELP
-    Usage: prompt_objects serve [options] <environment>
+
+    PromptObjects-oriented Programming (POoP) v#{PromptObjects::VERSION}
+
+    Usage: poop serve [options] <environment>
 
     Run an environment as a server, exposing it through different interfaces.
 
@@ -333,21 +346,22 @@ def print_serve_help
       --help, -h       Show this help message
 
     Examples:
-      prompt_objects serve my-assistant              # Web UI (default)
-      prompt_objects serve my-assistant --port 4000  # Custom port
-      prompt_objects serve --mcp my-assistant        # MCP server mode
-      prompt_objects serve ./my-environment          # Serve from path
+      poop serve my-assistant              # Web UI (default)
+      poop serve my-assistant --port 4000  # Custom port
+      poop serve --mcp my-assistant        # MCP server mode
+      poop serve ./my-environment          # Serve from path
 
     Claude Desktop Configuration (MCP mode):
       Add to claude_desktop_config.json:
       {
         "mcpServers": {
           "my-assistant": {
-            "command": "prompt_objects",
+            "command": "poop",
             "args": ["serve", "--mcp", "my-assistant"]
           }
         }
       }
+
   HELP
 end
 
@@ -444,7 +458,7 @@ def run_serve(args)
 
   unless options[:environment]
     puts "Error: environment name or path required"
-    puts "Run 'prompt_objects serve --help' for usage"
+    puts "Run 'poop serve --help' for usage"
     exit 1
   end
 

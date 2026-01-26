@@ -7,11 +7,11 @@
 
 ## Overview
 
-Integrate the web server into the gem's CLI and bundle the frontend assets for distribution. After this epic, users can `gem install prompt_objects` and run `prompt_objects serve ./my-env`.
+Integrate the web server into the gem's CLI and bundle the frontend assets for distribution. After this epic, users can `gem install poop` and run `poop serve ./my-env`.
 
 ## Goals
 
-- `prompt_objects serve` command in CLI
+- `poop serve` command in CLI
 - Frontend assets bundled with gem
 - Export/import .poenv bundles
 - Clean installation and first-run experience
@@ -29,7 +29,7 @@ Integrate the web server into the gem's CLI and bundle the frontend assets for d
 ### CLI Integration
 
 - [ ] Add `serve` command to Thor CLI
-  - [ ] `prompt_objects serve PATH` - serve an environment
+  - [ ] `poop serve PATH` - serve an environment
   - [ ] `--port` / `-p` option (default 3000)
   - [ ] `--host` / `-h` option (default localhost)
   - [ ] `--open` / `-o` flag to open browser automatically
@@ -44,7 +44,7 @@ Integrate the web server into the gem's CLI and bundle the frontend assets for d
 
 - [ ] Build script (`frontend/build.sh` or npm script)
   - [ ] Run `vite build`
-  - [ ] Output to `lib/prompt_objects/server/public/`
+  - [ ] Output to `lib/poop/server/public/`
   - [ ] Hash assets for cache busting
 - [ ] Add built assets to gem (not gitignored in gem, but gitignored in dev)
 - [ ] Verify assets load correctly when gem is installed
@@ -54,18 +54,18 @@ Integrate the web server into the gem's CLI and bundle the frontend assets for d
 
 ### Bundle Export/Import
 
-- [ ] `prompt_objects export PATH` command
+- [ ] `poop export PATH` command
   - [ ] Creates .poenv zip bundle
   - [ ] `--output` / `-o` to specify output path
   - [ ] `--no-sessions` to exclude sessions.db
-- [ ] `prompt_objects import BUNDLE` command
+- [ ] `poop import BUNDLE` command
   - [ ] Extracts .poenv to directory
   - [ ] `--path` to specify destination
   - [ ] Warns if destination exists
 
 ### First-Run Experience
 
-- [ ] `prompt_objects new NAME` creates new environment
+- [ ] `poop new NAME` creates new environment
   - [ ] `--template` option (minimal, developer, writer)
   - [ ] Creates directory with manifest, objects/, etc.
   - [ ] Prints next steps
@@ -76,7 +76,7 @@ Integrate the web server into the gem's CLI and bundle the frontend assets for d
 
 - [ ] Update gemspec to include server/ and public/ files
 - [ ] Test gem build and install locally
-- [ ] Test `gem install prompt_objects` from built gem
+- [ ] Test `gem install poop` from built gem
 - [ ] Document installation in README
 
 ---
@@ -85,27 +85,27 @@ Integrate the web server into the gem's CLI and bundle the frontend assets for d
 
 ```bash
 # Serve an environment
-prompt_objects serve ./my-environment
-prompt_objects serve ./my-environment --port 4000 --open
+poop serve ./my-environment
+poop serve ./my-environment --port 4000 --open
 
 # Serve a bundle directly
-prompt_objects serve my-agents.poenv
+poop serve my-agents.poenv
 
 # Create new environment
-prompt_objects new my-project
-prompt_objects new my-project --template developer
+poop new my-project
+poop new my-project --template developer
 
 # Export environment
-prompt_objects export ./my-environment
-prompt_objects export ./my-environment --output agents.poenv --no-sessions
+poop export ./my-environment
+poop export ./my-environment --output agents.poenv --no-sessions
 
 # Import bundle
-prompt_objects import agents.poenv
-prompt_objects import agents.poenv --path ./imported-agents
+poop import agents.poenv
+poop import agents.poenv --path ./imported-agents
 
 # Existing commands still work
-prompt_objects tui ./my-environment    # TUI mode
-prompt_objects mcp ./my-environment    # MCP server mode
+poop tui ./my-environment    # TUI mode
+poop mcp ./my-environment    # MCP server mode
 ```
 
 ---
@@ -113,10 +113,10 @@ prompt_objects mcp ./my-environment    # MCP server mode
 ## File Structure After This Epic
 
 ```
-prompt_objects.gemspec
+poop.gemspec
 lib/
-├── prompt_objects.rb
-└── prompt_objects/
+├── poop.rb
+└── poop/
     ├── cli.rb                    # Thor CLI with serve, export, import
     ├── server/
     │   ├── app.rb
@@ -142,22 +142,22 @@ frontend/                         # Development only, not in gem
 
 ```bash
 # Clean install test
-gem build prompt_objects.gemspec
-gem install ./prompt_objects-*.gem
+gem build poop.gemspec
+gem install ./poop-*.gem
 
 # Create and serve
-prompt_objects new test-env --template minimal
-prompt_objects serve ./test-env --open
+poop new test-env --template minimal
+poop serve ./test-env --open
 
 # Browser opens, UI loads, can chat with POs
 
 # Export and share
-prompt_objects export ./test-env --output test.poenv
+poop export ./test-env --output test.poenv
 # Send test.poenv to colleague
 
 # Import and run
-prompt_objects import test.poenv --path ./imported
-prompt_objects serve ./imported
+poop import test.poenv --path ./imported
+poop serve ./imported
 ```
 
 ---
@@ -167,12 +167,12 @@ prompt_objects serve ./imported
 ### Gemspec Assets
 
 ```ruby
-# prompt_objects.gemspec
+# poop.gemspec
 spec.files = Dir[
   'lib/**/*',
   'exe/*',
   # Include built frontend
-  'lib/prompt_objects/server/public/**/*'
+  'lib/poop/server/public/**/*'
 ]
 ```
 
@@ -180,7 +180,7 @@ spec.files = Dir[
 
 ```gitignore
 # During development, don't commit built assets
-lib/prompt_objects/server/public/
+lib/poop/server/public/
 
 # But the build script creates them before gem build
 ```
@@ -193,7 +193,7 @@ lib/prompt_objects/server/public/
 cd "$(dirname "$0")"
 npm ci
 npm run build
-# Vite outputs to ../lib/prompt_objects/server/public/
+# Vite outputs to ../lib/poop/server/public/
 ```
 
 ### Rake Task
@@ -205,7 +205,7 @@ task :build_frontend do
 end
 
 task :build => [:build_frontend] do
-  sh 'gem build prompt_objects.gemspec'
+  sh 'gem build poop.gemspec'
 end
 ```
 

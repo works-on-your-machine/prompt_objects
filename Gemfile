@@ -8,3 +8,7 @@ gemspec
 # Ruby 3.4+ compatibility - base64 moved out of stdlib
 gem "base64"
 
+group :development, :test do
+  gem 'aigcm'
+  gem 'debug_me'
+end

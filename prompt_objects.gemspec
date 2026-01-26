@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
+require_relative 'lib/prompt_objects/version'
+
 Gem::Specification.new do |spec|
   spec.name          = "prompt_objects"
-  spec.version       = "0.2.0"
+  spec.version       = PromptObjects::VERSION
   spec.authors       = ["Scott Werner"]
   spec.email         = ["scott@sublayer.com"]
 
@@ -28,8 +30,7 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   # Runtime dependencies
-  spec.add_dependency "ruby-openai", "~> 7.0"
-  spec.add_dependency "anthropic", "~> 1.0"
+  spec.add_dependency "ruby_llm", "~> 1.2"
   spec.add_dependency "front_matter_parser", "~> 1.0"
   spec.add_dependency "sqlite3", "~> 2.0"
 

@@ -15,8 +15,7 @@ module PromptObjects
               type: "string",
               description: "Optional: filter to requests from a specific PO"
             }
-          },
-          required: []
+          }
         )
 
         def self.call(po_name: nil, server_context:)

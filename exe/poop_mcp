@@ -1,0 +1,58 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "bundler/setup"
+require_relative "../lib/prompt_objects"
+require_relative "../lib/prompt_objects/mcp/server"
+
+# Parse command line options
+objects_dir = ENV["PROMPT_OBJECTS_DIR"] || "objects"
+primitives_dir = ENV["PROMPT_OBJECTS_PRIMITIVES_DIR"]
+protocol_version = ENV["MCP_PROTOCOL_VERSION"]
+
+# Allow overriding via command line
+ARGV.each_with_index do |arg, i|
+  case arg
+  when "--objects-dir"
+    objects_dir = ARGV[i + 1]
+  when "--primitives-dir"
+    primitives_dir = ARGV[i + 1]
+  when "--protocol-version"
+    protocol_version = ARGV[i + 1]
+  when "--help", "-h"
+    puts <<~HELP
+      Usage: poop_mcp [options]
+
+      Options:
+        --objects-dir DIR       Directory containing prompt objects (default: objects)
+        --primitives-dir DIR    Directory containing custom primitives
+        --protocol-version VER  MCP protocol version (default: 2025-06-18)
+                                Supported: 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05
+        --help, -h              Show this help message
+
+      Environment variables:
+        PROMPT_OBJECTS_DIR            Same as --objects-dir
+        PROMPT_OBJECTS_PRIMITIVES_DIR Same as --primitives-dir
+        PROMPT_OBJECTS_LOG            Log file path for stderr output
+        MCP_PROTOCOL_VERSION          Same as --protocol-version
+    HELP
+    exit 0
+  end
+end
+
+# Set protocol version in env for the server to pick up
+ENV["MCP_PROTOCOL_VERSION"] = protocol_version if protocol_version
+
+# Redirect stderr to a log file to avoid polluting MCP stdio
+if ENV["PROMPT_OBJECTS_LOG"]
+  $stderr.reopen(ENV["PROMPT_OBJECTS_LOG"], "a")
+  $stderr.sync = true
+end
+
+# Start the MCP server
+server = PromptObjects::MCP::Server.new(
+  objects_dir: objects_dir,
+  primitives_dir: primitives_dir
+)
+
+server.start

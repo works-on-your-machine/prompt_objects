@@ -5,87 +5,67 @@ module PromptObjects
     # Universal capability to list available primitives.
     # Shows stdlib primitives, custom (environment) primitives, and which ones
     # the current PO has active.
-    class ListPrimitives < Primitive
+    class ListPrimitives < Primitives::Base
       # Names of stdlib primitives (built into the framework)
       STDLIB_PRIMITIVES = %w[read_file list_files write_file http_get].freeze
 
-      def name
-        "list_primitives"
-      end
+      description "List available primitives (deterministic Ruby tools). Filter by type: stdlib (built-in), custom (environment-specific), active (on this PO), or available (all)."
+      param :filter, desc: "Filter primitives: 'available' (all), 'active' (currently on this PO), 'stdlib' (built-in), 'custom' (environment-specific). Default: 'available'"
 
-      def description
-        "List available primitives (deterministic Ruby tools). Filter by type: stdlib (built-in), custom (environment-specific), active (on this PO), or available (all)."
-      end
-
-      def parameters
-        {
-          type: "object",
-          properties: {
-            filter: {
-              type: "string",
-              enum: ["available", "active", "stdlib", "custom"],
-              description: "Filter primitives: 'available' (all), 'active' (currently on this PO), 'stdlib' (built-in), 'custom' (environment-specific). Default: 'available'"
-            }
-          },
-          required: []
-        }
-      end
-
-      def receive(message, context:)
-        filter = (message[:filter] || message["filter"] || "available").to_s
-
-        case filter
+      def execute(filter: "available")
+        case filter.to_s
         when "stdlib"
-          list_stdlib(context)
+          list_stdlib
         when "custom"
-          list_custom(context)
+          list_custom
         when "active"
-          list_active(context)
+          list_active
         when "available"
-          list_available(context)
+          list_available
         else
-          "Error: Unknown filter '#{filter}'. Use: available, active, stdlib, or custom."
+          { error: "Unknown filter '#{filter}'. Use: available, active, stdlib, or custom." }
         end
       end
 
       private
 
-      def list_stdlib(context)
+      def list_stdlib
         primitives = STDLIB_PRIMITIVES.filter_map do |name|
-          prim = context.env.registry.get(name)
-          prim if prim.is_a?(Primitive)
+          prim = registry.get(name)
+          prim if ruby_llm_tool_class?(prim)
         end
 
         format_list("Stdlib Primitives (built-in)", primitives)
       end
 
-      def list_custom(context)
-        primitives = context.env.registry.primitives.reject do |prim|
-          STDLIB_PRIMITIVES.include?(prim.name) || universal_primitive?(prim)
+      def list_custom
+        primitives = registry.primitives.reject do |prim|
+          name = extract_tool_name(prim)
+          STDLIB_PRIMITIVES.include?(name) || universal_primitive?(prim)
         end
 
         if primitives.empty?
-          "No custom primitives found.\nCustom primitives are stored in: #{context.env.primitives_dir}"
+          "No custom primitives found.\nCustom primitives are stored in: #{environment&.primitives_dir}"
         else
           format_list("Custom Primitives (environment-specific)", primitives)
         end
       end
 
-      def list_active(context)
-        caller = context.calling_po
+      def list_active
+        caller = context&.calling_po
         unless caller
-          return "Error: No calling PO context. This filter shows primitives active on the current PO."
+          return { error: "No calling PO context. This filter shows primitives active on the current PO." }
         end
 
-        po = context.env.registry.get(caller)
+        po = registry.get(caller)
         unless po.is_a?(PromptObject)
-          return "Error: Could not find calling PO '#{caller}'."
+          return { error: "Could not find calling PO '#{caller}'." }
         end
 
         capabilities = po.config["capabilities"] || []
         active_primitives = capabilities.filter_map do |cap_name|
-          cap = context.env.registry.get(cap_name)
-          cap if cap.is_a?(Primitive) && !universal_primitive?(cap)
+          cap = registry.get(cap_name)
+          cap if ruby_llm_tool_class?(cap) && !universal_primitive?(cap)
         end
 
         if active_primitives.empty?
@@ -95,13 +75,13 @@ module PromptObjects
         end
       end
 
-      def list_available(context)
+      def list_available
         # All registered primitives except universal ones
-        primitives = context.env.registry.primitives.reject { |p| universal_primitive?(p) }
+        primitives = registry.primitives.reject { |p| universal_primitive?(p) }
 
         # Categorize them
-        stdlib = primitives.select { |p| STDLIB_PRIMITIVES.include?(p.name) }
-        custom = primitives.reject { |p| STDLIB_PRIMITIVES.include?(p.name) }
+        stdlib = primitives.select { |p| STDLIB_PRIMITIVES.include?(extract_tool_name(p)) }
+        custom = primitives.reject { |p| STDLIB_PRIMITIVES.include?(extract_tool_name(p)) }
 
         lines = []
 
@@ -133,12 +113,32 @@ module PromptObjects
       end
 
       def format_primitive(primitive)
-        "- **#{primitive.name}**: #{primitive.description}"
+        name = extract_tool_name(primitive)
+        desc = primitive.respond_to?(:description) ? primitive.description : "No description"
+        "- **#{name}**: #{desc}"
+      end
+
+      def extract_tool_name(prim)
+        if prim.respond_to?(:tool_name)
+          prim.tool_name
+        elsif prim.is_a?(Class)
+          prim.name.split("::").last.gsub(/([a-z])([A-Z])/, '\1_\2').downcase
+        else
+          prim.name
+        end
+      end
+
+      def ruby_llm_tool_class?(cap)
+        cap.is_a?(Class) && defined?(RubyLLM::Tool) && cap < RubyLLM::Tool
       end
 
       def universal_primitive?(primitive)
         # Universal capabilities live in PromptObjects::Universal module
-        primitive.class.name&.start_with?("PromptObjects::Universal")
+        if primitive.is_a?(Class)
+          primitive.name&.start_with?("PromptObjects::Universal")
+        else
+          primitive.class.name&.start_with?("PromptObjects::Universal")
+        end
       end
     end
   end

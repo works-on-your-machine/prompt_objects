@@ -151,10 +151,10 @@ The server also exposes these MCP resources:
 
 ```bash
 # Stdio transport (for TUI, Claude Desktop)
-ruby exe/prompt_objects_mcp
+ruby exe/poop_mcp
 
 # With custom objects directory
-PROMPT_OBJECTS_DIR=/path/to/objects ruby exe/prompt_objects_mcp
+PROMPT_OBJECTS_DIR=/path/to/objects ruby exe/poop_mcp
 ```
 
 ## Claude Desktop Configuration
@@ -166,7 +166,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "prompt-objects": {
       "command": "ruby",
-      "args": ["/path/to/prompt-objects/exe/prompt_objects_mcp"],
+      "args": ["/path/to/prompt-objects/exe/poop_mcp"],
       "env": {
         "PROMPT_OBJECTS_DIR": "/path/to/objects"
       }

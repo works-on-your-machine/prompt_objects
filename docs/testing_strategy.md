@@ -79,7 +79,7 @@ test/
 
 ## Mock Strategy
 
-### MockLLM Adapter
+### MockLLM Client
 
 Returns predictable responses without API calls:
 
@@ -93,20 +93,23 @@ class MockLLM
     @call_index = 0
   end
 
-  def chat(messages:, tools: nil)
-    @calls << { messages: messages, tools: tools }
+  # Matches LLM::Client#chat signature (returns a hash)
+  def chat(system:, messages:, tools: [])
+    @calls << { system: system, messages: messages, tools: tools }
     response = @responses[@call_index] || default_response
     @call_index += 1
     response
   end
 
+  # Queue a specific response for the next call
+  def queue_response(content: nil, tool_calls: [])
+    @responses << { content: content, tool_calls: tool_calls }
+  end
+
   private
 
   def default_response
-    PromptObjects::LLM::Response.new(
-      content: "Mock response",
-      tool_calls: []
-    )
+    { content: "Mock response", tool_calls: [] }
   end
 end
 ```
