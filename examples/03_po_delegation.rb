@@ -1,24 +1,26 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Multi-PO Workflow Example
+# PO-to-PO Delegation Example
 #
 # Demonstrates:
-# - Multiple POs working on a shared task
-# - Human-orchestrated workflow (human coordinates POs)
+# - Prompt objects calling other prompt objects as capabilities
+# - Coordinator delegating to researcher and writer
+# - Autonomous multi-step workflows
 # - Message bus tracking inter-PO communication
-# - Chaining PO outputs (research -> writing)
 
 require_relative "setup"
 include Examples
 
-box "PromptObjects Multi-PO Workflow Example"
+box "PromptObjects PO-to-PO Delegation Example"
 
 run_demo do
   runtime = create_runtime(objects: objects_dir("research_team"))
 
-  researcher = runtime.load_by_name("researcher")
-  writer = runtime.load_by_name("writer")
+  # Load all three POs - they must be registered for delegation to work
+  coordinator = runtime.load_by_name("coordinator")
+  runtime.load_by_name("researcher")
+  runtime.load_by_name("writer")
 
   show_loaded_pos(runtime)
 
@@ -28,57 +30,38 @@ run_demo do
 
   context = runtime.context
 
-  # Step 1: Researcher gathers data
-  box "STEP 1: Researcher gathers data"
+  # Give coordinator a complex task - it should delegate autonomously
+  box "Coordinator receives a complex task"
 
   project_file = File.join(data_dir, "project.json")
+  output_file = File.join(data_dir, "announcement.md")
 
-  puts "Human -> Researcher: Read #{project_file} and summarize..."
+  puts "Human -> Coordinator: Research the project and create an announcement."
   puts
 
-  research_result = researcher.receive(<<~TASK, context: context)
-    Please read the file #{project_file} and summarize the project information.
+  result = coordinator.receive(<<~TASK, context: context)
+    Please complete this multi-step task:
+
+    1. Ask the researcher to read #{project_file} and summarize it
+    2. Ask the writer to create an announcement based on the research
+       and save it to #{output_file}
+
+    Coordinate the workflow and report back when complete.
   TASK
 
   puts
-  puts "Researcher's findings:"
-  puts research_result
+  puts "Coordinator's report:"
+  puts result
   puts
 
-  # Step 2: Writer creates announcement using write_file
-  box "STEP 2: Writer creates announcement"
-
-  announcement_file = File.join(data_dir, "announcement.md")
-  puts "Human -> Writer: Create announcement and save to #{announcement_file}..."
+  # Show message bus to see the delegation flow
+  box "Message Bus History (showing PO-to-PO calls)"
+  puts runtime.bus.format_log(15)
   puts
 
-  writer_response = writer.receive(<<~TASK, context: context)
-    Based on these research findings, create a brief markdown announcement
-    and save it to: #{announcement_file}
-
-    #{research_result}
-
-    Use write_file to save the announcement. The announcement should be
-    professional and highlight the key features. Use proper markdown
-    formatting with a title and bullet points.
-  TASK
-
-  puts
-  puts "Writer's response:"
-  puts writer_response
-  puts
-
-  # Workflow summary
-  box "Workflow Summary"
-
-  messages = runtime.bus.log
-  participants = messages.flat_map { |m| [m[:from], m[:to]] }.compact
-  participants = participants.map { |p| simplify_name(p) }.uniq
-
-  puts "Participants: #{participants.join(', ')}"
-  puts "Total messages: #{messages.length}"
-  puts
-  puts "Conversation lengths:"
-  puts "  Researcher: #{researcher.history.length} messages"
-  puts "  Writer: #{writer.history.length} messages"
+  # Verify the file was created
+  if File.exist?(output_file)
+    box "Generated Announcement"
+    puts File.read(output_file)
+  end
 end
