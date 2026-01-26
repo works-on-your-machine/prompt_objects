@@ -70,22 +70,22 @@ lib/prompt_objects/
 
 ```bash
 # Ruby TUI
-bundle exec ruby exe/prompt_objects_tui
+bundle exec ruby exe/poop_tui
 
 # With specific environment
-bundle exec ruby exe/prompt_objects_tui --env myenv
+bundle exec ruby exe/poop_tui --env myenv
 
 # Development mode
-bundle exec ruby exe/prompt_objects_tui --dev
+bundle exec ruby exe/poop_tui --dev
 
 # MCP Server (for Claude Desktop, etc.)
-bundle exec ruby exe/prompt_objects_mcp
+bundle exec ruby exe/poop_mcp
 
 # CLI commands
-bundle exec ruby exe/prompt_objects_tui env list
-bundle exec ruby exe/prompt_objects_tui env create myenv --template minimal
-bundle exec ruby exe/prompt_objects_tui env export myenv -o myenv.poenv
-bundle exec ruby exe/prompt_objects_tui env import shared.poenv --as imported
+bundle exec ruby exe/poop_tui env list
+bundle exec ruby exe/poop_tui env create myenv --template minimal
+bundle exec ruby exe/poop_tui env export myenv -o myenv.poenv
+bundle exec ruby exe/poop_tui env import shared.poenv --as imported
 ```
 
 ## Keyboard Shortcuts (TUI)

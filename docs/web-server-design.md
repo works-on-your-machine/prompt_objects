@@ -844,7 +844,7 @@ module PromptObjects
       puts
       puts "Next steps:"
       puts "  cd #{name}"
-      puts "  prompt_objects serve ."
+      puts "  poop serve ."
     end
 
     desc "export PATH", "Export environment as .poenv bundle"
@@ -1233,7 +1233,7 @@ User types message
 3. Test gem installation + serve flow
 4. Add `export`/`import` commands for .poenv bundles
 
-**Exit criteria**: `gem install prompt_objects && prompt_objects serve ./my-env` works.
+**Exit criteria**: `gem install prompt_objects && poop serve ./my-env` works.
 
 ### Future (Post-V1)
 

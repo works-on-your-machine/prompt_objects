@@ -13,6 +13,8 @@ module PromptObjects
   UNIVERSAL_CAPABILITIES = %w[ask_human think create_capability add_capability remove_capability list_capabilities list_primitives add_primitive create_primitive delete_primitive verify_primitive modify_primitive request_primitive modify_prompt].freeze
 end
 
+require_relative "prompt_objects/version"
+
 require_relative "prompt_objects/capability"
 require_relative "prompt_objects/primitive"
 require_relative "prompt_objects/registry"

@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
+require_relative 'lib/prompt_objects/version'
+
 Gem::Specification.new do |spec|
   spec.name          = "prompt_objects"
-  spec.version       = "0.2.0"
+  spec.version       = PromptObjects::VERSION
   spec.authors       = ["Scott Werner"]
   spec.email         = ["scott@sublayer.com"]
 
