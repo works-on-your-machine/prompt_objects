@@ -49,11 +49,18 @@ module PromptObjects
       end
 
       def setup_mcp_server
+        # Use 2025-06-18 for compatibility with ruby_llm MCP client
+        # which doesn't yet support the latest 2025-11-25 protocol
+        configuration = ::MCP::Configuration.new(
+          protocol_version: ENV.fetch("MCP_PROTOCOL_VERSION", "2025-06-18")
+        )
+
         @mcp_server = ::MCP::Server.new(
           name: "prompt_objects",
-          version: "0.1.0",
+          version: PromptObjects::VERSION,
           tools: build_tools,
-          server_context: { env: @env, context: @context }
+          server_context: { env: @env, context: @context },
+          configuration: configuration
         )
 
         setup_resource_handlers
