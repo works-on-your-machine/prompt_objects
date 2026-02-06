@@ -264,7 +264,7 @@ class REPL
       time = entry[:timestamp].strftime("%H:%M:%S")
       from = entry[:from]
       to = entry[:to]
-      msg = entry[:message]
+      msg = entry[:summary]
 
       line = "#{time}  #{from} -> #{to}: #{msg}"
       line = line[0, 70] + "..." if line.length > 73

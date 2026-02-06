@@ -4,6 +4,9 @@ module PromptObjects
   # Message bus for routing and logging all inter-capability communication.
   # This makes the semantic binding visible - you can see natural language
   # being transformed into capability calls.
+  #
+  # Each entry stores the full message content and a truncated summary.
+  # Use :summary for compact log displays, :message for full inspection.
   class MessageBus
     attr_reader :log
 
@@ -15,14 +18,15 @@ module PromptObjects
     # Log a message between capabilities.
     # @param from [String] Source capability name
     # @param to [String] Destination capability name
-    # @param message [String, Hash] The message content
+    # @param message [String, Hash] The message content (stored in full)
     # @return [Hash] The log entry
     def publish(from:, to:, message:)
       entry = {
         timestamp: Time.now,
         from: from,
         to: to,
-        message: truncate_message(message)
+        message: message,
+        summary: summarize(message)
       }
 
       @log << entry
@@ -54,7 +58,7 @@ module PromptObjects
       @log.clear
     end
 
-    # Format log entries for display.
+    # Format log entries for compact display.
     # @param count [Integer] Number of entries to format
     # @return [String]
     def format_log(count = 20)
@@ -62,7 +66,7 @@ module PromptObjects
         time = entry[:timestamp].strftime("%H:%M:%S")
         from = entry[:from]
         to = entry[:to]
-        msg = entry[:message]
+        msg = entry[:summary]
 
         "#{time}  #{from} → #{to}: #{msg}"
       end.join("\n")
@@ -74,7 +78,8 @@ module PromptObjects
       @subscribers.each { |s| s.call(entry) }
     end
 
-    def truncate_message(message, max_length = 100)
+    # Create a short summary for compact log displays.
+    def summarize(message, max_length = 200)
       str = case message
             when Hash
               message.to_json
@@ -84,7 +89,7 @@ module PromptObjects
               message.to_s
             end
 
-      # Remove newlines for cleaner log display
+      # Collapse whitespace for single-line display
       str = str.gsub(/\s+/, " ").strip
 
       if str.length > max_length

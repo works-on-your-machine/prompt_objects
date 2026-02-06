@@ -204,12 +204,21 @@ module PromptObjects
             {
               from: e[:from],
               to: e[:to],
-              message: e[:message],
+              summary: e[:summary],
+              content: serialize_bus_content(e[:message]),
               timestamp: e[:timestamp].iso8601
             }
           end
 
           { messages: messages }
+        end
+
+        def serialize_bus_content(message)
+          case message
+          when Hash then message
+          when String then message
+          else message.to_s
+          end
         end
 
         # === Helpers ===

@@ -121,7 +121,8 @@ module PromptObjects
           payload: {
             from: entry[:from],
             to: entry[:to],
-            content: entry[:message],
+            summary: entry[:summary],
+            content: serialize_bus_content(entry[:message]),
             timestamp: entry[:timestamp].iso8601
           }
         )
@@ -175,7 +176,8 @@ module PromptObjects
             payload: {
               from: entry[:from],
               to: entry[:to],
-              content: entry[:message],
+              summary: entry[:summary],
+              content: serialize_bus_content(entry[:message]),
               timestamp: entry[:timestamp].iso8601
             }
           )
@@ -677,6 +679,19 @@ module PromptObjects
           message: request.question,    # question is the message
           options: request.options || []
         }
+      end
+
+      # Serialize bus message content for JSON transmission.
+      # Handles String, Hash, and other types gracefully.
+      def serialize_bus_content(message)
+        case message
+        when Hash
+          message
+        when String
+          message
+        else
+          message.to_s
+        end
       end
     end
   end

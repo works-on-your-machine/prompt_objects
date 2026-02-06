@@ -138,6 +138,7 @@ module PromptObjects
           {
             from: entry[:from],
             to: entry[:to],
+            summary: entry[:summary],
             message: entry[:message],
             timestamp: entry[:timestamp]&.iso8601
           }
