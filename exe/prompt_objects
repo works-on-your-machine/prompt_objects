@@ -283,6 +283,8 @@ def print_main_help
     Commands:
       env                          Manage environments (create, list, export, etc.)
       serve <env>                  Run environment as a web server
+      message <env> <po> "text"    Send a message to a PO and print the response
+      events <env> [--session ID]  Show recent events from the message bus
       repl [name] [objects_dir]    Start interactive REPL with a prompt object
       help                         Show this help message
 
@@ -293,6 +295,8 @@ def print_main_help
       prompt_objects env create demo --template demo  # Create from template
       prompt_objects serve my-env                 # Start web UI
       prompt_objects serve my-env --open          # Start and open browser
+      prompt_objects message my-env solver "Hello"     # Send a message
+      prompt_objects message my-env solver "Hello" --json  # JSON output
   HELP
 end
 
@@ -538,6 +542,356 @@ def load_all_objects(runtime, env_path)
   end
 end
 
+def print_message_help
+  puts <<~HELP
+    Usage: prompt_objects message [options] <environment> <po_name> "message"
+
+    Send a message to a prompt object and print the response.
+
+    Arguments:
+      environment  Environment name or path
+      po_name      Name of the prompt object to message
+      message      The message to send (quoted string)
+
+    Options:
+      --json           Output response as JSON
+      --events         Also print the event log for this interaction
+      --new-thread     Start a new thread for this message
+      --session ID     Use a specific session ID
+      --help, -h       Show this help
+
+    If a server is running for the environment, the message is sent via
+    HTTP to the running server (and streams to the web UI in real time).
+    Otherwise, a standalone runtime is started for the request.
+
+    Examples:
+      prompt_objects message my-env solver "What patterns do you see?"
+      prompt_objects message my-env solver "Solve task 1" --json
+      prompt_objects message my-env solver "Try again" --new-thread
+  HELP
+end
+
+def run_message(args)
+  options = {
+    json: false,
+    events: false,
+    new_thread: false,
+    session_id: nil
+  }
+
+  positional = []
+  skip_next = false
+
+  args.each_with_index do |arg, i|
+    if skip_next
+      skip_next = false
+      next
+    end
+
+    case arg
+    when "--json"
+      options[:json] = true
+    when "--events"
+      options[:events] = true
+    when "--new-thread"
+      options[:new_thread] = true
+    when "--session"
+      options[:session_id] = args[i + 1]
+      skip_next = true
+    when "--help", "-h"
+      print_message_help
+      exit 0
+    else
+      positional << arg
+    end
+  end
+
+  env_name = positional[0]
+  po_name = positional[1]
+  message_text = positional[2]
+
+  unless env_name && po_name && message_text
+    puts "Error: environment, po_name, and message are required"
+    puts "Run 'prompt_objects message --help' for usage"
+    exit 1
+  end
+
+  # Resolve environment
+  env_path = resolve_environment(env_name)
+  unless env_path
+    $stderr.puts "Error: environment '#{env_name}' not found"
+    exit 1
+  end
+
+  # Check for running server
+  require "prompt_objects/server"
+  server_info = PromptObjects::Server.read_server_file(env_path)
+
+  if server_info
+    # Send via HTTP to running server
+    send_message_via_http(server_info, po_name, message_text, options)
+  else
+    # Standalone mode
+    send_message_standalone(env_path, po_name, message_text, options)
+  end
+end
+
+def send_message_via_http(server_info, po_name, message_text, options)
+  require "net/http"
+  require "uri"
+
+  uri = URI("http://#{server_info[:host]}:#{server_info[:port]}/api/prompt_objects/#{po_name}/message")
+
+  body = { message: message_text }
+  body[:new_thread] = true if options[:new_thread]
+  body[:session_id] = options[:session_id] if options[:session_id]
+
+  begin
+    response = Net::HTTP.post(uri, body.to_json, "Content-Type" => "application/json")
+    data = JSON.parse(response.body)
+
+    if data["error"]
+      $stderr.puts "Error: #{data['error']}"
+      exit 1
+    end
+
+    if options[:json]
+      puts JSON.pretty_generate(data)
+    else
+      puts data["response"]
+    end
+
+    if options[:events] && data["session_id"]
+      events_uri = URI("http://#{server_info[:host]}:#{server_info[:port]}/api/events/session/#{data['session_id']}")
+      events_response = Net::HTTP.get(events_uri)
+      events_data = JSON.parse(events_response)
+
+      if events_data["events"]&.any?
+        $stderr.puts
+        $stderr.puts "--- Events ---"
+        events_data["events"].each do |e|
+          $stderr.puts "#{e['timestamp']}  #{e['from']} -> #{e['to']}: #{e['summary']}"
+        end
+        $stderr.puts "--------------"
+      end
+    end
+  rescue Errno::ECONNREFUSED
+    $stderr.puts "Error: Server at #{server_info[:host]}:#{server_info[:port]} is not responding"
+    $stderr.puts "The .server file may be stale. Try running standalone."
+    exit 1
+  end
+end
+
+def send_message_standalone(env_path, po_name, message_text, options)
+  runtime = PromptObjects::Runtime.new(env_path: env_path)
+  load_all_objects(runtime, env_path)
+
+  po = runtime.registry.get(po_name)
+  unless po.is_a?(PromptObjects::PromptObject)
+    $stderr.puts "Error: prompt object '#{po_name}' not found"
+    $stderr.puts "Available: #{runtime.loaded_objects.join(', ')}"
+    exit 1
+  end
+
+  # Create new thread if requested
+  po.new_thread if options[:new_thread]
+
+  # Switch session if specified
+  if options[:session_id]
+    po.switch_session(options[:session_id])
+  end
+
+  session_id = po.session_id
+  log_start = runtime.bus.log.length
+
+  context = runtime.context
+  context.current_capability = "human"
+
+  # Log to bus
+  runtime.bus.publish(from: "human", to: po.name, message: message_text, session_id: session_id)
+
+  response = po.receive(message_text, context: context)
+
+  # Log response to bus
+  runtime.bus.publish(from: po.name, to: "human", message: response, session_id: session_id)
+
+  if options[:json]
+    data = {
+      response: response,
+      po_name: po.name,
+      session_id: session_id,
+      event_count: runtime.bus.log.length - log_start
+    }
+    puts JSON.pretty_generate(data)
+  else
+    puts response
+  end
+
+  if options[:events]
+    entries = runtime.bus.log[log_start..]
+    if entries&.any?
+      $stderr.puts
+      $stderr.puts "--- Events ---"
+      entries.each do |entry|
+        time = entry[:timestamp].strftime("%H:%M:%S")
+        $stderr.puts "#{time}  #{entry[:from]} -> #{entry[:to]}: #{entry[:summary]}"
+      end
+      $stderr.puts "--------------"
+    end
+  end
+end
+
+def print_events_help
+  puts <<~HELP
+    Usage: prompt_objects events [options] <environment>
+
+    Show recent events from the message bus.
+
+    Arguments:
+      environment  Environment name or path
+
+    Options:
+      --session ID     Show events for a specific session
+      --count N        Number of events to show (default: 50)
+      --json           Output as JSON
+      --help, -h       Show this help
+
+    Examples:
+      prompt_objects events my-env
+      prompt_objects events my-env --session abc-123
+      prompt_objects events my-env --count 100 --json
+  HELP
+end
+
+def run_events(args)
+  options = { count: 50, session_id: nil, json: false }
+  positional = []
+  skip_next = false
+
+  args.each_with_index do |arg, i|
+    if skip_next
+      skip_next = false
+      next
+    end
+
+    case arg
+    when "--session"
+      options[:session_id] = args[i + 1]
+      skip_next = true
+    when "--count"
+      options[:count] = args[i + 1].to_i
+      skip_next = true
+    when "--json"
+      options[:json] = true
+    when "--help", "-h"
+      print_events_help
+      exit 0
+    else
+      positional << arg
+    end
+  end
+
+  env_name = positional[0]
+  unless env_name
+    puts "Error: environment name required"
+    puts "Run 'prompt_objects events --help' for usage"
+    exit 1
+  end
+
+  env_path = resolve_environment(env_name)
+  unless env_path
+    $stderr.puts "Error: environment '#{env_name}' not found"
+    exit 1
+  end
+
+  # Check for running server
+  require "prompt_objects/server"
+  server_info = PromptObjects::Server.read_server_file(env_path)
+
+  if server_info
+    show_events_via_http(server_info, options)
+  else
+    show_events_standalone(env_path, options)
+  end
+end
+
+def show_events_via_http(server_info, options)
+  require "net/http"
+  require "uri"
+
+  if options[:session_id]
+    uri = URI("http://#{server_info[:host]}:#{server_info[:port]}/api/events/session/#{options[:session_id]}")
+  else
+    uri = URI("http://#{server_info[:host]}:#{server_info[:port]}/api/events?count=#{options[:count]}")
+  end
+
+  response = Net::HTTP.get(uri)
+  data = JSON.parse(response)
+
+  if options[:json]
+    puts JSON.pretty_generate(data)
+  else
+    print_events(data["events"] || [])
+  end
+rescue Errno::ECONNREFUSED
+  $stderr.puts "Error: Server not responding"
+  exit 1
+end
+
+def show_events_standalone(env_path, options)
+  db_path = File.join(env_path, "sessions.db")
+  unless File.exist?(db_path)
+    puts "No event history (sessions.db not found)"
+    exit 0
+  end
+
+  store = PromptObjects::Session::Store.new(db_path)
+
+  events = if options[:session_id]
+    store.get_events(session_id: options[:session_id])
+  else
+    store.get_recent_events(options[:count])
+  end
+
+  if options[:json]
+    formatted = events.map do |e|
+      {
+        id: e[:id],
+        from: e[:from],
+        to: e[:to],
+        summary: e[:summary],
+        message: e[:message],
+        timestamp: e[:timestamp]&.iso8601,
+        session_id: e[:session_id]
+      }
+    end
+    puts JSON.pretty_generate(formatted)
+  else
+    print_events(events)
+  end
+
+  store.close
+end
+
+def print_events(events)
+  if events.empty?
+    puts "No events found."
+    return
+  end
+
+  events.each do |e|
+    ts = e[:timestamp] || e["timestamp"]
+    ts = ts.is_a?(Time) ? ts.strftime("%H:%M:%S") : ts&.split("T")&.last&.split(".")&.first
+    from = e[:from] || e["from"]
+    to = e[:to] || e["to"]
+    summary = e[:summary] || e["summary"]
+
+    line = "#{ts}  #{from} -> #{to}: #{summary}"
+    line = line[0, 120] + "..." if line.length > 123
+    puts line
+  end
+end
+
 # === Main Entry Point ===
 
 def run_env(args)
@@ -561,6 +915,10 @@ def main
     run_repl(args)
   when "serve"
     run_serve(args)
+  when "message", "msg"
+    run_message(args)
+  when "events"
+    run_events(args)
   when "help", "--help", "-h"
     print_main_help
   else
