@@ -10,17 +10,20 @@ module PromptObjects
   class MessageBus
     attr_reader :log
 
-    def initialize
+    # @param session_store [Session::Store, nil] Optional store for persistent event logging
+    def initialize(session_store: nil)
       @log = []
       @subscribers = []
+      @store = session_store
     end
 
     # Log a message between capabilities.
     # @param from [String] Source capability name
     # @param to [String] Destination capability name
     # @param message [String, Hash] The message content (stored in full)
+    # @param session_id [String, nil] Optional session ID for event persistence
     # @return [Hash] The log entry
-    def publish(from:, to:, message:)
+    def publish(from:, to:, message:, session_id: nil)
       entry = {
         timestamp: Time.now,
         from: from,
@@ -30,6 +33,7 @@ module PromptObjects
       }
 
       @log << entry
+      persist_event(entry, session_id: session_id)
       notify_subscribers(entry)
       entry
     end
@@ -76,6 +80,16 @@ module PromptObjects
 
     def notify_subscribers(entry)
       @subscribers.each { |s| s.call(entry) }
+    end
+
+    # Persist event to the session store (if available).
+    def persist_event(entry, session_id: nil)
+      return unless @store
+
+      @store.add_event(entry, session_id: session_id)
+    rescue StandardError => e
+      # Don't let persistence failures break the bus
+      warn "Warning: Failed to persist event: #{e.message}"
     end
 
     # Create a short summary for compact log displays.

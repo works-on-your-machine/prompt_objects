@@ -86,7 +86,7 @@ module PromptObjects
       end
 
       @registry = Registry.new
-      @bus = MessageBus.new
+      @bus = MessageBus.new(session_store: @session_store)
       @human_queue = HumanQueue.new
 
       register_primitives

@@ -9,7 +9,7 @@ module PromptObjects
     # SQLite-based session storage for conversation history.
     # Each environment has its own sessions.db file (gitignored for privacy).
     class Store
-      SCHEMA_VERSION = 4
+      SCHEMA_VERSION = 5
 
       # Thread types for conversation branching
       THREAD_TYPES = %w[root continuation delegation fork].freeze
@@ -499,6 +499,101 @@ module PromptObjects
         row["count"]
       end
 
+      # --- Events (Message Bus Persistence) ---
+
+      # Add an event from the message bus.
+      # @param entry [Hash] Bus entry with :timestamp, :from, :to, :message, :summary
+      # @param session_id [String, nil] Associated session ID
+      # @return [Integer] Event ID
+      def add_event(entry, session_id: nil)
+        message_text = case entry[:message]
+                       when Hash then entry[:message].to_json
+                       when String then entry[:message]
+                       else entry[:message].to_s
+                       end
+
+        params = [
+          session_id || entry[:session_id],
+          entry[:timestamp].iso8601,
+          entry[:from],
+          entry[:to],
+          message_text,
+          entry[:summary]
+        ]
+
+        @db.execute(<<~SQL, params)
+          INSERT INTO events (session_id, timestamp, from_name, to_name, message, summary)
+          VALUES (?, ?, ?, ?, ?, ?)
+        SQL
+
+        @db.last_insert_row_id
+      end
+
+      # Get events for a session.
+      # @param session_id [String] Session ID
+      # @return [Array<Hash>]
+      def get_events(session_id:)
+        rows = @db.execute(<<~SQL, [session_id])
+          SELECT * FROM events WHERE session_id = ? ORDER BY id ASC
+        SQL
+
+        rows.map { |row| parse_event_row(row) }
+      end
+
+      # Get events since a timestamp.
+      # @param timestamp [String] ISO8601 timestamp
+      # @param limit [Integer] Maximum events to return
+      # @return [Array<Hash>]
+      def get_events_since(timestamp, limit: 500)
+        rows = @db.execute(<<~SQL, [timestamp, limit])
+          SELECT * FROM events WHERE timestamp > ? ORDER BY id ASC LIMIT ?
+        SQL
+
+        rows.map { |row| parse_event_row(row) }
+      end
+
+      # Get events between two timestamps.
+      # @param start_time [String] ISO8601 start timestamp
+      # @param end_time [String] ISO8601 end timestamp
+      # @return [Array<Hash>]
+      def get_events_between(start_time, end_time)
+        rows = @db.execute(<<~SQL, [start_time, end_time])
+          SELECT * FROM events WHERE timestamp BETWEEN ? AND ? ORDER BY id ASC
+        SQL
+
+        rows.map { |row| parse_event_row(row) }
+      end
+
+      # Get recent events.
+      # @param count [Integer] Number of events
+      # @return [Array<Hash>]
+      def get_recent_events(count = 50)
+        rows = @db.execute(<<~SQL, [count])
+          SELECT * FROM events ORDER BY id DESC LIMIT ?
+        SQL
+
+        rows.map { |row| parse_event_row(row) }.reverse
+      end
+
+      # Search events by message content.
+      # @param query [String] Search text
+      # @param limit [Integer] Maximum results
+      # @return [Array<Hash>]
+      def search_events(query, limit: 100)
+        rows = @db.execute(<<~SQL, ["%#{query}%", limit])
+          SELECT * FROM events WHERE message LIKE ? ORDER BY id DESC LIMIT ?
+        SQL
+
+        rows.map { |row| parse_event_row(row) }
+      end
+
+      # Get total event count.
+      # @return [Integer]
+      def total_events
+        row = @db.get_first_row("SELECT COUNT(*) as count FROM events")
+        row["count"]
+      end
+
       # --- Export ---
 
       # Export a session to JSON format.
@@ -733,6 +828,21 @@ module PromptObjects
             INSERT INTO messages_fts(messages_fts, rowid, content) VALUES('delete', old.id, old.content);
             INSERT INTO messages_fts(rowid, content) VALUES (new.id, new.content);
           END;
+
+          -- Event log for message bus persistence (v5)
+          CREATE TABLE IF NOT EXISTS events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT,
+            timestamp TEXT NOT NULL,
+            from_name TEXT NOT NULL,
+            to_name TEXT NOT NULL,
+            message TEXT NOT NULL,
+            summary TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id);
+          CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);
         SQL
       end
 
@@ -786,6 +896,25 @@ module PromptObjects
             CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_session_id);
           SQL
         end
+
+        if from_version < 5
+          # Add event log table for message bus persistence
+          @db.execute_batch(<<~SQL)
+            CREATE TABLE IF NOT EXISTS events (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              session_id TEXT,
+              timestamp TEXT NOT NULL,
+              from_name TEXT NOT NULL,
+              to_name TEXT NOT NULL,
+              message TEXT NOT NULL,
+              summary TEXT,
+              created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id);
+            CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);
+          SQL
+        end
       end
 
       def parse_session_row(row, include_count: false)
@@ -807,6 +936,19 @@ module PromptObjects
         }
         result[:message_count] = row["message_count"] if include_count && row["message_count"]
         result
+      end
+
+      def parse_event_row(row)
+        {
+          id: row["id"],
+          session_id: row["session_id"],
+          timestamp: row["timestamp"] ? Time.parse(row["timestamp"]) : nil,
+          from: row["from_name"],
+          to: row["to_name"],
+          message: row["message"],
+          summary: row["summary"],
+          created_at: row["created_at"] ? Time.parse(row["created_at"]) : nil
+        }
       end
 
       def parse_message_row(row)
