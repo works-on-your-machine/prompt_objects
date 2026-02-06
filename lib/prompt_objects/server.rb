@@ -69,6 +69,9 @@ module PromptObjects
         file_watcher.start
       end
 
+      # Write .server file for CLI discovery
+      server_file = write_server_file(env_path, host: host, port: port) if env_path
+
       Async do |task|
         endpoint = Async::HTTP::Endpoint.parse(url)
 
@@ -82,7 +85,58 @@ module PromptObjects
         end
       ensure
         file_watcher&.stop
+        remove_server_file(server_file) if server_file
       end
+    end
+
+    # Write a .server file so CLI clients can discover the running server.
+    # @param env_path [String] Path to the environment directory
+    # @param host [String] Server host
+    # @param port [Integer] Server port
+    # @return [String] Path to the .server file
+    def self.write_server_file(env_path, host:, port:)
+      return nil unless env_path
+
+      server_file = File.join(env_path, ".server")
+      data = {
+        pid: Process.pid,
+        host: host,
+        port: port,
+        started_at: Time.now.iso8601
+      }
+      File.write(server_file, JSON.generate(data))
+      server_file
+    end
+
+    # Remove the .server file on shutdown.
+    # @param path [String] Path to the .server file
+    def self.remove_server_file(path)
+      File.delete(path) if path && File.exist?(path)
+    rescue StandardError
+      # Ignore cleanup errors
+    end
+
+    # Read a .server file to discover a running server.
+    # Returns nil if no server is running or the file is stale.
+    # @param env_path [String] Path to the environment directory
+    # @return [Hash, nil] Server info with :host, :port, :pid
+    def self.read_server_file(env_path)
+      server_file = File.join(env_path, ".server")
+      return nil unless File.exist?(server_file)
+
+      data = JSON.parse(File.read(server_file), symbolize_names: true)
+
+      # Check if the process is still running
+      begin
+        Process.kill(0, data[:pid])
+        data
+      rescue Errno::ESRCH
+        # Process is dead, clean up stale file
+        File.delete(server_file)
+        nil
+      end
+    rescue StandardError
+      nil
     end
 
     # Handle file change events and broadcast to connected clients.

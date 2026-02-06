@@ -28,40 +28,49 @@ module PromptObjects
         def route(request, path)
           method = request.request_method
 
-          case [method, path]
+          case method
+          when "GET"
+            route_get(request, path)
+          when "POST"
+            route_post(request, path)
+          else
+            { error: "Not found", path: path }
+          end
+        end
 
-          # Environment
-          when ["GET", "/environment"]
+        def route_get(_request, path)
+          case path
+          when "/environment"
             get_environment
-
-          # Prompt Objects
-          when ["GET", "/prompt_objects"]
+          when "/prompt_objects"
             list_prompt_objects
-
-          when ["GET", %r{^/prompt_objects/([^/]+)$}]
-            get_prompt_object(path_param(path, 1))
-
-          when ["POST", "/prompt_objects"]
-            create_prompt_object(request.body.read)
-
-          # Sessions
-          when ["GET", %r{^/prompt_objects/([^/]+)/sessions$}]
-            list_sessions(path_param(path, 1))
-
-          when ["GET", %r{^/prompt_objects/([^/]+)/sessions/([^/]+)$}]
-            get_session(path_param(path, 1), path_param(path, 2))
-
-          when ["POST", %r{^/prompt_objects/([^/]+)/sessions$}]
-            create_session(path_param(path, 1), request.body.read)
-
-          # Primitives
-          when ["GET", "/primitives"]
+          when "/primitives"
             list_primitives
-
-          # Message Bus
-          when ["GET", "/bus/recent"]
+          when "/bus/recent"
             get_recent_bus_messages
+          when "/events"
+            get_recent_events(_request)
+          when %r{^/prompt_objects/([^/]+)/sessions/([^/]+)$}
+            get_session($1, $2)
+          when %r{^/prompt_objects/([^/]+)/sessions$}
+            list_sessions($1)
+          when %r{^/prompt_objects/([^/]+)$}
+            get_prompt_object($1)
+          when %r{^/events/session/([^/]+)$}
+            get_session_events($1)
+          else
+            { error: "Not found", path: path }
+          end
+        end
 
+        def route_post(request, path)
+          case path
+          when "/prompt_objects"
+            create_prompt_object(request.body.read)
+          when %r{^/prompt_objects/([^/]+)/message$}
+            send_message($1, request.body.read)
+          when %r{^/prompt_objects/([^/]+)/sessions$}
+            create_session($1, request.body.read)
           else
             { error: "Not found", path: path }
           end
@@ -112,6 +121,61 @@ module PromptObjects
         def create_prompt_object(body)
           # TODO: Implement PO creation via API
           { error: "Not implemented" }
+        end
+
+        # === Messages ===
+
+        def send_message(po_name, body)
+          po = @runtime.registry.get(po_name)
+
+          unless po.is_a?(PromptObject)
+            return { error: "Prompt object not found", name: po_name }
+          end
+
+          params = JSON.parse(body)
+          message = params["message"]
+          session_id = params["session_id"]
+          new_thread = params["new_thread"]
+
+          return { error: "Message is required" } unless message && !message.empty?
+
+          # Create a new thread if requested
+          if new_thread
+            session_id = po.new_thread
+          end
+
+          # Switch to specified session if provided
+          if session_id && session_id != po.session_id
+            po.switch_session(session_id)
+          end
+
+          request_session_id = po.session_id
+
+          # Send the message through the same path as WebSocket
+          context = @runtime.context(tui_mode: false)
+          context.current_capability = "human"
+
+          # Log to bus
+          @runtime.bus.publish(from: "human", to: po.name, message: message, session_id: request_session_id)
+
+          response = po.receive(message, context: context)
+
+          # Log response to bus
+          @runtime.bus.publish(from: po.name, to: "human", message: response, session_id: request_session_id)
+
+          # Count events for this session
+          event_count = if @runtime.session_store
+            @runtime.session_store.get_events(session_id: request_session_id).length
+          end
+
+          {
+            response: response,
+            po_name: po.name,
+            session_id: request_session_id,
+            event_count: event_count
+          }
+        rescue JSON::ParserError
+          { error: "Invalid JSON body" }
         end
 
         # === Sessions ===
@@ -219,6 +283,37 @@ module PromptObjects
           when String then message
           else message.to_s
           end
+        end
+
+        # === Events ===
+
+        def get_recent_events(request)
+          return { error: "No session store" } unless @runtime.session_store
+
+          count = (request.params["count"] || 50).to_i
+          events = @runtime.session_store.get_recent_events(count)
+
+          { events: events.map { |e| format_event(e) } }
+        end
+
+        def get_session_events(session_id)
+          return { error: "No session store" } unless @runtime.session_store
+
+          events = @runtime.session_store.get_events(session_id: session_id)
+
+          { events: events.map { |e| format_event(e) } }
+        end
+
+        def format_event(event)
+          {
+            id: event[:id],
+            session_id: event[:session_id],
+            from: event[:from],
+            to: event[:to],
+            summary: event[:summary],
+            message: event[:message],
+            timestamp: event[:timestamp]&.iso8601
+          }
         end
 
         # === Helpers ===
