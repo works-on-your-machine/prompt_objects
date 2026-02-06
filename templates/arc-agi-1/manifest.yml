@@ -1,0 +1,20 @@
+name: arc-agi-1
+description: ARC-AGI-1 challenge solving environment with grid primitives
+icon: "\U0001F9E9"
+color: "#F59E0B"
+
+objects:
+  - solver
+  - data_manager
+
+primitives:
+  - load_arc_task
+  - render_grid
+  - grid_diff
+  - grid_info
+  - find_objects
+  - grid_transform
+  - test_solution
+  - check_arc_data
+
+default_po: solver

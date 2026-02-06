@@ -365,6 +365,7 @@ module PromptObjects
             developer  - Code review, debugging, testing specialists
             writer     - Editor, researcher for content creation
             empty      - Bootstrap assistant only
+            arc-agi-1  - ARC-AGI-1 challenge solving with grid primitives
         HELP
       end
     end
