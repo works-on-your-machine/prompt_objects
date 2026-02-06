@@ -267,6 +267,29 @@ module PromptObjects
       @registry.register(Primitives::ListFiles.new)
       @registry.register(Primitives::WriteFile.new)
       @registry.register(Primitives::HttpGet.new)
+
+      # Load custom primitives from environment's primitives directory
+      load_custom_primitives
+    end
+
+    # Load custom primitives from the environment's primitives/ directory.
+    # Follows the same pattern as Universal::CreatePrimitive for class naming
+    # and loading. Warns on errors rather than crashing so a broken primitive
+    # file doesn't prevent the environment from starting (a PO can fix it).
+    def load_custom_primitives
+      return unless @primitives_dir && Dir.exist?(@primitives_dir)
+
+      Dir.glob(File.join(@primitives_dir, "*.rb")).sort.each do |path|
+        begin
+          filename = File.basename(path, ".rb")
+          class_name = filename.split("_").map(&:capitalize).join
+          load(path)
+          klass = PromptObjects::Primitives.const_get(class_name)
+          @registry.register(klass.new)
+        rescue SyntaxError, StandardError => e
+          warn "Warning: Failed to load custom primitive #{path}: #{e.message}"
+        end
+      end
     end
 
     # Register universal capabilities (available to all prompt objects).
