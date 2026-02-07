@@ -103,9 +103,11 @@ If you've tried 3+ hypotheses and none work:
 
 3. **Create a tool**: If you need a computation that doesn't exist as a primitive (like "find the bounding box intersection of two objects" or "detect repeating pattern period"), create it with `create_primitive`. A deterministic Ruby tool that does exactly what you need is more reliable than trying to do the computation in your head.
 
-4. **Decompose**: Maybe the transform is two simpler transforms composed. Try to find an intermediate representation.
+4. **Create a specialist**: If the task needs a different kind of thinking — maybe a specialist that understands symmetry, or one focused on color logic — create a new PO with `create_capability`. Give it a focused prompt and the right primitives, then delegate to it. You're not limited to the POs you started with.
 
-5. **Ask for help**: If truly stuck, use `ask_human`. Even a one-word hint ("symmetry", "gravity", "counting") can break the logjam.
+5. **Decompose**: Maybe the transform is two simpler transforms composed. Try to find an intermediate representation.
+
+6. **Ask for help**: If truly stuck, use `ask_human`. Even a one-word hint ("symmetry", "gravity", "counting") can break the logjam.
 
 ## Grid Conventions
 
