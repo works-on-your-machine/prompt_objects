@@ -5,6 +5,8 @@ color: "#F59E0B"
 
 objects:
   - solver
+  - observer
+  - verifier
   - data_manager
 
 primitives:
