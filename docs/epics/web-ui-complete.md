@@ -5,6 +5,30 @@
 **Depends on**: [web-server-infrastructure.md](web-server-infrastructure.md) (Complete)
 **Design doc**: [web-server-design.md](../web-server-design.md)
 
+## Implementation Status
+
+### Done
+- Dashboard with PO cards grid (status indicators, session counts)
+- PO detail view with chat tab
+- Chat with markdown rendering, syntax highlighting, streaming
+- Split view layout (dashboard sidebar while chatting)
+- Collapsible message bus sidebar (shows summary, sends both summary and full content)
+- Threads/sessions sidebar for session management
+- LLM provider switching
+- Prompt editing (inline, persisted to file)
+- Real-time tool call chain display
+- Capabilities panel showing declared + universal capabilities with parameters
+- Notification system for ask_human requests
+
+### Remaining
+- Capabilities tab (dedicated view for capability inspection)
+- Edit tab (Monaco editor for full PO markdown editing)
+- Sessions tab (full session management beyond the threads sidebar)
+- Event history panel (browse persistent events from SQLite, search across events)
+- Full message inspection (click to expand in bus panel)
+
+---
+
 ## Overview
 
 Build the complete web UI: dashboard with PO cards, detail view with tabs, message bus sidebar, and notifications. This epic brings the web interface to feature parity with core TUI workflows.

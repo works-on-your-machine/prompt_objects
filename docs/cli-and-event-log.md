@@ -68,6 +68,10 @@ The fix: store full messages, truncate only at display time. The persistent even
 
 ---
 
+**Status**: Phases 1-4 are complete (commits 79010dd through 1069d63). Phase 5 (Embedded MCP) and Phase 6 (Web UI History) are remaining.
+
+---
+
 ## Implementation Steps
 
 ### Phase 1: Message Bus — Store Full, Display Truncated
@@ -238,13 +242,13 @@ This phase is lower priority — the CLI covers the Claude Code use case, and MC
 
 ## Summary
 
-| Phase | What | Enables |
-|-------|------|---------|
-| 1 | Full messages in bus | Inspecting tool arguments and results |
-| 2 | Persistent event log | Historical replay, cross-session tracing |
-| 3 | REST message endpoint | CLI and external clients |
-| 4 | CLI `message` command | Claude Code interaction, scripting, CI |
-| 5 | Embedded MCP | Single-process MCP for Claude Desktop |
-| 6 | Web UI history | Browse past runs, search events, compare attempts |
+| Phase | What | Enables | Status |
+|-------|------|---------|--------|
+| 1 | Full messages in bus | Inspecting tool arguments and results | ✅ Done |
+| 2 | Persistent event log | Historical replay, cross-session tracing | ✅ Done |
+| 3 | REST message endpoint | CLI and external clients | ✅ Done |
+| 4 | CLI `message` command | Claude Code interaction, scripting, CI | ✅ Done |
+| 5 | Embedded MCP | Single-process MCP for Claude Desktop | Not started |
+| 6 | Web UI history | Browse past runs, search events, compare attempts | Not started |
 
-Phases 1-4 are the critical path. Phase 5 is nice-to-have. Phase 6 is ongoing polish.
+Phases 1-4 are complete. Phase 5 (Embedded MCP) and Phase 6 (Web UI History) are remaining — Phase 5 is nice-to-have, Phase 6 is ongoing polish.

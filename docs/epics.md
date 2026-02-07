@@ -46,7 +46,7 @@ Model Context Protocol for external clients.
 - Stdio transport
 - Tools: list_prompt_objects, send_message, get_conversation
 - Resources: po://, bus://
-- See: [epics/mcp-tools.md](epics/mcp-tools.md)
+- See: [archive/completed/mcp-tools.md](archive/completed/mcp-tools.md)
 
 ### Environments
 Smalltalk-like "images" - isolated, versioned runtime environments.
@@ -56,7 +56,7 @@ Smalltalk-like "images" - isolated, versioned runtime environments.
 - Export/import bundles (.poenv)
 - Archive + rich metadata
 - Dev mode (--dev flag)
-- See: [epics/environments.md](epics/environments.md)
+- See: [archive/completed/environments.md](archive/completed/environments.md)
 
 ### Sessions
 Multiple named conversation sessions per PO.
@@ -64,7 +64,7 @@ Multiple named conversation sessions per PO.
 - Create, rename, delete sessions
 - Session switching
 - Session name in panel title
-- See: [epics/sessions.md](epics/sessions.md)
+- See: [archive/completed/sessions.md](archive/completed/sessions.md)
 
 ### Primitive Management
 Enable POs to create and request their own primitives.
@@ -74,7 +74,7 @@ Enable POs to create and request their own primitives.
 - `verify_primitive`: Test primitives with sample inputs
 - `modify_primitive`: Update existing primitive code
 - `request_primitive`: Ask human to create/approve primitives
-- See: [epics/primitive-management.md](epics/primitive-management.md)
+- See: [archive/completed/primitive-management.md](archive/completed/primitive-management.md)
 
 ### Session Management (Enhanced)
 Environment-wide session exploration beyond per-PO picker.
@@ -83,7 +83,7 @@ Environment-wide session exploration beyond per-PO picker.
 - Full-text search across sessions (SQLite FTS5)
 - Export/import sessions (JSON, Markdown)
 - Session commands (/sessions, /session new|rename|switch|export|info)
-- See: [epics/session-management.md](epics/session-management.md)
+- See: [archive/completed/session-management.md](archive/completed/session-management.md)
 
 ### Charm Native Integration (FFI Stability Fix)
 Fixed FFI crashes by using charm-native as single Go runtime for all Charm gems.
@@ -94,34 +94,52 @@ Fixed FFI crashes by using charm-native as single Go runtime for all Charm gems.
 - All Charm functionality works with single Go runtime - no more crashes
 - See: [archive/tui-epics/charm-forks.md](archive/tui-epics/charm-forks.md) (archived)
 
----
-
-## In Progress
-
-*Nothing currently in progress. Web server implementation ready to start.*
-
----
-
-## Ready
-
-### Web Server Infrastructure (NEW)
+### Web Server Infrastructure
 Falcon-based web server and React frontend foundation.
 - Falcon server with WebSocket support
 - WebSocketHandler integrated with MessageBus
 - React + Zustand + Vite frontend
 - End-to-end streaming: message → LLM → WebSocket → UI
-- See: [epics/web-server-infrastructure.md](epics/web-server-infrastructure.md)
+- See: [archive/completed/web-server-infrastructure.md](archive/completed/web-server-infrastructure.md)
 - Design doc: [web-server-design.md](web-server-design.md)
 
-### Web UI Complete (NEW)
-Full web interface with dashboard, detail views, and all features.
-- Dashboard with PO cards (status, notifications, sessions)
-- PO detail view with tabs (Chat, Sessions, Capabilities, Edit)
-- Collapsible message bus sidebar
-- Notifications (global + per-PO)
+### Custom Primitive Auto-Loading
+Primitives placed in env/primitives/ now load automatically on startup.
+- Fixed bug where custom primitives were not being discovered
+- Primitives register in the capability registry at boot
+
+### CLI Interface & Persistent Event Log (Phases 1-4)
+HTTP-hub CLI and full-fidelity event persistence.
+- Message bus stores full messages (truncate only at display time)
+- Persistent SQLite event log for all message bus activity
+- REST message endpoint for CLI and scripting
+- CLI `message` and `events` commands
+- Server discovery via .server file
+- See: [cli-and-event-log.md](cli-and-event-log.md)
+
+### ARC-AGI-1 Template
+Environment template for ARC-AGI puzzle solving.
+- Solver and data_manager Prompt Objects
+- 8 grid manipulation primitives
+- Template available via environment wizard
+
+---
+
+## In Progress
+
+*Nothing currently in progress.*
+
+---
+
+## Ready
+
+### Web UI Complete
+Full web interface — dashboard, chat, and real-time panels are shipped; remaining tabs and event history still to build.
+- **Done**: Dashboard with PO cards, chat interface, threads sidebar, message bus panel, split view
+- **Remaining**: Capabilities tab, Edit tab (Monaco editor), Sessions tab (full view), event history/search in bus panel
 - See: [epics/web-ui-complete.md](epics/web-ui-complete.md)
 
-### Web Distribution (NEW)
+### Web Distribution
 CLI integration and gem packaging for the web interface.
 - `prompt_objects serve` command
 - Frontend assets bundled with gem
@@ -136,6 +154,12 @@ Shared data space for loose-coupled PO coordination.
 - POs react to data, not direct messages
 - Foundation for external integrations (email, webhooks, cron)
 - See: [epics/environment-data.md](epics/environment-data.md)
+
+### CLI & Event Log Phases 5-6
+Remaining phases from the CLI & Event Log epic.
+- Phase 5: Embedded MCP — run MCP server inside the web server process
+- Phase 6: Web UI event history — event log viewer, search, and filtering in the web interface
+- See: [cli-and-event-log.md](cli-and-event-log.md)
 
 ---
 
@@ -201,22 +225,26 @@ Speech interaction.
 
 | Epic | File | Status |
 |------|------|--------|
-| **Web Server Infrastructure** | [epics/web-server-infrastructure.md](epics/web-server-infrastructure.md) | Ready |
-| **Web UI Complete** | [epics/web-ui-complete.md](epics/web-ui-complete.md) | Backlog |
-| **Web Distribution** | [epics/web-distribution.md](epics/web-distribution.md) | Backlog |
+| **Web UI Complete** | [epics/web-ui-complete.md](epics/web-ui-complete.md) | Ready |
+| **Web Distribution** | [epics/web-distribution.md](epics/web-distribution.md) | Ready |
 | Environment Data (Stigmergy) | [epics/environment-data.md](epics/environment-data.md) | Ready |
-| Connectors | [epics/connectors.md](epics/connectors.md) | Partially superseded by web |
+| CLI & Event Log Phases 5-6 | [cli-and-event-log.md](cli-and-event-log.md) | Ready |
+| Connectors | [epics/connectors.md](epics/connectors.md) | Partially superseded by web server + CLI |
 
 ### Completed Epics
 
 | Epic | File | Status |
 |------|------|--------|
-| Environments | [epics/environments.md](epics/environments.md) | Done |
-| Sessions | [epics/sessions.md](epics/sessions.md) | Done |
-| MCP Server | [epics/mcp-server.md](epics/mcp-server.md) | Done |
-| MCP Tools Reference | [epics/mcp-tools.md](epics/mcp-tools.md) | Done |
-| Primitive Management | [epics/primitive-management.md](epics/primitive-management.md) | Done |
-| Session Management | [epics/session-management.md](epics/session-management.md) | Done |
+| Web Server Infrastructure | [archive/completed/web-server-infrastructure.md](archive/completed/web-server-infrastructure.md) | Done |
+| CLI & Event Log (Phases 1-4) | [cli-and-event-log.md](cli-and-event-log.md) | Done |
+| ARC-AGI-1 Template | — | Done |
+| Custom Primitive Auto-Loading | — | Done |
+| Environments | [archive/completed/environments.md](archive/completed/environments.md) | Done |
+| Sessions | [archive/completed/sessions.md](archive/completed/sessions.md) | Done |
+| MCP Server | [archive/completed/mcp-server.md](archive/completed/mcp-server.md) | Done |
+| MCP Tools Reference | [archive/completed/mcp-tools.md](archive/completed/mcp-tools.md) | Done |
+| Primitive Management | [archive/completed/primitive-management.md](archive/completed/primitive-management.md) | Done |
+| Session Management | [archive/completed/session-management.md](archive/completed/session-management.md) | Done |
 
 ### Archived (TUI-specific)
 
