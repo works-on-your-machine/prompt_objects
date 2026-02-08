@@ -7,6 +7,7 @@ require "open3"
 class CliMessageTest < PromptObjectsTest
   def setup
     super
+    skip "CLI integration tests require an LLM API key" unless llm_available?
     @env_dir = track_temp_dir(create_temp_env(name: "cli_test"))
     create_test_po_file(@env_dir, name: "solver", capabilities: ["read_file"])
   end
@@ -83,6 +84,10 @@ class CliMessageTest < PromptObjectsTest
   end
 
   private
+
+  def llm_available?
+    [ENV["ANTHROPIC_API_KEY"], ENV["OPENAI_API_KEY"], ENV["GEMINI_API_KEY"]].any? { |k| k && !k.empty? }
+  end
 
   def run_cli(*args)
     exe = File.expand_path("../../exe/prompt_objects", __dir__)
