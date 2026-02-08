@@ -67,7 +67,8 @@ export interface PromptObject {
 export interface BusMessage {
   from: string
   to: string
-  content: string
+  content: string | Record<string, unknown>
+  summary?: string
   timestamp: string
 }
 

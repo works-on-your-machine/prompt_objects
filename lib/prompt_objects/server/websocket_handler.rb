@@ -651,21 +651,29 @@ module PromptObjects
       def message_to_hash(msg)
         case msg[:role]
         when :user
-          { role: "user", content: msg[:content], from: msg[:from] }
+          # In-memory messages use :from, SQLite-loaded messages use :from_po
+          from = msg[:from] || msg[:from_po]
+          { role: "user", content: msg[:content], from: from }
         when :assistant
           hash = { role: "assistant", content: msg[:content] }
           if msg[:tool_calls]
             hash[:tool_calls] = msg[:tool_calls].map do |tc|
-              # Handle both ToolCall objects and Hashes
-              tc_id = tc.respond_to?(:id) ? tc.id : (tc[:id] || tc["id"])
-              tc_name = tc.respond_to?(:name) ? tc.name : (tc[:name] || tc["name"])
-              tc_args = tc.respond_to?(:arguments) ? tc.arguments : (tc[:arguments] || tc["arguments"] || {})
-              { id: tc_id, name: tc_name, arguments: tc_args }
+              # Handle both ToolCall objects and Hashes (from DB with symbol or string keys)
+              if tc.is_a?(LLM::ToolCall)
+                { id: tc.id, name: tc.name, arguments: tc.arguments }
+              else
+                tc_id = tc[:id] || tc["id"]
+                tc_name = tc[:name] || tc["name"]
+                tc_args = tc[:arguments] || tc["arguments"] || {}
+                { id: tc_id, name: tc_name, arguments: tc_args }
+              end
             end
           end
           hash
         when :tool
-          { role: "tool", results: msg[:results] }
+          # In-memory messages use :results, SQLite-loaded messages use :tool_results
+          results = msg[:results] || msg[:tool_results]
+          { role: "tool", results: results }
         else
           { role: msg[:role].to_s, content: msg[:content] }
         end

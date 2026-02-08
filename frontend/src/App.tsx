@@ -81,7 +81,7 @@ export default function App() {
 
         {/* Message Bus sidebar */}
         {busOpen && (
-          <aside className="w-80 border-l border-po-border bg-po-surface overflow-hidden">
+          <aside className="w-80 flex-shrink-0 border-l border-po-border bg-po-surface overflow-hidden">
             <MessageBus />
           </aside>
         )}

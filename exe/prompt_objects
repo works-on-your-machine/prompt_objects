@@ -480,6 +480,9 @@ def run_serve(args)
   elsif options[:web]
     require "prompt_objects/server"
 
+    # Rebuild frontend to ensure built assets match source
+    rebuild_frontend
+
     # Open browser if requested
     if options[:open]
       url = "http://#{options[:host]}:#{options[:port]}"
@@ -492,6 +495,31 @@ def run_serve(args)
       port: options[:port],
       env_path: env_path
     )
+  end
+end
+
+def rebuild_frontend
+  # Find the frontend directory relative to this executable
+  gem_root = File.expand_path("../..", __FILE__)
+  frontend_dir = File.join(gem_root, "frontend")
+
+  unless Dir.exist?(frontend_dir)
+    # No frontend source (e.g., installed as gem without source) — skip
+    return
+  end
+
+  node_modules = File.join(frontend_dir, "node_modules")
+  unless Dir.exist?(node_modules)
+    puts "Frontend dependencies not installed. Run: cd frontend && npm install"
+    return
+  end
+
+  print "Building frontend... "
+  result = system("npm run build --prefix #{frontend_dir}", out: File::NULL, err: File::NULL)
+  if result
+    puts "done"
+  else
+    puts "failed (serving stale assets)"
   end
 end
 

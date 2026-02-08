@@ -41,9 +41,10 @@ export function MessageBus() {
                 </span>
               </div>
               <div className="text-gray-300 break-words">
-                {msg.content.length > 200
-                  ? msg.content.slice(0, 200) + '...'
-                  : msg.content}
+                {(() => {
+                  const text = msg.summary || (typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content))
+                  return text.length > 200 ? text.slice(0, 200) + '...' : text
+                })()}
               </div>
             </div>
           ))
