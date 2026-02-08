@@ -220,14 +220,14 @@ export function useWebSocket() {
         }
 
         case 'thread_export': {
-          const { content, format } = message.payload as { content: string; format: string }
+          const { content, format, session_id } = message.payload as { content: string; format: string; session_id: string }
           const mimeType = format === 'json' ? 'application/json' : 'text/markdown'
           const ext = format === 'json' ? 'json' : 'md'
           const blob = new Blob([content], { type: mimeType })
           const url = URL.createObjectURL(blob)
           const a = document.createElement('a')
           a.href = url
-          a.download = `thread-export.${ext}`
+          a.download = `${session_id}.${ext}`
           a.click()
           URL.revokeObjectURL(url)
           break
