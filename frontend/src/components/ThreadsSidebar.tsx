@@ -7,6 +7,7 @@ interface ThreadsSidebarProps {
   switchSession: (target: string, sessionId: string) => void
   createThread: (target: string) => void
   requestUsage?: (sessionId: string, includeTree?: boolean) => void
+  exportThread?: (sessionId: string, format?: string) => void
 }
 
 // Build a flat list with depth info
@@ -61,7 +62,7 @@ function ThreadTypeIcon({ type }: { type: ThreadType }) {
   }
 }
 
-export function ThreadsSidebar({ po, switchSession, createThread, requestUsage }: ThreadsSidebarProps) {
+export function ThreadsSidebar({ po, switchSession, createThread, requestUsage, exportThread }: ThreadsSidebarProps) {
   const sessions = po.sessions || []
   const currentSessionId = po.current_session?.id
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; sessionId: string } | null>(null)
@@ -124,22 +125,36 @@ export function ThreadsSidebar({ po, switchSession, createThread, requestUsage }
         )}
       </div>
 
-      {contextMenu && requestUsage && (
+      {contextMenu && (
         <ContextMenu
           x={contextMenu.x}
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
           items={[
-            {
-              label: 'View Usage',
-              icon: '📊',
-              onClick: () => requestUsage(contextMenu.sessionId),
-            },
-            {
-              label: 'View Tree Usage',
-              icon: '🌳',
-              onClick: () => requestUsage(contextMenu.sessionId, true),
-            },
+            ...(requestUsage ? [
+              {
+                label: 'View Usage',
+                icon: '📊',
+                onClick: () => requestUsage(contextMenu.sessionId),
+              },
+              {
+                label: 'View Tree Usage',
+                icon: '🌳',
+                onClick: () => requestUsage(contextMenu.sessionId, true),
+              },
+            ] : []),
+            ...(exportThread ? [
+              {
+                label: 'Export as Markdown',
+                icon: '📄',
+                onClick: () => exportThread(contextMenu.sessionId, 'markdown'),
+              },
+              {
+                label: 'Export as JSON',
+                icon: '📋',
+                onClick: () => exportThread(contextMenu.sessionId, 'json'),
+              },
+            ] : []),
           ]}
         />
       )}

@@ -10,7 +10,7 @@ import { ThreadsSidebar } from './components/ThreadsSidebar'
 import { UsagePanel } from './components/UsagePanel'
 
 export default function App() {
-  const { sendMessage, respondToNotification, createSession, switchSession, switchLLM, createThread, updatePrompt, requestUsage } =
+  const { sendMessage, respondToNotification, createSession, switchSession, switchLLM, createThread, updatePrompt, requestUsage, exportThread } =
     useWebSocket()
   const { selectedPO, busOpen, notifications, usageData, clearUsageData } = useStore()
   const selectedPOData = useSelectedPO()
@@ -49,6 +49,7 @@ export default function App() {
                   switchSession={switchSession}
                   createThread={createThread}
                   requestUsage={requestUsage}
+                  exportThread={exportThread}
                 />
               </aside>
             )}

@@ -60,6 +60,8 @@ module PromptObjects
             get_session_events($1)
           when %r{^/sessions/([^/]+)/usage$}
             get_session_usage($1, _request)
+          when %r{^/sessions/([^/]+)/export$}
+            export_thread($1, _request)
           else
             { error: "Not found", path: path }
           end
@@ -344,6 +346,27 @@ module PromptObjects
             calls: usage[:calls],
             by_model: by_model
           }
+        end
+
+        # === Export ===
+
+        def export_thread(session_id, request)
+          return { error: "No session store" } unless @runtime.session_store
+
+          format = request.params["format"] || "markdown"
+
+          case format
+          when "markdown"
+            content = @runtime.session_store.export_thread_tree_markdown(session_id)
+            return { error: "Session not found" } unless content
+            { format: "markdown", content: content }
+          when "json"
+            data = @runtime.session_store.export_thread_tree_json(session_id)
+            return { error: "Session not found" } unless data
+            data
+          else
+            { error: "Unknown format: #{format}" }
+          end
         end
 
         # === Helpers ===

@@ -219,6 +219,20 @@ export function useWebSocket() {
           break
         }
 
+        case 'thread_export': {
+          const { content, format } = message.payload as { content: string; format: string }
+          const mimeType = format === 'json' ? 'application/json' : 'text/markdown'
+          const ext = format === 'json' ? 'json' : 'md'
+          const blob = new Blob([content], { type: mimeType })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `thread-export.${ext}`
+          a.click()
+          URL.revokeObjectURL(url)
+          break
+        }
+
         case 'error': {
           const { message: errorMsg } = message.payload as { message: string }
           console.error('Server error:', errorMsg)
@@ -374,6 +388,21 @@ export function useWebSocket() {
     )
   }, [])
 
+  // Export a thread as markdown or JSON
+  const exportThread = useCallback((sessionId: string, format?: string) => {
+    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket not connected')
+      return
+    }
+
+    ws.current.send(
+      JSON.stringify({
+        type: 'export_thread',
+        payload: { session_id: sessionId, format: format || 'markdown' },
+      })
+    )
+  }, [])
+
   // Update a PO's prompt (markdown body)
   const updatePrompt = useCallback((target: string, prompt: string) => {
     if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
@@ -398,5 +427,6 @@ export function useWebSocket() {
     createThread,
     updatePrompt,
     requestUsage,
+    exportThread,
   }
 }

@@ -225,6 +225,8 @@ module PromptObjects
           handle_update_prompt(message["payload"])
         when "get_session_usage"
           handle_get_session_usage(message["payload"])
+        when "export_thread"
+          handle_export_thread(message["payload"])
         when "ping"
           send_message(type: "pong", payload: {})
         else
@@ -594,6 +596,32 @@ module PromptObjects
             estimated_cost_usd: usage[:estimated_cost_usd].round(6),
             calls: usage[:calls],
             by_model: by_model
+          }
+        )
+      end
+
+      def handle_export_thread(payload)
+        session_id = payload["session_id"]
+        format = payload["format"] || "markdown"
+        return send_error("Session ID required") unless session_id
+        return send_error("No session store available") unless @runtime.session_store
+
+        content = case format
+                  when "markdown"
+                    @runtime.session_store.export_thread_tree_markdown(session_id)
+                  when "json"
+                    data = @runtime.session_store.export_thread_tree_json(session_id)
+                    data ? JSON.pretty_generate(data) : nil
+                  end
+
+        return send_error("Session not found") unless content
+
+        send_message(
+          type: "thread_export",
+          payload: {
+            session_id: session_id,
+            format: format,
+            content: content
           }
         )
       end

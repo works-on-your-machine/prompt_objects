@@ -734,6 +734,38 @@ module PromptObjects
         end
       end
 
+      # Export a full thread tree as a single markdown document.
+      # Follows all delegation sub-threads recursively.
+      # @param session_id [String] Root session ID
+      # @return [String, nil] Markdown content
+      def export_thread_tree_markdown(session_id)
+        tree = get_thread_tree(session_id)
+        return nil unless tree
+
+        lines = []
+        lines << "# Thread Export"
+        lines << ""
+        lines << "- **Root PO**: #{tree[:session][:po_name]}"
+        lines << "- **Started**: #{tree[:session][:created_at]&.strftime('%Y-%m-%d %H:%M')}"
+        lines << "- **Exported**: #{Time.now.strftime('%Y-%m-%d %H:%M')}"
+        lines << ""
+        lines << "---"
+        lines << ""
+
+        render_thread_node(tree, lines, depth: 0)
+        lines.join("\n")
+      end
+
+      # Export a full thread tree as structured JSON.
+      # @param session_id [String] Root session ID
+      # @return [Hash, nil] Tree data
+      def export_thread_tree_json(session_id)
+        tree = get_thread_tree(session_id)
+        return nil unless tree
+
+        serialize_tree_for_export(tree)
+      end
+
       # --- Import ---
 
       # Import a session from JSON data.
@@ -773,6 +805,105 @@ module PromptObjects
       end
 
       private
+
+      def render_thread_node(node, lines, depth:)
+        session = node[:session]
+        messages = get_messages(session[:id])
+        indent = "  " * depth
+        po_name = session[:po_name]
+
+        # Thread header
+        if depth == 0
+          lines << "## #{po_name}"
+        else
+          type_label = session[:thread_type] == "delegation" ? "Delegation" : (session[:thread_type] || "thread").capitalize
+          lines << ""
+          lines << "#{indent}### #{type_label} → #{po_name}"
+          lines << "#{indent}*Created by #{session[:parent_po]}*" if session[:parent_po]
+        end
+        lines << ""
+
+        # Messages
+        messages.each do |msg|
+          case msg[:role]
+          when :user
+            from = msg[:from_po] || "human"
+            lines << "#{indent}**#{from}:**"
+            lines << ""
+            lines << "#{indent}#{msg[:content]}" if msg[:content]
+            lines << ""
+          when :assistant
+            lines << "#{indent}**#{po_name}:**"
+            lines << ""
+            if msg[:content]
+              msg[:content].each_line { |l| lines << "#{indent}#{l.rstrip}" }
+              lines << ""
+            end
+            if msg[:tool_calls]
+              msg[:tool_calls].each do |tc|
+                tc_name = tc[:name] || tc["name"]
+                tc_args = tc[:arguments] || tc["arguments"] || {}
+                lines << "#{indent}<details>"
+                lines << "#{indent}<summary>Tool call: <code>#{tc_name}</code></summary>"
+                lines << ""
+                lines << "#{indent}```json"
+                JSON.pretty_generate(tc_args).each_line { |l| lines << "#{indent}#{l.rstrip}" }
+                lines << "#{indent}```"
+                lines << "#{indent}</details>"
+                lines << ""
+              end
+            end
+          when :tool
+            results = msg[:tool_results] || msg[:results] || []
+            results.each do |r|
+              r_name = r[:name] || r["name"] || "tool"
+              r_content = r[:content] || r["content"] || ""
+              lines << "#{indent}<details>"
+              lines << "#{indent}<summary>Result from <code>#{r_name}</code></summary>"
+              lines << ""
+              lines << "#{indent}```"
+              display = r_content.to_s.length > 2000 ? r_content.to_s[0, 2000] + "\n... (truncated)" : r_content.to_s
+              display.each_line { |l| lines << "#{indent}#{l.rstrip}" }
+              lines << "#{indent}```"
+              lines << "#{indent}</details>"
+              lines << ""
+            end
+          end
+        end
+
+        # Recurse into children
+        (node[:children] || []).each do |child|
+          render_thread_node(child, lines, depth: depth + 1)
+        end
+      end
+
+      def serialize_tree_for_export(node)
+        session = node[:session]
+        messages = get_messages(session[:id])
+
+        {
+          session: {
+            id: session[:id],
+            po_name: session[:po_name],
+            name: session[:name],
+            thread_type: session[:thread_type],
+            parent_po: session[:parent_po],
+            created_at: session[:created_at]&.iso8601
+          },
+          messages: messages.map { |m|
+            {
+              role: m[:role].to_s,
+              content: m[:content],
+              from_po: m[:from_po],
+              tool_calls: m[:tool_calls],
+              tool_results: m[:tool_results],
+              usage: m[:usage],
+              created_at: m[:created_at]&.iso8601
+            }
+          },
+          children: (node[:children] || []).map { |c| serialize_tree_for_export(c) }
+        }
+      end
 
       def setup_schema
         # Check if we need to create/migrate
