@@ -119,13 +119,138 @@ class SessionExportTest < PromptObjectsTest
     assert_includes md, "*Created by worker*"
   end
 
+  def test_export_delegation_with_child_tool_calls
+    # Scenario: solver calls reader, reader does 2 internal tool calls, responds
+    parent_id = @store.create_session(po_name: "solver", name: "Root")
+    @store.add_message(session_id: parent_id, role: :user, content: "Read and summarize /tmp/data.csv")
+    @store.add_message(
+      session_id: parent_id,
+      role: :assistant,
+      content: nil,
+      tool_calls: [{ id: "call_1", name: "reader", arguments: { message: "Read /tmp/data.csv" } }]
+    )
+
+    # Reader's delegation thread with its OWN tool loop
+    child_id = @store.create_session(
+      po_name: "reader",
+      name: "Delegation",
+      parent_session_id: parent_id,
+      parent_po: "solver",
+      thread_type: "delegation"
+    )
+    @store.add_message(session_id: child_id, role: :user, content: "Read /tmp/data.csv", from_po: "solver")
+    # Reader calls read_file
+    @store.add_message(
+      session_id: child_id,
+      role: :assistant,
+      content: nil,
+      tool_calls: [{ id: "child_call_1", name: "read_file", arguments: { path: "/tmp/data.csv" } }]
+    )
+    @store.add_message(
+      session_id: child_id,
+      role: :tool,
+      tool_results: [{ tool_call_id: "child_call_1", name: "read_file", content: "name,value\nalpha,42\nbeta,17" }]
+    )
+    # Reader calls list_files
+    @store.add_message(
+      session_id: child_id,
+      role: :assistant,
+      content: nil,
+      tool_calls: [{ id: "child_call_2", name: "list_files", arguments: { path: "/tmp" } }]
+    )
+    @store.add_message(
+      session_id: child_id,
+      role: :tool,
+      tool_results: [{ tool_call_id: "child_call_2", name: "list_files", content: "data.csv\nother.txt" }]
+    )
+    # Reader's final response
+    @store.add_message(session_id: child_id, role: :assistant, content: "The CSV has 2 rows: alpha=42, beta=17")
+
+    # Back in solver
+    @store.add_message(
+      session_id: parent_id,
+      role: :tool,
+      tool_results: [{ tool_call_id: "call_1", name: "reader", content: "The CSV has 2 rows: alpha=42, beta=17" }]
+    )
+    @store.add_message(session_id: parent_id, role: :assistant, content: "Summary: the data has 2 entries")
+
+    md = @store.export_thread_tree_markdown(parent_id)
+
+    # Parent section should exist
+    assert_includes md, "## solver"
+    assert_includes md, "Read and summarize /tmp/data.csv"
+    assert_includes md, "Summary: the data has 2 entries"
+
+    # Child section should exist WITH its tool calls
+    assert_includes md, "### Delegation → reader"
+    assert_includes md, "*Created by solver*"
+    # Reader's internal tool calls should be visible
+    assert_includes md, "Tool call: <code>read_file</code>"
+    assert_includes md, "/tmp/data.csv"
+    assert_includes md, "Result from <code>read_file</code>"
+    assert_includes md, "name,value"
+    assert_includes md, "Tool call: <code>list_files</code>"
+    assert_includes md, "Result from <code>list_files</code>"
+    assert_includes md, "data.csv"
+    # Reader's final response
+    assert_includes md, "alpha=42, beta=17"
+  end
+
+  def test_export_delegation_renders_inline_after_tool_call
+    # The delegation sub-thread should appear right after the tool call,
+    # NOT at the bottom after all parent messages
+    parent_id = @store.create_session(po_name: "solver", name: "Root")
+    @store.add_message(session_id: parent_id, role: :user, content: "Do work")
+    @store.add_message(
+      session_id: parent_id,
+      role: :assistant,
+      content: nil,
+      tool_calls: [{ id: "call_1", name: "helper", arguments: { message: "Help me" } }]
+    )
+
+    child_id = @store.create_session(
+      po_name: "helper",
+      name: "Delegation",
+      parent_session_id: parent_id,
+      parent_po: "solver",
+      thread_type: "delegation"
+    )
+    @store.add_message(session_id: child_id, role: :user, content: "Help me", from_po: "solver")
+    @store.add_message(session_id: child_id, role: :assistant, content: "Helped!")
+
+    @store.add_message(
+      session_id: parent_id,
+      role: :tool,
+      tool_results: [{ tool_call_id: "call_1", name: "helper", content: "Helped!" }]
+    )
+    @store.add_message(session_id: parent_id, role: :assistant, content: "All done")
+
+    md = @store.export_thread_tree_markdown(parent_id)
+
+    # The delegation section should appear BETWEEN the tool call and the tool result
+    tool_call_pos = md.index("Tool call: <code>helper</code>")
+    delegation_pos = md.index("Delegation → helper")
+    result_pos = md.index("Result from <code>helper</code>")
+    final_pos = md.index("All done")
+
+    assert tool_call_pos, "Tool call should be in export"
+    assert delegation_pos, "Delegation section should be in export"
+    assert result_pos, "Tool result should be in export"
+    assert final_pos, "Final response should be in export"
+
+    # Delegation should come after tool call but before tool result
+    assert tool_call_pos < delegation_pos, "Delegation should come after the tool call"
+    assert delegation_pos < result_pos, "Delegation should come before the tool result"
+    assert result_pos < final_pos, "Tool result should come before final response"
+  end
+
   def test_export_nonexistent_session
     assert_nil @store.export_thread_tree_markdown("nonexistent")
   end
 
   def test_export_truncates_long_results
     id = @store.create_session(po_name: "test", name: "Long")
-    long_content = "x" * 3000
+    long_content = "x" * 15_000
     @store.add_message(
       session_id: id,
       role: :tool,
@@ -135,8 +260,8 @@ class SessionExportTest < PromptObjectsTest
     md = @store.export_thread_tree_markdown(id)
 
     assert_includes md, "... (truncated)"
-    # Should have 2000 chars of content, not 3000
-    refute_includes md, "x" * 2500
+    # Should have 10000 chars of content, not 15000
+    refute_includes md, "x" * 12_000
   end
 
   # --- JSON tree export ---

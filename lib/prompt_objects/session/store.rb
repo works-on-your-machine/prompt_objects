@@ -806,11 +806,28 @@ module PromptObjects
 
       private
 
+      TOOL_RESULT_TRUNCATE_LIMIT = 10_000
+
       def render_thread_node(node, lines, depth:)
         session = node[:session]
         messages = get_messages(session[:id])
         indent = "  " * depth
         po_name = session[:po_name]
+        children = node[:children] || []
+
+        # Build a lookup: tool_call_name → child delegation node
+        # so we can render delegations inline where the tool call happened
+        delegation_children = {}
+        other_children = []
+        children.each do |child|
+          child_po = child[:session][:po_name]
+          if child[:session][:thread_type] == "delegation"
+            delegation_children[child_po] ||= []
+            delegation_children[child_po] << child
+          else
+            other_children << child
+          end
+        end
 
         # Thread header
         if depth == 0
@@ -851,6 +868,14 @@ module PromptObjects
                 lines << "#{indent}```"
                 lines << "#{indent}</details>"
                 lines << ""
+
+                # Render delegation sub-thread inline if this tool call targets a PO
+                if delegation_children[tc_name]
+                  child_node = delegation_children[tc_name].shift
+                  if child_node
+                    render_thread_node(child_node, lines, depth: depth + 1)
+                  end
+                end
               end
             end
           when :tool
@@ -862,7 +887,11 @@ module PromptObjects
               lines << "#{indent}<summary>Result from <code>#{r_name}</code></summary>"
               lines << ""
               lines << "#{indent}```"
-              display = r_content.to_s.length > 2000 ? r_content.to_s[0, 2000] + "\n... (truncated)" : r_content.to_s
+              if r_content.to_s.length > TOOL_RESULT_TRUNCATE_LIMIT
+                display = r_content.to_s[0, TOOL_RESULT_TRUNCATE_LIMIT] + "\n... (truncated)"
+              else
+                display = r_content.to_s
+              end
               display.each_line { |l| lines << "#{indent}#{l.rstrip}" }
               lines << "#{indent}```"
               lines << "#{indent}</details>"
@@ -871,8 +900,10 @@ module PromptObjects
           end
         end
 
-        # Recurse into children
-        (node[:children] || []).each do |child|
+        # Render any remaining children that weren't matched to a tool call
+        # (e.g., fork threads, or delegations we couldn't match by name)
+        remaining = delegation_children.values.flatten + other_children
+        remaining.each do |child|
           render_thread_node(child, lines, depth: depth + 1)
         end
       end
