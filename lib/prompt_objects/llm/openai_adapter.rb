@@ -80,12 +80,24 @@ module PromptObjects
         choice = raw.dig("choices", 0)
         message = choice&.dig("message")
 
-        return Response.new(content: "", raw: raw) unless message
+        return Response.new(content: "", raw: raw, usage: extract_usage(raw)) unless message
 
         content = message["content"] || ""
         tool_calls = parse_tool_calls(message["tool_calls"])
 
-        Response.new(content: content, tool_calls: tool_calls, raw: raw)
+        Response.new(content: content, tool_calls: tool_calls, raw: raw, usage: extract_usage(raw))
+      end
+
+      def extract_usage(raw)
+        usage = raw["usage"]
+        return nil unless usage
+
+        {
+          input_tokens: usage["prompt_tokens"] || 0,
+          output_tokens: usage["completion_tokens"] || 0,
+          model: @model,
+          provider: "openai"
+        }
       end
 
       def parse_tool_calls(raw_tool_calls)

@@ -192,7 +192,19 @@ module PromptObjects
           end
         end
 
-        Response.new(content: text_content, tool_calls: tool_calls, raw: raw)
+        Response.new(content: text_content, tool_calls: tool_calls, raw: raw, usage: extract_usage(raw))
+      end
+
+      def extract_usage(raw)
+        meta = raw["usageMetadata"]
+        return nil unless meta
+
+        {
+          input_tokens: meta["promptTokenCount"] || 0,
+          output_tokens: meta["candidatesTokenCount"] || 0,
+          model: @model,
+          provider: "gemini"
+        }
       end
 
       def parse_function_call(fc)

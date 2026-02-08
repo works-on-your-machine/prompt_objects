@@ -9,7 +9,7 @@ module PromptObjects
     # SQLite-based session storage for conversation history.
     # Each environment has its own sessions.db file (gitignored for privacy).
     class Store
-      SCHEMA_VERSION = 5
+      SCHEMA_VERSION = 6
 
       # Thread types for conversation branching
       THREAD_TYPES = %w[root continuation delegation fork].freeze
@@ -427,7 +427,7 @@ module PromptObjects
       # @param tool_results [Array, nil] Tool results data
       # @param source [String, nil] Source interface that added this message
       # @return [Integer] Message ID
-      def add_message(session_id:, role:, content: nil, from_po: nil, tool_calls: nil, tool_results: nil, source: nil)
+      def add_message(session_id:, role:, content: nil, from_po: nil, tool_calls: nil, tool_results: nil, usage: nil, source: nil)
         now = Time.now.utc.iso8601
 
         params = [
@@ -437,12 +437,13 @@ module PromptObjects
           from_po,
           tool_calls&.to_json,
           tool_results&.to_json,
+          usage&.to_json,
           now
         ]
 
         @db.execute(<<~SQL, params)
-          INSERT INTO messages (session_id, role, content, from_po, tool_calls, tool_results, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO messages (session_id, role, content, from_po, tool_calls, tool_results, usage, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         SQL
 
         # Update session's updated_at and optionally last_message_source
@@ -592,6 +593,29 @@ module PromptObjects
       def total_events
         row = @db.get_first_row("SELECT COUNT(*) as count FROM events")
         row["count"]
+      end
+
+      # --- Usage Aggregation ---
+
+      # Get total token usage for a session.
+      # @param session_id [String] Session ID
+      # @return [Hash] Aggregated usage data
+      def session_usage(session_id)
+        rows = @db.execute(<<~SQL, [session_id])
+          SELECT usage FROM messages WHERE session_id = ? AND usage IS NOT NULL
+        SQL
+
+        aggregate_usage_rows(rows)
+      end
+
+      # Get usage for a full thread tree (session + all descendants).
+      # @param session_id [String] Root session ID
+      # @return [Hash] Aggregated usage across the tree
+      def thread_tree_usage(session_id)
+        tree = get_thread_tree(session_id)
+        return empty_usage unless tree
+
+        collect_tree_usage(tree)
       end
 
       # --- Export ---
@@ -803,6 +827,7 @@ module PromptObjects
             from_po TEXT,
             tool_calls TEXT,
             tool_results TEXT,
+            usage TEXT,
             created_at TEXT NOT NULL
           );
 
@@ -915,6 +940,71 @@ module PromptObjects
             CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);
           SQL
         end
+
+        if from_version < 6
+          # Add usage column for token tracking
+          @db.execute("ALTER TABLE messages ADD COLUMN usage TEXT")
+        end
+      end
+
+      def empty_usage
+        { input_tokens: 0, output_tokens: 0, total_tokens: 0, estimated_cost_usd: 0.0, calls: 0, by_model: {} }
+      end
+
+      def aggregate_usage_rows(rows)
+        totals = empty_usage
+
+        rows.each do |row|
+          usage = JSON.parse(row["usage"], symbolize_names: true)
+          input = usage[:input_tokens] || 0
+          output = usage[:output_tokens] || 0
+          model = usage[:model] || "unknown"
+
+          totals[:input_tokens] += input
+          totals[:output_tokens] += output
+          totals[:total_tokens] += input + output
+          totals[:estimated_cost_usd] += LLM::Pricing.calculate(model: model, input_tokens: input, output_tokens: output)
+          totals[:calls] += 1
+
+          # Breakdown by model
+          totals[:by_model][model] ||= { input_tokens: 0, output_tokens: 0, estimated_cost_usd: 0.0, calls: 0 }
+          totals[:by_model][model][:input_tokens] += input
+          totals[:by_model][model][:output_tokens] += output
+          totals[:by_model][model][:estimated_cost_usd] += LLM::Pricing.calculate(model: model, input_tokens: input, output_tokens: output)
+          totals[:by_model][model][:calls] += 1
+        end
+
+        totals
+      end
+
+      def collect_tree_usage(node)
+        # Get usage for this node's session
+        session_rows = @db.execute(<<~SQL, [node[:session][:id]])
+          SELECT usage FROM messages WHERE session_id = ? AND usage IS NOT NULL
+        SQL
+
+        totals = aggregate_usage_rows(session_rows)
+
+        # Recurse into children
+        (node[:children] || []).each do |child|
+          child_usage = collect_tree_usage(child)
+          totals[:input_tokens] += child_usage[:input_tokens]
+          totals[:output_tokens] += child_usage[:output_tokens]
+          totals[:total_tokens] += child_usage[:total_tokens]
+          totals[:estimated_cost_usd] += child_usage[:estimated_cost_usd]
+          totals[:calls] += child_usage[:calls]
+
+          # Merge by_model
+          child_usage[:by_model].each do |model, data|
+            totals[:by_model][model] ||= { input_tokens: 0, output_tokens: 0, estimated_cost_usd: 0.0, calls: 0 }
+            totals[:by_model][model][:input_tokens] += data[:input_tokens]
+            totals[:by_model][model][:output_tokens] += data[:output_tokens]
+            totals[:by_model][model][:estimated_cost_usd] += data[:estimated_cost_usd]
+            totals[:by_model][model][:calls] += data[:calls]
+          end
+        end
+
+        totals
       end
 
       def parse_session_row(row, include_count: false)
@@ -960,6 +1050,7 @@ module PromptObjects
           from_po: row["from_po"],
           tool_calls: row["tool_calls"] ? JSON.parse(row["tool_calls"], symbolize_names: true) : nil,
           tool_results: row["tool_results"] ? JSON.parse(row["tool_results"], symbolize_names: true) : nil,
+          usage: row["usage"] ? JSON.parse(row["usage"], symbolize_names: true) : nil,
           created_at: row["created_at"] ? Time.parse(row["created_at"]) : nil
         }
       end

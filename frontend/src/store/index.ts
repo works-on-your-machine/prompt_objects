@@ -58,6 +58,11 @@ interface Store {
   llmConfig: LLMConfig | null
   setLLMConfig: (config: LLMConfig) => void
   updateCurrentLLM: (provider: string, model: string) => void
+
+  // Usage data (for modal display)
+  usageData: Record<string, unknown> | null
+  setUsageData: (data: Record<string, unknown>) => void
+  clearUsageData: () => void
 }
 
 export const useStore = create<Store>((set) => ({
@@ -230,6 +235,11 @@ export const useStore = create<Store>((set) => ({
         ? { ...s.llmConfig, current_provider: provider, current_model: model }
         : null,
     })),
+
+  // Usage data
+  usageData: null,
+  setUsageData: (data) => set({ usageData: data }),
+  clearUsageData: () => set({ usageData: null }),
 }))
 
 // Selectors - use useShallow to prevent infinite re-renders with derived arrays

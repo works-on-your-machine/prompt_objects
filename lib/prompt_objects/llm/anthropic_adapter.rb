@@ -130,7 +130,21 @@ module PromptObjects
           end
         end
 
-        Response.new(content: content, tool_calls: tool_calls, raw: raw)
+        Response.new(content: content, tool_calls: tool_calls, raw: raw, usage: extract_usage(raw))
+      end
+
+      def extract_usage(raw)
+        return nil unless raw.respond_to?(:usage) && raw.usage
+
+        usage = raw.usage
+        {
+          input_tokens: usage.respond_to?(:input_tokens) ? usage.input_tokens : 0,
+          output_tokens: usage.respond_to?(:output_tokens) ? usage.output_tokens : 0,
+          cache_creation_tokens: usage.respond_to?(:cache_creation_input_tokens) ? (usage.cache_creation_input_tokens || 0) : 0,
+          cache_read_tokens: usage.respond_to?(:cache_read_input_tokens) ? (usage.cache_read_input_tokens || 0) : 0,
+          model: @model,
+          provider: "anthropic"
+        }
       end
     end
   end

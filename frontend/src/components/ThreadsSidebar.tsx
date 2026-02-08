@@ -1,10 +1,12 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { ContextMenu } from './ContextMenu'
 import type { PromptObject, Session, ThreadType } from '../types'
 
 interface ThreadsSidebarProps {
   po: PromptObject
   switchSession: (target: string, sessionId: string) => void
   createThread: (target: string) => void
+  requestUsage?: (sessionId: string, includeTree?: boolean) => void
 }
 
 // Build a flat list with depth info
@@ -59,11 +61,17 @@ function ThreadTypeIcon({ type }: { type: ThreadType }) {
   }
 }
 
-export function ThreadsSidebar({ po, switchSession, createThread }: ThreadsSidebarProps) {
+export function ThreadsSidebar({ po, switchSession, createThread, requestUsage }: ThreadsSidebarProps) {
   const sessions = po.sessions || []
   const currentSessionId = po.current_session?.id
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; sessionId: string } | null>(null)
 
   const threadList = useMemo(() => buildThreadList(sessions), [sessions])
+
+  const handleContextMenu = (e: React.MouseEvent, sessionId: string) => {
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY, sessionId })
+  }
 
   return (
     <div className="h-full flex flex-col">
@@ -88,6 +96,7 @@ export function ThreadsSidebar({ po, switchSession, createThread }: ThreadsSideb
             <button
               key={session.id}
               onClick={() => switchSession(po.name, session.id)}
+              onContextMenu={(e) => handleContextMenu(e, session.id)}
               className={`w-full text-left p-2 rounded text-xs transition-colors ${
                 session.id === currentSessionId
                   ? 'bg-po-accent/20 border border-po-accent'
@@ -114,6 +123,26 @@ export function ThreadsSidebar({ po, switchSession, createThread }: ThreadsSideb
           ))
         )}
       </div>
+
+      {contextMenu && requestUsage && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          items={[
+            {
+              label: 'View Usage',
+              icon: '📊',
+              onClick: () => requestUsage(contextMenu.sessionId),
+            },
+            {
+              label: 'View Tree Usage',
+              icon: '🌳',
+              onClick: () => requestUsage(contextMenu.sessionId, true),
+            },
+          ]}
+        />
+      )}
     </div>
   )
 }

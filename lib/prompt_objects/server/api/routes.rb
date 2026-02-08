@@ -58,6 +58,8 @@ module PromptObjects
             get_prompt_object($1)
           when %r{^/events/session/([^/]+)$}
             get_session_events($1)
+          when %r{^/sessions/([^/]+)/usage$}
+            get_session_usage($1, _request)
           else
             { error: "Not found", path: path }
           end
@@ -313,6 +315,34 @@ module PromptObjects
             summary: event[:summary],
             message: event[:message],
             timestamp: event[:timestamp]&.iso8601
+          }
+        end
+
+        # === Usage ===
+
+        def get_session_usage(session_id, request)
+          return { error: "No session store" } unless @runtime.session_store
+
+          include_tree = request.params["tree"] == "true"
+
+          usage = if include_tree
+                    @runtime.session_store.thread_tree_usage(session_id)
+                  else
+                    @runtime.session_store.session_usage(session_id)
+                  end
+
+          by_model = {}
+          usage[:by_model].each { |model, data| by_model[model.to_s] = data }
+
+          {
+            session_id: session_id,
+            include_tree: include_tree,
+            input_tokens: usage[:input_tokens],
+            output_tokens: usage[:output_tokens],
+            total_tokens: usage[:total_tokens],
+            estimated_cost_usd: usage[:estimated_cost_usd].round(6),
+            calls: usage[:calls],
+            by_model: by_model
           }
         end
 

@@ -25,6 +25,7 @@ require_relative "prompt_objects/llm/openai_adapter"
 require_relative "prompt_objects/llm/anthropic_adapter"
 require_relative "prompt_objects/llm/gemini_adapter"
 require_relative "prompt_objects/llm/factory"
+require_relative "prompt_objects/llm/pricing"
 require_relative "prompt_objects/prompt_object"
 
 # Environment module (must be loaded before environment.rb which uses them)

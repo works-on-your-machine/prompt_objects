@@ -36,6 +36,7 @@ export function useWebSocket() {
     clearPendingResponse,
     setLLMConfig,
     updateCurrentLLM,
+    setUsageData,
   } = useStore()
 
   const connect = useCallback(() => {
@@ -213,6 +214,11 @@ export function useWebSocket() {
           break
         }
 
+        case 'session_usage': {
+          setUsageData(message.payload as Record<string, unknown>)
+          break
+        }
+
         case 'error': {
           const { message: errorMsg } = message.payload as { message: string }
           console.error('Server error:', errorMsg)
@@ -242,6 +248,7 @@ export function useWebSocket() {
       removeNotification,
       setLLMConfig,
       updateCurrentLLM,
+      setUsageData,
     ]
   )
 
@@ -352,6 +359,21 @@ export function useWebSocket() {
     )
   }, [])
 
+  // Request usage data for a session
+  const requestUsage = useCallback((sessionId: string, includeTree?: boolean) => {
+    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket not connected')
+      return
+    }
+
+    ws.current.send(
+      JSON.stringify({
+        type: 'get_session_usage',
+        payload: { session_id: sessionId, include_tree: includeTree || false },
+      })
+    )
+  }, [])
+
   // Update a PO's prompt (markdown body)
   const updatePrompt = useCallback((target: string, prompt: string) => {
     if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
@@ -375,5 +397,6 @@ export function useWebSocket() {
     switchLLM,
     createThread,
     updatePrompt,
+    requestUsage,
   }
 }

@@ -7,11 +7,12 @@ import { PODetail } from './components/PODetail'
 import { MessageBus } from './components/MessageBus'
 import { NotificationPanel } from './components/NotificationPanel'
 import { ThreadsSidebar } from './components/ThreadsSidebar'
+import { UsagePanel } from './components/UsagePanel'
 
 export default function App() {
-  const { sendMessage, respondToNotification, createSession, switchSession, switchLLM, createThread, updatePrompt } =
+  const { sendMessage, respondToNotification, createSession, switchSession, switchLLM, createThread, updatePrompt, requestUsage } =
     useWebSocket()
-  const { selectedPO, busOpen, notifications } = useStore()
+  const { selectedPO, busOpen, notifications, usageData, clearUsageData } = useStore()
   const selectedPOData = useSelectedPO()
   const [splitView, setSplitView] = useState(true) // Default to split view
 
@@ -47,6 +48,7 @@ export default function App() {
                   po={selectedPOData}
                   switchSession={switchSession}
                   createThread={createThread}
+                  requestUsage={requestUsage}
                 />
               </aside>
             )}
@@ -90,6 +92,11 @@ export default function App() {
       {/* Notification panel */}
       {notifications.length > 0 && (
         <NotificationPanel respondToNotification={respondToNotification} />
+      )}
+
+      {/* Usage panel modal */}
+      {usageData && (
+        <UsagePanel usage={usageData as any} onClose={clearUsageData} />
       )}
     </div>
   )

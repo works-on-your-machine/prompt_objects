@@ -223,6 +223,8 @@ module PromptObjects
           handle_switch_llm(message["payload"])
         when "update_prompt"
           handle_update_prompt(message["payload"])
+        when "get_session_usage"
+          handle_get_session_usage(message["payload"])
         when "ping"
           send_message(type: "pong", payload: {})
         else
@@ -563,6 +565,37 @@ module PromptObjects
         else
           send_error("Failed to save prompt for #{po_name}")
         end
+      end
+
+      def handle_get_session_usage(payload)
+        session_id = payload["session_id"]
+        include_tree = payload["include_tree"] || false
+        return send_error("Session ID required") unless session_id
+        return send_error("No session store available") unless @runtime.session_store
+
+        usage = if include_tree
+                  @runtime.session_store.thread_tree_usage(session_id)
+                else
+                  @runtime.session_store.session_usage(session_id)
+                end
+
+        # Convert by_model symbol keys to strings for JSON
+        by_model = {}
+        usage[:by_model].each { |model, data| by_model[model.to_s] = data }
+
+        send_message(
+          type: "session_usage",
+          payload: {
+            session_id: session_id,
+            include_tree: include_tree,
+            input_tokens: usage[:input_tokens],
+            output_tokens: usage[:output_tokens],
+            total_tokens: usage[:total_tokens],
+            estimated_cost_usd: usage[:estimated_cost_usd].round(6),
+            calls: usage[:calls],
+            by_model: by_model
+          }
+        )
       end
 
       # === Helpers ===

@@ -88,7 +88,8 @@ module PromptObjects
             # wait for tool results before generating a response. This prevents
             # the model from "hedging" by generating both a response AND a tool call.
             content: nil,
-            tool_calls: response.tool_calls
+            tool_calls: response.tool_calls,
+            usage: response.usage
           }
           @history << assistant_msg
           persist_message(assistant_msg)
@@ -101,7 +102,7 @@ module PromptObjects
           notify_history_updated
         else
           # No tool calls - we have our final response
-          assistant_msg = { role: :assistant, content: response.content }
+          assistant_msg = { role: :assistant, content: response.content, usage: response.usage }
           @history << assistant_msg
           persist_message(assistant_msg)
           @state = :idle
@@ -390,7 +391,8 @@ module PromptObjects
           session_id: @session_id,
           role: :assistant,
           content: msg[:content],
-          tool_calls: tool_calls_data
+          tool_calls: tool_calls_data,
+          usage: msg[:usage]
         )
       when :tool
         session_store.add_message(

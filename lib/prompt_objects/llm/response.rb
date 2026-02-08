@@ -5,12 +5,13 @@ module PromptObjects
     # Normalized response from an LLM API call.
     # Wraps provider-specific responses into a common interface.
     class Response
-      attr_reader :content, :tool_calls, :raw
+      attr_reader :content, :tool_calls, :raw, :usage
 
-      def initialize(content:, tool_calls: [], raw: nil)
+      def initialize(content:, tool_calls: [], raw: nil, usage: nil)
         @content = content
         @tool_calls = tool_calls
         @raw = raw
+        @usage = usage  # { input_tokens:, output_tokens:, model:, provider: }
       end
 
       # Check if the response includes tool calls.
