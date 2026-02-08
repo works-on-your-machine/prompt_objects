@@ -6,12 +6,17 @@ module PromptObjects
     class OpenAIAdapter
       DEFAULT_MODEL = "gpt-5.2"
 
-      def initialize(api_key: nil, model: nil)
+      def initialize(api_key: nil, model: nil, base_url: nil, extra_headers: nil, provider_name: nil)
         @api_key = api_key || ENV.fetch("OPENAI_API_KEY") do
           raise Error, "OPENAI_API_KEY environment variable not set"
         end
         @model = model || DEFAULT_MODEL
-        @client = OpenAI::Client.new(access_token: @api_key)
+        @provider_name = provider_name || "openai"
+
+        client_opts = { access_token: @api_key }
+        client_opts[:uri_base] = base_url if base_url
+        client_opts[:extra_headers] = extra_headers if extra_headers
+        @client = OpenAI::Client.new(**client_opts)
       end
 
       # Make a chat completion request.
@@ -96,7 +101,7 @@ module PromptObjects
           input_tokens: usage["prompt_tokens"] || 0,
           output_tokens: usage["completion_tokens"] || 0,
           model: @model,
-          provider: "openai"
+          provider: @provider_name
         }
       end
 

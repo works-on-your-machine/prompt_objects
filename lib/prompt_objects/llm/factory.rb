@@ -1,9 +1,12 @@
 # frozen_string_literal: true
 
+require "net/http"
+require "json"
+
 module PromptObjects
   module LLM
     # Factory for creating LLM adapters based on provider name.
-    # Provides a unified interface for switching between OpenAI, Anthropic, and Gemini.
+    # Provides a unified interface for switching between providers.
     class Factory
       PROVIDERS = {
         "openai" => {
@@ -23,6 +26,34 @@ module PromptObjects
           env_key: "GEMINI_API_KEY",
           default_model: "gemini-3-flash-preview",
           models: %w[gemini-3-flash-preview gemini-2.5-pro gemini-2.5-flash]
+        },
+        "ollama" => {
+          adapter: "OpenAIAdapter",
+          env_key: nil,
+          api_key_default: "ollama",
+          default_model: "llama3.2",
+          models: [],  # Dynamic — populated from Ollama API
+          base_url: "http://localhost:11434/v1",
+          local: true
+        },
+        "openrouter" => {
+          adapter: "OpenAIAdapter",
+          env_key: "OPENROUTER_API_KEY",
+          default_model: "meta-llama/llama-3.3-70b-instruct",
+          models: %w[
+            meta-llama/llama-3.3-70b-instruct
+            meta-llama/llama-4-scout
+            meta-llama/llama-4-maverick
+            mistralai/mistral-large-2411
+            google/gemma-3-27b-it
+            deepseek/deepseek-r1
+            qwen/qwen-2.5-72b-instruct
+          ],
+          base_url: "https://openrouter.ai/api/v1",
+          extra_headers: {
+            "HTTP-Referer" => "https://github.com/prompt-objects",
+            "X-Title" => "PromptObjects"
+          }
         }
       }.freeze
 
@@ -30,7 +61,7 @@ module PromptObjects
 
       class << self
         # Create an adapter for the given provider.
-        # @param provider [String] Provider name (openai, anthropic, gemini)
+        # @param provider [String] Provider name
         # @param model [String, nil] Optional model override
         # @param api_key [String, nil] Optional API key override
         # @return [OpenAIAdapter, AnthropicAdapter, GeminiAdapter]
@@ -40,8 +71,20 @@ module PromptObjects
 
           raise Error, "Unknown LLM provider: #{provider_name}" unless config
 
+          # Resolve API key: explicit > env var > default
+          resolved_key = api_key ||
+            (config[:env_key] && ENV[config[:env_key]]) ||
+            config[:api_key_default]
+
           adapter_class = LLM.const_get(config[:adapter])
-          adapter_class.new(api_key: api_key, model: model)
+
+          adapter_args = { api_key: resolved_key, model: model || config[:default_model] }
+          adapter_args[:base_url] = config[:base_url] if config[:base_url]
+          adapter_args[:extra_headers] = config[:extra_headers] if config[:extra_headers]
+          # Pass provider name for usage tracking (OpenAI adapter handles multiple providers)
+          adapter_args[:provider_name] = provider_name if config[:adapter] == "OpenAIAdapter"
+
+          adapter_class.new(**adapter_args)
         end
 
         # List available providers.
@@ -57,11 +100,17 @@ module PromptObjects
           PROVIDERS[provider.to_s.downcase]
         end
 
-        # Check which providers have API keys configured.
+        # Check which providers are available (have API keys or are local).
         # @return [Hash<String, Boolean>]
         def available_providers
           PROVIDERS.transform_values do |config|
-            ENV.key?(config[:env_key])
+            if config[:local]
+              check_local_provider(config[:base_url])
+            elsif config[:env_key]
+              ENV.key?(config[:env_key])
+            else
+              true
+            end
           end
         end
 
@@ -73,10 +122,48 @@ module PromptObjects
         end
 
         # Get available models for a provider.
+        # For Ollama, dynamically discovers installed models.
         # @param provider [String] Provider name
         # @return [Array<String>]
         def models_for(provider)
-          PROVIDERS.dig(provider.to_s.downcase, :models) || []
+          config = PROVIDERS[provider.to_s.downcase]
+          return [] unless config
+
+          # Dynamic model discovery for Ollama
+          if config[:local] && provider.to_s.downcase == "ollama"
+            models = discover_ollama_models(config[:base_url])
+            return models unless models.empty?
+          end
+
+          config[:models] || []
+        end
+
+        # Discover installed Ollama models.
+        # @param base_url [String] Ollama API base URL (with /v1 suffix)
+        # @return [Array<String>] Model names
+        def discover_ollama_models(base_url = "http://localhost:11434/v1")
+          # Ollama's model list endpoint is at /api/tags (not under /v1)
+          tags_url = base_url.sub(%r{/v1\z}, "") + "/api/tags"
+          uri = URI(tags_url)
+          response = Net::HTTP.get_response(uri)
+          return [] unless response.is_a?(Net::HTTPSuccess)
+
+          data = JSON.parse(response.body)
+          (data["models"] || []).map { |m| m["name"] }
+        rescue StandardError
+          []
+        end
+
+        private
+
+        def check_local_provider(base_url)
+          return false unless base_url
+          tags_url = base_url.sub(%r{/v1\z}, "") + "/api/tags"
+          uri = URI(tags_url)
+          response = Net::HTTP.get_response(uri)
+          response.is_a?(Net::HTTPSuccess)
+        rescue StandardError
+          false
         end
       end
     end

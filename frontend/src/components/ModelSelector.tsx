@@ -33,6 +33,8 @@ export function ModelSelector({ switchLLM }: Props) {
     openai: 'OpenAI',
     anthropic: 'Anthropic',
     gemini: 'Gemini',
+    ollama: 'Ollama',
+    openrouter: 'OpenRouter',
   }
 
   return (
@@ -62,7 +64,9 @@ export function ModelSelector({ switchLLM }: Props) {
               <div className="px-3 py-2 bg-po-bg text-xs font-medium text-gray-400 uppercase tracking-wide flex items-center justify-between">
                 <span>{providerNames[provider.name] || provider.name}</span>
                 {!provider.available && (
-                  <span className="text-red-400 text-[10px] normal-case">No API Key</span>
+                  <span className="text-red-400 text-[10px] normal-case">
+                    {provider.name === 'ollama' ? 'Not Running' : 'No API Key'}
+                  </span>
                 )}
               </div>
               {provider.models.map((model) => {
