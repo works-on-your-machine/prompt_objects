@@ -63,7 +63,7 @@ module PromptObjects
       content = normalize_message(message)
 
       # Track who sent this message - another PO or a human?
-      sender = context.current_capability
+      sender = context.calling_po
       from = (sender && sender != name) ? sender : "human"
 
       user_msg = { role: :user, content: content, from: from }
