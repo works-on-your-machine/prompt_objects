@@ -285,6 +285,7 @@ def print_main_help
       serve <env>                  Run environment as a web server
       message <env> <po> "text"    Send a message to a PO and print the response
       events <env> [--session ID]  Show recent events from the message bus
+      explore [env] [--session ID] Open Thread Explorer to visualize conversations
       repl [name] [objects_dir]    Start interactive REPL with a prompt object
       help                         Show this help message
 
@@ -920,6 +921,163 @@ def print_events(events)
   end
 end
 
+# === Explore Command ===
+
+def run_explore(args)
+  options = { session_id: nil }
+  positional = []
+  skip_next = false
+
+  args.each_with_index do |arg, i|
+    if skip_next
+      skip_next = false
+      next
+    end
+
+    case arg
+    when "--session"
+      options[:session_id] = args[i + 1]
+      skip_next = true
+    when "--help", "-h"
+      print_explore_help
+      exit 0
+    else
+      positional << arg
+    end
+  end
+
+  explorer_html = File.expand_path("../tools/thread-explorer.html", __dir__)
+
+  # No args: just open the empty visualizer
+  unless positional[0]
+    open_in_browser("file://#{explorer_html}")
+    puts "Opened Thread Explorer in browser"
+    exit 0
+  end
+
+  env_path = resolve_environment(positional[0])
+  unless env_path
+    $stderr.puts "Error: environment '#{positional[0]}' not found"
+    exit 1
+  end
+
+  db_path = File.join(env_path, "sessions.db")
+  unless File.exist?(db_path)
+    $stderr.puts "No session data found (sessions.db not found)"
+    $stderr.puts "Opening empty Thread Explorer..."
+    open_in_browser("file://#{explorer_html}")
+    exit 0
+  end
+
+  store = PromptObjects::Session::Store.new(db_path)
+
+  if options[:session_id]
+    # Export a specific thread
+    export_and_open(store, options[:session_id], explorer_html)
+  else
+    # List sessions and let user choose, or export the most recent root thread
+    # Query root sessions directly (list_sessions requires po_name)
+    rows = store.instance_variable_get(:@db).execute(<<~SQL)
+      SELECT * FROM sessions
+      WHERE thread_type IS NULL OR thread_type = 'root'
+      ORDER BY created_at ASC
+    SQL
+    root_sessions = rows.map { |r| { id: r["id"], po_name: r["po_name"], name: r["name"], thread_type: r["thread_type"], created_at: r["created_at"] } }
+
+    if root_sessions.empty?
+      $stderr.puts "No root sessions found"
+      open_in_browser("file://#{explorer_html}")
+      exit 0
+    end
+
+    # Show available sessions
+    puts "Root threads:"
+    root_sessions.last(10).each_with_index do |s, i|
+      name = s[:name] || "(unnamed)"
+      po = s[:po_name] || "?"
+      time = s[:created_at]
+      time_str = time.is_a?(Time) ? time.strftime("%Y-%m-%d %H:%M") : time.to_s[0, 16]
+      puts "  #{i + 1}. [#{po}] #{name}  (#{time_str})  #{s[:id]}"
+    end
+
+    puts
+    puts "Opening most recent thread..."
+    export_and_open(store, root_sessions.last[:id], explorer_html)
+  end
+
+  store.close
+end
+
+def export_and_open(store, session_id, explorer_html)
+  data = store.export_thread_tree_json(session_id)
+  unless data
+    $stderr.puts "Error: session '#{session_id}' not found"
+    exit 1
+  end
+
+  json_str = JSON.generate(data)
+
+  # Read the explorer HTML and inject the data as auto-load
+  html_content = File.read(explorer_html)
+  inject_script = <<~JS
+    <script>
+    // Auto-load embedded data
+    window.addEventListener('DOMContentLoaded', function() {
+      var data = #{json_str};
+      if (typeof loadData === 'function') loadData(data);
+    });
+    </script>
+  JS
+
+  # Insert before </body>
+  html_content = html_content.sub("</body>", "#{inject_script}</body>")
+
+  # Write to temp file
+  require "tempfile"
+  tmp = Tempfile.new(["thread-explorer-", ".html"])
+  tmp.write(html_content)
+  tmp.close
+
+  open_in_browser("file://#{tmp.path}")
+  puts "Opened Thread Explorer for session #{session_id}"
+
+  # Keep temp file around briefly so the browser can load it
+  sleep 2
+end
+
+def open_in_browser(url)
+  case RUBY_PLATFORM
+  when /darwin/
+    system("open", url)
+  when /linux/
+    system("xdg-open", url)
+  when /mswin|mingw|cygwin/
+    system("start", url)
+  else
+    $stderr.puts "Open this URL in your browser: #{url}"
+  end
+end
+
+def print_explore_help
+  puts <<~HELP
+    Usage: prompt_objects explore [env] [options]
+
+    Open the Thread Explorer to visualize conversation threads.
+
+    Arguments:
+      env                  Environment name or path (optional)
+
+    Options:
+      --session ID         Open a specific thread by session ID
+      --help, -h           Show this help message
+
+    Examples:
+      prompt_objects explore                          # Open empty explorer
+      prompt_objects explore my-env                   # Open most recent thread
+      prompt_objects explore my-env --session abc123  # Open specific thread
+  HELP
+end
+
 # === Main Entry Point ===
 
 def run_env(args)
@@ -947,6 +1105,8 @@ def main
     run_message(args)
   when "events"
     run_events(args)
+  when "explore"
+    run_explore(args)
   when "help", "--help", "-h"
     print_main_help
   else

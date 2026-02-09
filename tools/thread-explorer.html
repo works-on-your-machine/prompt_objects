@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thread Explorer | PromptObjects</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ======== THEME ======== */
+:root {
+  --bg-deep: #0a0e0a;
+  --bg: #0d120d;
+  --bg-raised: #131a13;
+  --bg-surface: #182018;
+  --border: #1e2b1e;
+  --border-bright: #2a3d2a;
+  --phosphor: #33ff66;
+  --phosphor-dim: #1a8033;
+  --phosphor-faint: #0d4020;
+  --phosphor-glow: rgba(51,255,102,0.15);
+  --amber: #ffaa33;
+  --amber-dim: #805515;
+  --amber-glow: rgba(255,170,51,0.12);
+  --cyan: #33ddff;
+  --cyan-dim: #1a7088;
+  --magenta: #dd55ff;
+  --magenta-dim: #6b2a80;
+  --red: #ff4455;
+  --red-dim: #661a22;
+  --pink: #ff6699;
+  --teal: #33ffcc;
+  --yellow: #ffdd44;
+  --text: #b8ccb8;
+  --text-dim: #667766;
+  --text-bright: #ddeedd;
+  --mono: 'IBM Plex Mono','Menlo',monospace;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; background:var(--bg-deep); color:var(--text); font-family:var(--mono); font-size:13px; line-height:1.6; overflow:hidden; }
+body::after { content:''; position:fixed; inset:0; background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px); pointer-events:none; z-index:9999; }
+::selection { background:var(--phosphor-dim); color:var(--text-bright); }
+::-webkit-scrollbar { width:5px; height:5px; }
+::-webkit-scrollbar-track { background:var(--bg); }
+::-webkit-scrollbar-thumb { background:var(--border-bright); border-radius:3px; }
+::-webkit-scrollbar-thumb:hover { background:var(--phosphor-dim); }
+button { font-family:var(--mono); cursor:pointer; }
+
+/* ======== DROP ZONE ======== */
+#drop-zone { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:100; background:var(--bg-deep); transition:opacity 0.4s; }
+#drop-zone.hidden { opacity:0; pointer-events:none; }
+#drop-zone .logo { font-size:36px; font-weight:700; color:var(--phosphor); text-shadow:0 0 30px var(--phosphor-glow); letter-spacing:-1px; margin-bottom:6px; animation:flicker 4s ease-in-out infinite; }
+#drop-zone .subtitle { font-size:11px; color:var(--text-dim); margin-bottom:40px; letter-spacing:3px; text-transform:uppercase; }
+.drop-area { width:480px; height:240px; border:2px dashed var(--border-bright); border-radius:4px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; transition:all 0.2s; cursor:pointer; background:var(--bg); }
+.drop-area:hover,.drop-area.dragover { border-color:var(--phosphor-dim); background:rgba(51,255,102,0.02); }
+.drop-area .icon { font-size:40px; color:var(--phosphor-dim); transition:color 0.2s; }
+.drop-area:hover .icon,.drop-area.dragover .icon { color:var(--phosphor); }
+.drop-area p { color:var(--text-dim); font-size:13px; }
+.drop-area p span { color:var(--phosphor); text-decoration:underline; text-underline-offset:3px; }
+.drop-area .hint { font-size:11px; opacity:0.5; }
+#file-input { display:none; }
+.sample-link { margin-top:16px; font-size:11px; color:var(--text-dim); cursor:pointer; text-decoration:underline; text-underline-offset:3px; opacity:0.6; transition:opacity 0.2s; }
+.sample-link:hover { opacity:1; color:var(--phosphor-dim); }
+
+/* ======== APP LAYOUT ======== */
+#app { display:none; height:100vh; grid-template-columns:1fr; grid-template-rows:auto auto 1fr; }
+#app.visible { display:grid; }
+
+/* Header */
+#header { display:flex; align-items:center; gap:16px; padding:0 16px; height:40px; background:var(--bg); border-bottom:1px solid var(--border); }
+.brand-name { font-weight:700; font-size:14px; color:var(--phosphor); text-shadow:0 0 20px var(--phosphor-glow); white-space:nowrap; }
+.brand-sep { color:var(--border-bright); }
+.thread-name { color:var(--text); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.header-stats { display:flex; gap:14px; font-size:11px; color:var(--text-dim); margin-left:auto; white-space:nowrap; }
+.header-stats .v { color:var(--text); font-weight:500; }
+.btn-open { background:none; border:1px solid var(--border-bright); color:var(--text-dim); font-size:10px; padding:3px 10px; border-radius:3px; transition:all 0.15s; margin-left:8px; }
+.btn-open:hover { border-color:var(--phosphor-dim); color:var(--phosphor); }
+
+/* Token cost bar */
+#cost-bar { display:flex; height:20px; background:var(--bg); border-bottom:1px solid var(--border); padding:0 16px; align-items:center; gap:8px; }
+#cost-bar .label { font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; }
+#cost-bar .bar { flex:1; height:8px; background:var(--bg-deep); border-radius:2px; overflow:hidden; display:flex; }
+#cost-bar .bar-seg { height:100%; transition:opacity 0.15s; cursor:pointer; position:relative; min-width:2px; }
+#cost-bar .bar-seg:hover { opacity:0.8; }
+#cost-bar .bar-legend { display:flex; gap:10px; font-size:10px; color:var(--text-dim); }
+#cost-bar .bar-legend .dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:3px; vertical-align:middle; }
+
+/* Toolbar */
+#toolbar { display:flex; align-items:center; height:32px; background:var(--bg); border-bottom:1px solid var(--border); padding:0 16px; gap:8px; }
+.tab { background:none; border:none; color:var(--text-dim); font-size:11px; padding:4px 12px; border-radius:3px; transition:all 0.15s; text-transform:uppercase; letter-spacing:0.5px; font-weight:500; }
+.tab:hover { color:var(--text); background:var(--bg-raised); }
+.tab.active { color:var(--phosphor); background:var(--phosphor-faint); }
+.toolbar-sep { width:1px; height:16px; background:var(--border); }
+#search { background:var(--bg-deep); border:1px solid var(--border); color:var(--text); font-family:var(--mono); font-size:11px; padding:3px 8px; border-radius:3px; width:200px; outline:none; transition:border-color 0.15s; }
+#search:focus { border-color:var(--phosphor-dim); }
+#search::placeholder { color:var(--text-dim); }
+.filter-btns { display:flex; gap:4px; margin-left:auto; }
+.filter-btn { background:none; border:1px solid var(--border); color:var(--text-dim); font-size:10px; padding:2px 8px; border-radius:3px; transition:all 0.15s; }
+.filter-btn:hover { border-color:var(--border-bright); color:var(--text); }
+.filter-btn.active { border-color:var(--phosphor-dim); color:var(--phosphor); background:var(--phosphor-faint); }
+
+/* ======== MAIN CONTENT ======== */
+#main { overflow:hidden; display:grid; }
+
+/* Split view */
+#main.split { grid-template-columns:1fr 1fr; }
+#main.full { grid-template-columns:1fr; }
+
+/* ======== SEQUENCE VIEW ======== */
+#seq-view { overflow:auto; background:var(--bg-deep); }
+.seq-actors { display:flex; position:sticky; top:0; z-index:5; background:var(--bg); border-bottom:1px solid var(--border); }
+.seq-actor { flex:1; min-width:100px; text-align:center; padding:6px 4px; font-size:11px; font-weight:600; color:var(--text-dim); border-right:1px solid var(--border); cursor:pointer; transition:all 0.15s; position:relative; }
+.seq-actor:last-child { border-right:none; }
+.seq-actor:hover { background:var(--bg-raised); }
+.seq-actor .actor-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; vertical-align:middle; }
+.seq-actor.filtered { background:var(--phosphor-faint); color:var(--phosphor); }
+.seq-events { position:relative; }
+
+/* Lifelines */
+.seq-lifelines { position:absolute; inset:0; display:flex; pointer-events:none; z-index:0; }
+.seq-lifeline { flex:1; min-width:100px; border-right:1px dashed var(--border); position:relative; }
+.seq-lifeline:last-child { border-right:none; }
+
+/* Event rows */
+.seq-row { position:relative; min-height:32px; display:flex; align-items:center; border-bottom:1px solid rgba(30,43,30,0.3); z-index:1; cursor:pointer; transition:background 0.1s; }
+.seq-row:hover { background:rgba(51,255,102,0.02); }
+.seq-row.active { background:rgba(51,255,102,0.05); }
+.seq-row.structural { background:rgba(255,68,85,0.03); }
+.seq-row .row-content { position:absolute; left:0; right:0; display:flex; align-items:center; padding:0; height:100%; }
+
+/* Arrow rendering */
+.seq-arrow-container { position:absolute; top:50%; height:0; display:flex; align-items:center; }
+.seq-arrow-line { height:2px; flex:1; position:relative; }
+.seq-arrow-head { width:0; height:0; border-top:5px solid transparent; border-bottom:5px solid transparent; flex-shrink:0; }
+.seq-arrow-head.right { border-left:8px solid; }
+.seq-arrow-head.left { border-right:8px solid; }
+.seq-arrow-label { position:absolute; top:-16px; font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; padding:0 4px; }
+.seq-arrow-label.above-right { left:4px; }
+.seq-arrow-label.above-left { right:4px; text-align:right; }
+
+/* Event type styling on arrows */
+.seq-row.type-delegation .seq-arrow-line { height:3px; }
+.seq-row.type-delegation_return .seq-arrow-line { height:1px; opacity:0.5; }
+.seq-row.type-tool_call .seq-arrow-line { height:1px; opacity:0.6; }
+.seq-row.type-tool_result .seq-arrow-line { height:1px; opacity:0.4; }
+
+/* Structural event badge */
+.seq-structural-badge { position:absolute; font-size:9px; padding:1px 6px; border-radius:2px; background:var(--red-dim); color:var(--red); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; top:50%; transform:translateY(-50%); }
+
+/* Self-arrow (tool on same actor) */
+.seq-self-arrow { position:absolute; width:30px; height:20px; border:1px solid; border-left:none; border-radius:0 6px 6px 0; top:50%; transform:translateY(-50%); }
+
+/* Collapsed group */
+.seq-group { position:relative; border-bottom:1px solid rgba(30,43,30,0.3); cursor:pointer; transition:background 0.1s; }
+.seq-group:hover { background:rgba(51,255,102,0.02); }
+.seq-group-header { display:flex; align-items:center; padding:4px 8px; min-height:28px; font-size:11px; color:var(--text-dim); gap:6px; }
+.seq-group-header .chevron { font-size:9px; transition:transform 0.15s; width:10px; color:var(--text-dim); }
+.seq-group-header.expanded .chevron { transform:rotate(90deg); }
+.seq-group-header .group-label { opacity:0.7; }
+.seq-group-body { display:none; }
+.seq-group-body.expanded { display:block; }
+
+/* ======== TIMELINE VIEW ======== */
+#timeline-view { overflow:auto; background:var(--bg-deep); }
+.tl-event { display:flex; align-items:flex-start; padding:6px 16px; gap:10px; border-bottom:1px solid rgba(30,43,30,0.3); cursor:pointer; transition:background 0.1s; min-height:32px; }
+.tl-event:hover { background:rgba(51,255,102,0.02); }
+.tl-event.active { background:rgba(51,255,102,0.05); }
+.tl-event.structural { border-left:2px solid var(--red); }
+.tl-idx { font-size:10px; color:var(--text-dim); width:28px; text-align:right; flex-shrink:0; padding-top:2px; opacity:0.5; }
+.tl-time { font-size:10px; color:var(--text-dim); width:60px; flex-shrink:0; padding-top:2px; }
+.tl-actor-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:5px; }
+.tl-body { flex:1; min-width:0; }
+.tl-header-line { display:flex; align-items:center; gap:6px; font-size:12px; }
+.tl-from { font-weight:600; }
+.tl-arrow { color:var(--text-dim); font-size:10px; }
+.tl-to { font-weight:500; }
+.tl-type-badge { font-size:9px; padding:1px 5px; border-radius:2px; text-transform:uppercase; letter-spacing:0.3px; font-weight:600; margin-left:4px; }
+.tl-type-badge.delegation { background:rgba(255,170,51,0.15); color:var(--amber); }
+.tl-type-badge.structural { background:rgba(255,68,85,0.15); color:var(--red); }
+.tl-type-badge.tool { background:rgba(102,119,102,0.15); color:var(--text-dim); }
+.tl-preview { font-size:11px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; max-width:600px; }
+.tl-usage { font-size:10px; color:var(--text-dim); opacity:0.5; margin-top:1px; }
+.tl-depth-indent { display:inline-block; }
+
+/* ======== DETAIL VIEW ======== */
+#detail-view { overflow:auto; background:var(--bg-deep); border-left:1px solid var(--border); }
+.detail-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:var(--text-dim); gap:6px; }
+.detail-empty .icon { font-size:28px; opacity:0.3; }
+.detail-header { position:sticky; top:0; z-index:5; background:var(--bg); border-bottom:1px solid var(--border); padding:10px 16px; display:flex; align-items:center; justify-content:space-between; }
+.detail-header .po-name { font-weight:700; font-size:15px; color:var(--text-bright); }
+.detail-header .type-badge { font-size:9px; text-transform:uppercase; letter-spacing:0.5px; padding:2px 6px; border-radius:2px; font-weight:600; margin-left:8px; }
+.badge-root { background:var(--phosphor-faint); color:var(--phosphor); }
+.badge-delegation { background:rgba(255,170,51,0.1); color:var(--amber); }
+.detail-header .parent-info { font-size:10px; color:var(--text-dim); margin-left:8px; }
+.detail-header .parent-info em { color:var(--amber); font-style:normal; }
+.detail-header .stats { font-size:10px; color:var(--text-dim); display:flex; gap:12px; }
+.detail-header .stats .v { color:var(--text); }
+
+/* Breadcrumbs */
+.breadcrumbs { padding:6px 16px; background:var(--bg); border-bottom:1px solid var(--border); font-size:11px; display:flex; align-items:center; gap:4px; }
+.breadcrumb { color:var(--text-dim); cursor:pointer; transition:color 0.15s; }
+.breadcrumb:hover { color:var(--phosphor); }
+.breadcrumb.current { color:var(--text-bright); cursor:default; }
+.breadcrumb-sep { color:var(--border-bright); }
+
+/* Messages */
+.messages { padding:12px 16px 60px; }
+.msg { margin-bottom:2px; animation:fadeIn 0.12s ease; }
+.msg-head { display:flex; align-items:center; gap:6px; padding-top:10px; margin-bottom:4px; }
+.msg-sender { font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.3px; }
+.msg-sender.human { color:var(--cyan); }
+.msg-sender.assistant { color:var(--phosphor); }
+.msg-sender.delegator { color:var(--amber); }
+.msg-ts { font-size:10px; color:var(--text-dim); opacity:0.4; }
+.msg-tokens { font-size:10px; color:var(--text-dim); margin-left:auto; }
+.msg-body { padding:8px 12px; border-radius:3px; font-size:12px; line-height:1.65; white-space:pre-wrap; word-break:break-word; }
+.msg.user .msg-body { background:rgba(51,221,255,0.04); border-left:2px solid var(--cyan-dim); }
+.msg.user.from-po .msg-body { background:rgba(255,170,51,0.04); border-left:2px solid var(--amber-dim); }
+.msg.assistant .msg-body { background:rgba(51,255,102,0.03); border-left:2px solid var(--phosphor-faint); }
+.msg.highlighted .msg-body { box-shadow:inset 0 0 0 1px var(--phosphor-dim); }
+
+/* Tool calls in detail */
+.tc { margin:3px 0; border:1px solid var(--border); border-radius:3px; overflow:hidden; }
+.tc-head { display:flex; align-items:center; gap:6px; padding:6px 10px; background:var(--bg-raised); cursor:pointer; font-size:11px; user-select:none; transition:background 0.1s; }
+.tc-head:hover { background:var(--bg-surface); }
+.tc-head .chv { color:var(--text-dim); font-size:9px; width:10px; transition:transform 0.15s; }
+.tc-head.open .chv { transform:rotate(90deg); }
+.tc-head .tc-name { font-weight:600; color:var(--phosphor-dim); }
+.tc-head .tc-label { color:var(--text-dim); font-size:10px; }
+.tc-body { display:none; border-top:1px solid var(--border); }
+.tc-body.open { display:block; }
+.tc-section { padding:8px 10px; }
+.tc-section + .tc-section { border-top:1px solid var(--border); }
+.tc-section-label { font-size:9px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-dim); margin-bottom:4px; }
+.tc-section pre { font-family:var(--mono); font-size:11px; line-height:1.5; color:var(--text); white-space:pre-wrap; word-break:break-all; max-height:250px; overflow-y:auto; }
+.tc-result { max-height:150px; overflow-y:auto; font-size:11px; color:var(--text-dim); white-space:pre-wrap; word-break:break-all; line-height:1.5; }
+
+/* Delegation marker in detail */
+.deleg-marker { display:flex; align-items:center; gap:6px; padding:6px 10px; margin:4px 0; border:1px dashed var(--amber-dim); border-radius:3px; background:rgba(255,170,51,0.03); font-size:11px; color:var(--amber); cursor:pointer; transition:all 0.15s; }
+.deleg-marker:hover { background:rgba(255,170,51,0.06); border-color:var(--amber); }
+.deleg-marker .dm-info { opacity:0.5; margin-left:auto; font-size:10px; }
+
+/* ======== ANIMATIONS ======== */
+@keyframes flicker { 0%,100%{opacity:1} 92%{opacity:1} 93%{opacity:0.8} 94%{opacity:1} 96%{opacity:0.9} 97%{opacity:1} }
+@keyframes fadeIn { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:translateY(0)} }
+</style>
+</head>
+<body>
+
+<div id="drop-zone">
+  <div class="logo">Thread Explorer</div>
+  <div class="subtitle">PromptObjects</div>
+  <div class="drop-area" id="drop-area">
+    <div class="icon">{...}</div>
+    <p>Drop a thread export <span>JSON</span> here</p>
+    <p class="hint">or click to browse</p>
+  </div>
+  <input type="file" id="file-input" accept=".json,application/json">
+  <div class="sample-link" id="load-sample">load sample data</div>
+</div>
+
+<div id="app">
+  <div id="header">
+    <span class="brand-name">Thread Explorer</span>
+    <span class="brand-sep">/</span>
+    <span class="thread-name" id="h-name">---</span>
+    <div class="header-stats" id="h-stats"></div>
+    <button class="btn-open" id="btn-open">Open</button>
+  </div>
+  <div id="cost-bar">
+    <span class="label">Tokens</span>
+    <div class="bar" id="cost-bar-inner"></div>
+    <div class="bar-legend" id="cost-legend"></div>
+  </div>
+  <div id="main" class="split">
+    <div style="display:flex;flex-direction:column;overflow:hidden;">
+      <div id="toolbar">
+        <button class="tab active" data-view="sequence">Sequence</button>
+        <button class="tab" data-view="timeline">Timeline</button>
+        <div class="toolbar-sep"></div>
+        <input id="search" type="text" placeholder="Search messages...">
+        <div class="filter-btns" id="filter-btns"></div>
+      </div>
+      <div id="seq-view" style="flex:1;overflow:auto;"></div>
+      <div id="timeline-view" style="flex:1;overflow:auto;display:none;"></div>
+    </div>
+    <div id="detail-view">
+      <div class="detail-empty"><div class="icon">&larr;</div><div>Select an event</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========================================
+// THREAD EXPLORER
+// ========================================
+
+// --- State ---
+let treeData = null;
+let events = [];        // flattened event sequence
+let actors = [];        // ordered actor names
+let poNames = new Set();
+let actorColors = {};
+let activeView = 'sequence';
+let selectedEventIdx = null;
+let selectedSessionId = null;
+let searchQuery = '';
+let activeFilters = new Set(); // PO name filters
+let allNodes = {};      // id -> node for quick lookup
+
+const COLORS = ['#33ff66','#ffaa33','#33ddff','#dd55ff','#ff6699','#33ffcc','#ffdd44','#88aaff','#ff8844','#99ff33'];
+const STRUCTURAL_TOOLS = new Set(['create_capability','add_capability','request_capability','remove_capability','modify_prompt','create_po','delete_primitive','ask_human']);
+
+// --- DOM refs ---
+const dropZone = document.getElementById('drop-zone');
+const dropArea = document.getElementById('drop-area');
+const fileInput = document.getElementById('file-input');
+const app = document.getElementById('app');
+
+// --- File loading ---
+dropArea.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => { if(e.target.files[0]) loadFile(e.target.files[0]); });
+dropArea.addEventListener('dragover', e => { e.preventDefault(); dropArea.classList.add('dragover'); });
+dropArea.addEventListener('dragleave', () => dropArea.classList.remove('dragover'));
+dropArea.addEventListener('drop', e => { e.preventDefault(); dropArea.classList.remove('dragover'); if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+document.getElementById('btn-open').addEventListener('click', () => { const i=document.createElement('input'); i.type='file'; i.accept='.json'; i.onchange=e=>{if(e.target.files[0])loadFile(e.target.files[0]);}; i.click(); });
+document.getElementById('load-sample').addEventListener('click', () => loadData(generateSampleData()));
+
+function loadFile(file) {
+  const r = new FileReader();
+  r.onload = e => { try { loadData(JSON.parse(e.target.result)); } catch(err) { alert('Parse error: '+err.message); } };
+  r.readAsText(file);
+}
+
+function loadData(data) {
+  treeData = data;
+  allNodes = {};
+  indexNodes(data);
+  poNames = extractPONames(data);
+  events = extractEvents(data);
+  actors = extractActors();
+  assignColors();
+  selectedEventIdx = null;
+  selectedSessionId = null;
+  activeFilters = new Set();
+  searchQuery = '';
+  document.getElementById('search').value = '';
+
+  dropZone.classList.add('hidden');
+  app.classList.add('visible');
+
+  renderAll();
+  // Auto-select first event
+  if (events.length > 0) selectEvent(0);
+}
+
+function indexNodes(node, parent) {
+  const id = node.session?.id || 'n-'+Object.keys(allNodes).length;
+  allNodes[id] = { ...node, _parent: parent || null };
+  (node.children||[]).forEach(c => indexNodes(c, node));
+}
+
+function extractPONames(node) {
+  const s = new Set();
+  s.add(node.session?.po_name);
+  (node.children||[]).forEach(c => extractPONames(c).forEach(n => s.add(n)));
+  return s;
+}
+
+function extractActors() {
+  const ordered = ['human'];
+  const seen = new Set(['human']);
+  events.forEach(e => {
+    [e.from, e.to].forEach(a => {
+      if (a && !seen.has(a) && (poNames.has(a) || a === 'human')) { seen.add(a); ordered.push(a); }
+    });
+  });
+  // Add "tools" pseudo-actor if any tool calls exist
+  if (events.some(e => e.type === 'tool_call' || e.type === 'tool_result')) {
+    ordered.push('[tools]');
+  }
+  return ordered;
+}
+
+function assignColors() {
+  actorColors = {};
+  let ci = 0;
+  actors.forEach(a => {
+    if (a === 'human') actorColors[a] = '#33ddff';
+    else if (a === '[tools]') actorColors[a] = '#667766';
+    else { actorColors[a] = COLORS[ci % COLORS.length]; ci++; }
+  });
+}
+
+// --- Event extraction ---
+function extractEvents(node, depth) {
+  depth = depth || 0;
+  const evts = [];
+  const session = node.session || {};
+  const poName = session.po_name || 'unknown';
+  const messages = node.messages || [];
+
+  // Delegation children lookup
+  const delegKids = {};
+  (node.children||[]).forEach(c => {
+    const cp = c.session?.po_name;
+    if (c.session?.thread_type === 'delegation' && cp) {
+      if (!delegKids[cp]) delegKids[cp] = [];
+      delegKids[cp].push(c);
+    }
+  });
+  const delegCallIds = new Set();
+
+  for (const msg of messages) {
+    if (msg.role === 'user') {
+      evts.push({
+        type: 'message', from: msg.from_po || 'human', to: poName,
+        content: msg.content || '', summary: trunc(msg.content||'',80),
+        sessionId: session.id, depth, ts: msg.created_at, usage: null, isStructural: false
+      });
+    }
+    if (msg.role === 'assistant') {
+      if (msg.tool_calls) {
+        for (const tc of msg.tool_calls) {
+          const tcName = tc.name||'';
+          const tcId = tc.id||'';
+          const isDeleg = delegKids[tcName] && delegKids[tcName].length > 0;
+          if (isDeleg) {
+            delegCallIds.add(tcId);
+            evts.push({
+              type: 'delegation', from: poName, to: tcName,
+              content: JSON.stringify(tc.arguments||{}), summary: 'delegate \u2192 '+tcName,
+              sessionId: session.id, depth, ts: msg.created_at, usage: msg.usage, isStructural: false
+            });
+            const child = delegKids[tcName].shift();
+            evts.push(...extractEvents(child, depth+1));
+            evts.push({
+              type: 'delegation_return', from: tcName, to: poName,
+              content: '', summary: tcName+' \u2192 return',
+              sessionId: session.id, depth, ts: msg.created_at, usage: null, isStructural: false
+            });
+          } else {
+            const isSt = STRUCTURAL_TOOLS.has(tcName);
+            evts.push({
+              type: isSt ? 'structural' : 'tool_call', from: poName, to: isSt ? poName : '[tools]',
+              content: JSON.stringify(tc.arguments||{}), summary: tcName, toolName: tcName,
+              sessionId: session.id, depth, ts: msg.created_at, usage: msg.usage, isStructural: isSt,
+              structuralType: isSt ? tcName : null, toolCallId: tcId
+            });
+          }
+        }
+      }
+      if (msg.content) {
+        evts.push({
+          type: 'response', from: poName, to: session.parent_po || 'human',
+          content: msg.content, summary: trunc(msg.content,80),
+          sessionId: session.id, depth, ts: msg.created_at, usage: msg.usage, isStructural: false
+        });
+      }
+    }
+    if (msg.role === 'tool') {
+      for (const tr of (msg.tool_results||[])) {
+        if (delegCallIds.has(tr.tool_call_id)) continue;
+        evts.push({
+          type: 'tool_result', from: '[tools]', to: poName,
+          content: tr.content||'', summary: trunc(tr.content||'',60), toolName: tr.name,
+          sessionId: session.id, depth, ts: msg.created_at, usage: null, isStructural: false,
+          toolCallId: tr.tool_call_id
+        });
+      }
+    }
+  }
+  return evts;
+}
+
+// --- Rendering orchestration ---
+function renderAll() {
+  renderHeader();
+  renderCostBar();
+  renderFilterBtns();
+  renderSequenceView();
+  renderTimelineView();
+  renderDetail();
+}
+
+function getFilteredEvents() {
+  let filtered = events;
+  if (activeFilters.size > 0) {
+    filtered = filtered.filter(e => activeFilters.has(e.from) || activeFilters.has(e.to));
+  }
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    filtered = filtered.filter(e => (e.content||'').toLowerCase().includes(q) || (e.summary||'').toLowerCase().includes(q) || (e.toolName||'').toLowerCase().includes(q));
+  }
+  return filtered;
+}
+
+// --- Header ---
+function renderHeader() {
+  const s = treeData.session||{};
+  document.getElementById('h-name').textContent = s.name || s.po_name || 'Untitled';
+  const usage = sumUsageTree(treeData);
+  const nEvents = events.length;
+  const nSessions = Object.keys(allNodes).length;
+  document.getElementById('h-stats').innerHTML =
+    `<span><span class="v">${nSessions}</span> sessions</span>`+
+    `<span><span class="v">${nEvents}</span> events</span>`+
+    `<span><span class="v">${fmtNum(usage.input)}</span> in</span>`+
+    `<span><span class="v">${fmtNum(usage.output)}</span> out</span>`;
+}
+
+// --- Cost bar ---
+function renderCostBar() {
+  const perPo = {};
+  events.forEach(e => {
+    if (e.usage) {
+      const po = e.from;
+      if (!perPo[po]) perPo[po] = { input:0, output:0 };
+      perPo[po].input += e.usage.input_tokens||0;
+      perPo[po].output += e.usage.output_tokens||0;
+    }
+  });
+  const total = Object.values(perPo).reduce((s,v) => s+v.input+v.output, 0) || 1;
+  const bar = document.getElementById('cost-bar-inner');
+  const legend = document.getElementById('cost-legend');
+  bar.innerHTML = '';
+  legend.innerHTML = '';
+  Object.entries(perPo).forEach(([po, v]) => {
+    const pct = ((v.input+v.output)/total*100);
+    if (pct < 0.5) return;
+    const seg = document.createElement('div');
+    seg.className = 'bar-seg';
+    seg.style.width = pct+'%';
+    seg.style.background = actorColors[po] || '#667766';
+    seg.title = `${po}: ${fmtNum(v.input)} in, ${fmtNum(v.output)} out`;
+    seg.addEventListener('click', () => toggleFilter(po));
+    bar.appendChild(seg);
+    legend.innerHTML += `<span><span class="dot" style="background:${actorColors[po]||'#667'}"></span>${esc(po)}</span>`;
+  });
+}
+
+// --- Filter buttons ---
+function renderFilterBtns() {
+  const container = document.getElementById('filter-btns');
+  container.innerHTML = '';
+  actors.filter(a => a !== '[tools]').forEach(a => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn' + (activeFilters.has(a) ? ' active' : '');
+    btn.textContent = a;
+    btn.style.borderColor = activeFilters.has(a) ? (actorColors[a]||'') : '';
+    btn.style.color = activeFilters.has(a) ? (actorColors[a]||'') : '';
+    btn.addEventListener('click', () => toggleFilter(a));
+    container.appendChild(btn);
+  });
+}
+
+function toggleFilter(actor) {
+  if (activeFilters.has(actor)) activeFilters.delete(actor);
+  else activeFilters.add(actor);
+  renderFilterBtns();
+  renderSequenceView();
+  renderTimelineView();
+}
+
+// --- Search ---
+document.getElementById('search').addEventListener('input', e => {
+  searchQuery = e.target.value;
+  renderSequenceView();
+  renderTimelineView();
+});
+
+// --- Tab switching ---
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    activeView = tab.dataset.view;
+    document.getElementById('seq-view').style.display = activeView === 'sequence' ? 'block' : 'none';
+    document.getElementById('timeline-view').style.display = activeView === 'timeline' ? 'block' : 'none';
+  });
+});
+
+// ========================================
+// SEQUENCE VIEW
+// ========================================
+function renderSequenceView() {
+  const container = document.getElementById('seq-view');
+  const filtered = getFilteredEvents();
+
+  // Actor header
+  let html = '<div class="seq-actors">';
+  actors.forEach(a => {
+    const col = actorColors[a]||'#667';
+    const cls = activeFilters.has(a) ? ' filtered' : '';
+    html += `<div class="seq-actor${cls}" onclick="toggleFilter('${esc(a)}')" style="color:${col}"><span class="actor-dot" style="background:${col}"></span>${esc(a)}</div>`;
+  });
+  html += '</div>';
+
+  // Events area
+  html += '<div class="seq-events">';
+  // Lifelines
+  html += '<div class="seq-lifelines">';
+  actors.forEach(() => { html += '<div class="seq-lifeline"></div>'; });
+  html += '</div>';
+
+  // Group consecutive tool_call/tool_result pairs by same PO
+  const groups = groupToolCalls(filtered);
+
+  groups.forEach(g => {
+    if (g.group) {
+      html += renderSeqGroup(g);
+    } else {
+      html += renderSeqRow(g.event, g.originalIdx);
+    }
+  });
+
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function groupToolCalls(evts) {
+  const result = [];
+  let i = 0;
+  while (i < evts.length) {
+    const e = evts[i];
+    if ((e.type === 'tool_call' || e.type === 'tool_result') && !e.isStructural) {
+      // Collect consecutive tool events from the same session
+      const groupEvents = [];
+      const sessionId = e.sessionId;
+      while (i < evts.length && (evts[i].type === 'tool_call' || evts[i].type === 'tool_result') && evts[i].sessionId === sessionId && !evts[i].isStructural) {
+        groupEvents.push({ event: evts[i], originalIdx: events.indexOf(evts[i]) });
+        i++;
+      }
+      if (groupEvents.length > 2) {
+        result.push({ group: true, events: groupEvents, sessionId });
+      } else {
+        groupEvents.forEach(ge => result.push(ge));
+      }
+    } else {
+      result.push({ event: e, originalIdx: events.indexOf(e) });
+      i++;
+    }
+  }
+  return result;
+}
+
+function renderSeqGroup(g) {
+  const toolNames = [...new Set(g.events.filter(e=>e.event.type==='tool_call').map(e=>e.event.toolName||e.event.summary))];
+  const count = g.events.filter(e=>e.event.type==='tool_call').length;
+  const firstEvt = g.events[0].event;
+  const fromIdx = actors.indexOf(firstEvt.from);
+  const col = actorColors[firstEvt.from]||'#667';
+
+  let html = `<div class="seq-group">`;
+  html += `<div class="seq-group-header" onclick="toggleSeqGroup(this)">`;
+  html += `<span class="chevron">&#9654;</span>`;
+  html += `<span style="color:${col}">${esc(firstEvt.from)}</span>`;
+  html += `<span class="group-label">${count} tool calls: ${esc(toolNames.slice(0,3).join(', '))}${toolNames.length>3?'...':''}</span>`;
+  html += `</div>`;
+  html += `<div class="seq-group-body">`;
+  g.events.forEach(ge => { html += renderSeqRow(ge.event, ge.originalIdx); });
+  html += `</div></div>`;
+  return html;
+}
+
+function renderSeqRow(evt, idx) {
+  const fromIdx = actors.indexOf(evt.from);
+  const toIdx = actors.indexOf(evt.to);
+  const isActive = idx === selectedEventIdx;
+
+  let cls = `seq-row type-${evt.type}${isActive?' active':''}${evt.isStructural?' structural':''}`;
+  let html = `<div class="${cls}" data-idx="${idx}" onclick="selectEvent(${idx})">`;
+  html += `<div class="row-content">`;
+
+  if (evt.isStructural) {
+    // Structural badge on actor's lifeline
+    const x = fromIdx >= 0 ? ((fromIdx + 0.5) / actors.length * 100) : 50;
+    const col = actorColors[evt.from]||'#667';
+    html += `<div class="seq-structural-badge" style="left:calc(${x}% + 12px);background:rgba(255,68,85,0.15);color:var(--red);">${esc(evt.structuralType||evt.summary)}</div>`;
+  } else if (fromIdx >= 0 && toIdx >= 0 && fromIdx !== toIdx) {
+    // Arrow between two different actors
+    const left = Math.min(fromIdx, toIdx);
+    const right = Math.max(fromIdx, toIdx);
+    const goesRight = toIdx > fromIdx;
+    const leftPct = ((left + 0.5) / actors.length * 100);
+    const rightPct = ((right + 0.5) / actors.length * 100);
+    const col = actorColors[evt.from]||'#667';
+    const labelText = evt.type === 'tool_result' ? (evt.toolName||'\u2190') : evt.summary;
+
+    html += `<div class="seq-arrow-container" style="left:${leftPct}%;width:${rightPct-leftPct}%;">`;
+    if (!goesRight) html += `<div class="seq-arrow-head left" style="border-right-color:${col}"></div>`;
+    html += `<div class="seq-arrow-line" style="background:${col}">`;
+    html += `<div class="seq-arrow-label ${goesRight?'above-right':'above-left'}" style="color:${col}">${esc(trunc(labelText,40))}</div>`;
+    html += `</div>`;
+    if (goesRight) html += `<div class="seq-arrow-head right" style="border-left-color:${col}"></div>`;
+    html += `</div>`;
+  } else if (fromIdx >= 0 && fromIdx === toIdx) {
+    // Self-arrow (rare)
+    const x = ((fromIdx + 0.5) / actors.length * 100);
+    const col = actorColors[evt.from]||'#667';
+    html += `<div class="seq-self-arrow" style="left:calc(${x}% + 4px);border-color:${col}"></div>`;
+    html += `<div class="seq-structural-badge" style="left:calc(${x}% + 40px);background:transparent;color:${col}">${esc(trunc(evt.summary,30))}</div>`;
+  }
+
+  html += `</div></div>`;
+  return html;
+}
+
+function toggleSeqGroup(header) {
+  header.classList.toggle('expanded');
+  header.nextElementSibling.classList.toggle('expanded');
+}
+
+// ========================================
+// TIMELINE VIEW
+// ========================================
+function renderTimelineView() {
+  const container = document.getElementById('timeline-view');
+  const filtered = getFilteredEvents();
+
+  let html = '';
+  filtered.forEach((evt, fi) => {
+    const idx = events.indexOf(evt);
+    const isActive = idx === selectedEventIdx;
+    const col = actorColors[evt.from]||'#667';
+    const indent = evt.depth * 16;
+    const typeBadge = evt.type === 'delegation' || evt.type === 'delegation_return' ? '<span class="tl-type-badge delegation">deleg</span>'
+      : evt.isStructural ? '<span class="tl-type-badge structural">'+esc(evt.structuralType||'struct')+'</span>'
+      : (evt.type === 'tool_call' || evt.type === 'tool_result') ? '<span class="tl-type-badge tool">'+ esc(evt.toolName||'tool')+'</span>' : '';
+
+    html += `<div class="tl-event${isActive?' active':''}${evt.isStructural?' structural':''}" data-idx="${idx}" onclick="selectEvent(${idx})">`;
+    html += `<div class="tl-idx">${idx}</div>`;
+    html += `<div class="tl-time">${fmtTime(evt.ts)}</div>`;
+    html += `<div class="tl-actor-dot" style="background:${col};margin-left:${indent}px"></div>`;
+    html += `<div class="tl-body">`;
+    html += `<div class="tl-header-line">`;
+    html += `<span class="tl-from" style="color:${col}">${esc(evt.from)}</span>`;
+    html += `<span class="tl-arrow">\u2192</span>`;
+    html += `<span class="tl-to" style="color:${actorColors[evt.to]||'#667'}">${esc(evt.to)}</span>`;
+    html += typeBadge;
+    html += `</div>`;
+    if (evt.summary && evt.type !== 'tool_result') {
+      html += `<div class="tl-preview">${esc(evt.summary)}</div>`;
+    }
+    if (evt.usage) {
+      html += `<div class="tl-usage">${fmtNum(evt.usage.input_tokens||0)} in / ${fmtNum(evt.usage.output_tokens||0)} out</div>`;
+    }
+    html += `</div></div>`;
+  });
+
+  container.innerHTML = html || '<div class="detail-empty"><div>No events match</div></div>';
+}
+
+// ========================================
+// DETAIL VIEW
+// ========================================
+function selectEvent(idx) {
+  selectedEventIdx = idx;
+  const evt = events[idx];
+  if (!evt) return;
+
+  // Determine which session to show
+  const sessionId = evt.sessionId;
+  selectedSessionId = sessionId;
+
+  // Highlight in sequence/timeline
+  document.querySelectorAll('.seq-row,.tl-event').forEach(el => {
+    el.classList.toggle('active', parseInt(el.dataset.idx) === idx);
+  });
+
+  renderDetail();
+
+  // Scroll the active row into view in the current view
+  const activeRow = document.querySelector(activeView === 'sequence' ? '.seq-row.active' : '.tl-event.active');
+  if (activeRow) activeRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function renderDetail() {
+  const container = document.getElementById('detail-view');
+  if (!selectedSessionId) {
+    container.innerHTML = '<div class="detail-empty"><div class="icon">&larr;</div><div>Select an event</div></div>';
+    return;
+  }
+
+  const node = allNodes[selectedSessionId];
+  if (!node) { container.innerHTML = '<div class="detail-empty"><div>Session not found</div></div>'; return; }
+
+  const session = node.session||{};
+  const type = session.thread_type||'root';
+  const usage = sumUsageTree(node);
+  const messages = node.messages||[];
+
+  // Build breadcrumbs
+  const crumbs = buildBreadcrumbs(selectedSessionId);
+
+  let html = '';
+
+  // Breadcrumbs
+  if (crumbs.length > 1) {
+    html += '<div class="breadcrumbs">';
+    crumbs.forEach((c, i) => {
+      if (i > 0) html += '<span class="breadcrumb-sep">/</span>';
+      const isCurrent = c.id === selectedSessionId;
+      html += `<span class="breadcrumb${isCurrent?' current':''}" onclick="${isCurrent?'':`navigateToSession('${c.id}')`}">${esc(c.name)}</span>`;
+    });
+    html += '</div>';
+  }
+
+  // Header
+  html += `<div class="detail-header">`;
+  html += `<div style="display:flex;align-items:center">`;
+  html += `<span class="po-name">${esc(session.po_name||'?')}</span>`;
+  html += `<span class="type-badge badge-${type}">${type}</span>`;
+  if (session.parent_po) html += `<span class="parent-info">from <em>${esc(session.parent_po)}</em></span>`;
+  html += `</div>`;
+  html += `<div class="stats"><span><span class="v">${fmtNum(usage.input)}</span> in</span><span><span class="v">${fmtNum(usage.output)}</span> out</span></div>`;
+  html += `</div>`;
+
+  // Messages
+  html += '<div class="messages">';
+
+  // tool_call_id -> result lookup
+  const toolResults = {};
+  messages.forEach(m => {
+    if (m.role === 'tool' && m.tool_results) m.tool_results.forEach(tr => { toolResults[tr.tool_call_id] = tr; });
+  });
+
+  // delegation children lookup
+  const delegKids = {};
+  (node.children||[]).forEach(c => {
+    const cp = c.session?.po_name;
+    if (c.session?.thread_type === 'delegation' && cp) {
+      if (!delegKids[cp]) delegKids[cp] = [];
+      delegKids[cp].push(c);
+    }
+  });
+
+  for (const msg of messages) {
+    if (msg.role === 'tool') continue;
+
+    if (msg.role === 'user') {
+      const fromPo = msg.from_po && msg.from_po !== 'human';
+      html += `<div class="msg user${fromPo?' from-po':''}">`;
+      html += `<div class="msg-head"><span class="msg-sender ${fromPo?'delegator':'human'}">${esc(fromPo?msg.from_po:'human')}</span>`;
+      html += `<span class="msg-ts">${fmtTime(msg.created_at)}</span></div>`;
+      html += `<div class="msg-body">${esc(msg.content||'')}</div></div>`;
+    }
+
+    if (msg.role === 'assistant') {
+      if (msg.content) {
+        html += `<div class="msg assistant">`;
+        html += `<div class="msg-head"><span class="msg-sender assistant">${esc(session.po_name||'assistant')}</span>`;
+        html += `<span class="msg-ts">${fmtTime(msg.created_at)}</span>`;
+        if (msg.usage) html += `<span class="msg-tokens">${fmtNum(msg.usage.input_tokens||0)} in / ${fmtNum(msg.usage.output_tokens||0)} out</span>`;
+        html += `</div>`;
+        html += `<div class="msg-body">${esc(msg.content)}</div></div>`;
+      }
+
+      if (msg.tool_calls) {
+        for (const tc of msg.tool_calls) {
+          const tcName = tc.name||'';
+          const tcArgs = tc.arguments||{};
+          const tcId = tc.id||'';
+          const result = toolResults[tcId];
+          const isSt = STRUCTURAL_TOOLS.has(tcName);
+
+          html += `<div class="tc">`;
+          html += `<div class="tc-head" onclick="toggleTc(this)">`;
+          html += `<span class="chv">&#9654;</span>`;
+          html += `<span class="tc-name" ${isSt?'style="color:var(--red)"':''}>${esc(tcName)}</span>`;
+          html += `<span class="tc-label">${isSt?'structural':'tool call'}</span>`;
+          html += `</div>`;
+          html += `<div class="tc-body">`;
+          html += `<div class="tc-section"><div class="tc-section-label">Arguments</div><pre>${esc(JSON.stringify(tcArgs,null,2))}</pre></div>`;
+          if (result) html += `<div class="tc-section"><div class="tc-section-label">Result</div><div class="tc-result">${esc(trunc(result.content||'',5000))}</div></div>`;
+          html += `</div></div>`;
+
+          // Delegation marker
+          if (delegKids[tcName] && delegKids[tcName].length > 0) {
+            const child = delegKids[tcName].shift();
+            if (child) {
+              const cid = child.session?.id;
+              const cMsgs = (child.messages||[]).filter(m=>m.role!=='tool').length;
+              html += `<div class="deleg-marker" onclick="navigateToSession('${cid}')">`;
+              html += `<span>\u2192</span> <strong>Delegated to ${esc(tcName)}</strong>`;
+              html += `<span class="dm-info">${cMsgs} messages</span>`;
+              html += `</div>`;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  html += '</div>';
+  container.innerHTML = html;
+  container.scrollTop = 0;
+}
+
+function toggleTc(head) {
+  head.classList.toggle('open');
+  head.nextElementSibling.classList.toggle('open');
+}
+
+function navigateToSession(sessionId) {
+  selectedSessionId = sessionId;
+  // Find first event for this session
+  const idx = events.findIndex(e => e.sessionId === sessionId);
+  if (idx >= 0) selectedEventIdx = idx;
+  renderDetail();
+  // Highlight in views
+  document.querySelectorAll('.seq-row,.tl-event').forEach(el => {
+    el.classList.toggle('active', parseInt(el.dataset.idx) === selectedEventIdx);
+  });
+}
+
+function buildBreadcrumbs(sessionId) {
+  const crumbs = [];
+  let current = allNodes[sessionId];
+  while (current) {
+    const s = current.session||{};
+    crumbs.unshift({ id: s.id, name: s.po_name||'?' });
+    // Find parent
+    if (s.parent_session_id && allNodes[s.parent_session_id]) {
+      current = allNodes[s.parent_session_id];
+    } else if (current._parent) {
+      current = current._parent;
+      // Check if this is really the parent by matching session
+      const ps = current.session;
+      if (ps && ps.id && !crumbs.find(c=>c.id===ps.id)) {
+        continue;
+      } else break;
+    } else break;
+  }
+  return crumbs;
+}
+
+// --- Utility ---
+function sumUsageTree(node) {
+  let input=0, output=0;
+  (node.messages||[]).forEach(m => { if(m.usage){ input+=m.usage.input_tokens||0; output+=m.usage.output_tokens||0; }});
+  (node.children||[]).forEach(c => { const u=sumUsageTree(c); input+=u.input; output+=u.output; });
+  return {input,output};
+}
+function fmtNum(n) { if(n>=1e6) return (n/1e6).toFixed(1)+'M'; if(n>=1e3) return (n/1e3).toFixed(1)+'K'; return ''+n; }
+function fmtTime(iso) { if(!iso) return ''; try { return new Date(iso).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}); } catch{return '';} }
+function trunc(s,n) { return s && s.length>n ? s.substring(0,n)+'...' : (s||''); }
+function esc(s) { if(!s) return ''; const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+// ========================================
+// SAMPLE DATA
+// ========================================
+function generateSampleData() {
+  const t = n => new Date(Date.now() - n*1000).toISOString();
+  return {
+    session: { id:"s1", po_name:"solver", name:"Analyze data pipeline", thread_type:"root", parent_po:null, created_at:t(600) },
+    messages: [
+      { role:"user", content:"Analyze the data pipeline in /src/pipeline and fix the ETL issue.", from_po:null, created_at:t(600) },
+      { role:"assistant", content:null,
+        tool_calls:[{id:"c1",name:"reader",arguments:{message:"Read and summarize all files in /src/pipeline/"}}],
+        usage:{input_tokens:1250,output_tokens:45,model:"claude-sonnet-4-5",provider:"anthropic"}, created_at:t(595) },
+      { role:"tool", tool_results:[{tool_call_id:"c1",name:"reader",content:"3 stages: extract (PostgreSQL), transform (cleaning), load (warehouse). Key issue: transform.py drops ~12% of rows with null timestamps."}], created_at:t(560) },
+      { role:"assistant", content:null,
+        tool_calls:[{id:"c2",name:"read_file",arguments:{path:"/src/pipeline/transform.py"}}],
+        usage:{input_tokens:1800,output_tokens:32,model:"claude-sonnet-4-5",provider:"anthropic"}, created_at:t(555) },
+      { role:"tool", tool_results:[{tool_call_id:"c2",name:"read_file",content:"import pandas as pd\nfrom datetime import datetime\n\ndef transform(df):\n    df = df.dropna(subset=['created_at'])\n    df['created_at'] = pd.to_datetime(df['created_at'])\n    df['amount'] = df['amount'].clip(lower=0)\n    df['status'] = df['status'].str.lower()\n    return df"}], created_at:t(553) },
+      { role:"assistant", content:null,
+        tool_calls:[{id:"c3",name:"write_file",arguments:{path:"/src/pipeline/transform.py",content:"import pandas as pd\nfrom datetime import datetime\n\ndef transform(df):\n    df['created_at'] = df['created_at'].fillna(df['updated_at'])\n    df['created_at'] = pd.to_datetime(df['created_at'])\n    df['amount'] = df['amount'].clip(lower=0)\n    df['status'] = df['status'].str.lower()\n    return df"}}],
+        usage:{input_tokens:2200,output_tokens:60,model:"claude-sonnet-4-5",provider:"anthropic"}, created_at:t(545) },
+      { role:"tool", tool_results:[{tool_call_id:"c3",name:"write_file",content:"File written successfully"}], created_at:t(543) },
+      { role:"assistant", content:null,
+        tool_calls:[{id:"c4",name:"validator",arguments:{message:"Run the test suite for /src/pipeline/ and verify the transform fix handles null timestamps correctly."}}],
+        usage:{input_tokens:2500,output_tokens:55,model:"claude-sonnet-4-5",provider:"anthropic"}, created_at:t(540) },
+      { role:"tool", tool_results:[{tool_call_id:"c4",name:"validator",content:"All 12 tests pass. Null timestamp handling verified: 0 rows dropped, fallback to updated_at working correctly."}], created_at:t(500) },
+      { role:"assistant", content:null,
+        tool_calls:[{id:"c5",name:"add_capability",arguments:{name:"solver",capability:"write_file"}}],
+        usage:{input_tokens:2800,output_tokens:30,model:"claude-sonnet-4-5",provider:"anthropic"}, created_at:t(495) },
+      { role:"tool", tool_results:[{tool_call_id:"c5",name:"add_capability",content:"Capability write_file added to solver"}], created_at:t(494) },
+      { role:"assistant", content:"Fixed the ETL pipeline issue.\n\n**Problem:** `transform.py` used `df.dropna(subset=['created_at'])` which silently dropped ~12% of records with null timestamps.\n\n**Fix:** Replaced with `df['created_at'].fillna(df['updated_at'])` to use the `updated_at` field as a fallback instead of discarding rows.\n\n**Verification:** All 12 tests pass. The validator confirmed 0 rows are now dropped and the fallback works correctly.\n\nI've also added `write_file` to my capabilities for future code fixes.",
+        usage:{input_tokens:3000,output_tokens:120,model:"claude-sonnet-4-5",provider:"anthropic"}, created_at:t(490) }
+    ],
+    children: [
+      {
+        session: { id:"s2", po_name:"reader", name:"Read pipeline files", thread_type:"delegation", parent_po:"solver", created_at:t(595) },
+        messages: [
+          { role:"user", content:"Read and summarize all files in /src/pipeline/", from_po:"solver", created_at:t(595) },
+          { role:"assistant", content:null,
+            tool_calls:[{id:"r1",name:"list_files",arguments:{path:"/src/pipeline/"}}],
+            usage:{input_tokens:420,output_tokens:18,model:"claude-sonnet-4-5",provider:"anthropic"}, created_at:t(593) },
+          { role:"tool", tool_results:[{tool_call_id:"r1",name:"list_files",content:"extract.py\ntransform.py\nload.py\nconfig.yml\n__init__.py"}], created_at:t(592) },
+          { role:"assistant", content:null,
+            tool_calls:[
+              {id:"r2",name:"read_file",arguments:{path:"/src/pipeline/extract.py"}},
+              {id:"r3",name:"read_file",arguments:{path:"/src/pipeline/transform.py"}},
+              {id:"r4",name:"read_file",arguments:{path:"/src/pipeline/load.py"}}
+            ],
+            usage:{input_tokens:680,output_tokens:42,model:"claude-sonnet-4-5",provider:"anthropic"}, created_at:t(590) },
+          { role:"tool", tool_results:[
+            {tool_call_id:"r2",name:"read_file",content:"import psycopg2\n\ndef extract(config):\n    conn = psycopg2.connect(**config['db'])\n    cursor = conn.cursor()\n    cursor.execute('SELECT * FROM events ORDER BY id')\n    while True:\n        rows = cursor.fetchmany(1000)\n        if not rows: break\n        yield rows"},
+            {tool_call_id:"r3",name:"read_file",content:"import pandas as pd\nfrom datetime import datetime\n\ndef transform(df):\n    df = df.dropna(subset=['created_at'])\n    df['created_at'] = pd.to_datetime(df['created_at'])\n    df['amount'] = df['amount'].clip(lower=0)\n    df['status'] = df['status'].str.lower()\n    return df"},
+            {tool_call_id:"r4",name:"read_file",content:"from sqlalchemy import create_engine\n\ndef load(df, config):\n    engine = create_engine(config['warehouse_url'])\n    df.to_sql('events_clean', engine, if_exists='append', index=False, method='multi', chunksize=500)"}
+          ], created_at:t(585) },
+          { role:"assistant",
+            content:"3 stages: extract (PostgreSQL), transform (cleaning), load (warehouse). Key issue: transform.py drops ~12% of rows with null timestamps.",
+            usage:{input_tokens:1400,output_tokens:95,model:"claude-sonnet-4-5",provider:"anthropic"}, created_at:t(565) }
+        ],
+        children: []
+      },
+      {
+        session: { id:"s3", po_name:"validator", name:"Validate fix", thread_type:"delegation", parent_po:"solver", created_at:t(540) },
+        messages: [
+          { role:"user", content:"Run the test suite for /src/pipeline/ and verify the transform fix handles null timestamps correctly.", from_po:"solver", created_at:t(540) },
+          { role:"assistant", content:null,
+            tool_calls:[{id:"v1",name:"list_files",arguments:{path:"/src/pipeline/tests/"}}],
+            usage:{input_tokens:350,output_tokens:15,model:"claude-sonnet-4-5",provider:"anthropic"}, created_at:t(538) },
+          { role:"tool", tool_results:[{tool_call_id:"v1",name:"list_files",content:"test_extract.py\ntest_transform.py\ntest_load.py\nconftest.py"}], created_at:t(537) },
+          { role:"assistant", content:null,
+            tool_calls:[{id:"v2",name:"read_file",arguments:{path:"/src/pipeline/tests/test_transform.py"}}],
+            usage:{input_tokens:500,output_tokens:20,model:"claude-sonnet-4-5",provider:"anthropic"}, created_at:t(535) },
+          { role:"tool", tool_results:[{tool_call_id:"v2",name:"read_file",content:"import pytest\nimport pandas as pd\nfrom pipeline.transform import transform\n\ndef test_null_timestamps():\n    df = pd.DataFrame({'created_at': [None, '2024-01-01'], 'updated_at': ['2024-02-01', '2024-01-01'], 'amount': [100, 200], 'status': ['ACTIVE', 'inactive']})\n    result = transform(df)\n    assert len(result) == 2\n    assert result.iloc[0]['created_at'] == pd.Timestamp('2024-02-01')"}], created_at:t(533) },
+          { role:"assistant", content:null,
+            tool_calls:[
+              {id:"v3",name:"read_file",arguments:{path:"/src/pipeline/transform.py"}},
+              {id:"v4",name:"read_file",arguments:{path:"/src/pipeline/tests/conftest.py"}}
+            ],
+            usage:{input_tokens:900,output_tokens:28,model:"claude-sonnet-4-5",provider:"anthropic"}, created_at:t(520) },
+          { role:"tool", tool_results:[
+            {tool_call_id:"v3",name:"read_file",content:"import pandas as pd\nfrom datetime import datetime\n\ndef transform(df):\n    df['created_at'] = df['created_at'].fillna(df['updated_at'])\n    df['created_at'] = pd.to_datetime(df['created_at'])\n    df['amount'] = df['amount'].clip(lower=0)\n    df['status'] = df['status'].str.lower()\n    return df"},
+            {tool_call_id:"v4",name:"read_file",content:"import pytest\n\n@pytest.fixture\ndef sample_data():\n    return {'events': [{'id': 1, 'created_at': None, 'updated_at': '2024-01-15'}]}"}
+          ], created_at:t(515) },
+          { role:"assistant",
+            content:"All 12 tests pass. Null timestamp handling verified: 0 rows dropped, fallback to updated_at working correctly.",
+            usage:{input_tokens:1200,output_tokens:40,model:"claude-sonnet-4-5",provider:"anthropic"}, created_at:t(505) }
+        ],
+        children: []
+      }
+    ]
+  };
+}
+</script>
+</body>
+</html>
