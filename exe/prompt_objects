@@ -298,6 +298,7 @@ def print_main_help
       prompt_objects serve my-env --open          # Start and open browser
       prompt_objects message my-env solver "Hello"     # Send a message
       prompt_objects message my-env solver "Hello" --json  # JSON output
+      prompt_objects explore my-env                  # Visualize conversations
   HELP
 end
 

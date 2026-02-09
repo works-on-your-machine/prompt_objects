@@ -873,7 +873,7 @@ function renderDetail() {
           html += `</div>`;
           html += `<div class="tc-body">`;
           html += `<div class="tc-section"><div class="tc-section-label">Arguments</div><pre>${esc(JSON.stringify(tcArgs,null,2))}</pre></div>`;
-          if (result) html += `<div class="tc-section"><div class="tc-section-label">Result</div><div class="tc-result">${esc(trunc(result.content||'',5000))}</div></div>`;
+          if (result) html += `<div class="tc-section"><div class="tc-section-label">Result</div><div class="tc-result">${esc(result.content||'')}</div></div>`;
           html += `</div></div>`;
 
           // Delegation marker

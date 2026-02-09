@@ -2,6 +2,18 @@
 
 All notable changes to PromptObjects are documented in this file.
 
+## [0.3.1] - 2025-02-08
+
+### Added
+
+- **Thread Explorer** — Standalone HTML visualizer for exploring conversation thread exports. Three views: sequence diagram (swim lanes showing PO communication), timeline (flat chronological event list), and detail panel (full conversation with tool calls). Includes token cost bar, search, per-PO filtering, breadcrumb navigation, and structural event highlighting.
+- **`explore` CLI command** — Open Thread Explorer from the command line. `prompt_objects explore <env>` lists root threads and opens the most recent; `--session ID` targets a specific thread. Data is embedded directly so it opens ready to go.
+
+### Fixed
+
+- Delegation messages now correctly show the calling PO's name instead of "human". Previously `context.current_capability` resolved to the target PO (matching its own name), causing a fallback to "human". Now uses `context.calling_po`.
+- CLI integration tests skip gracefully in CI when no LLM API key is available, instead of failing.
+
 ## [0.3.0] - 2025-02-05
 
 ### Added
