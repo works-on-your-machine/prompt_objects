@@ -20,8 +20,7 @@ module PromptObjects
               type: "string",
               description: "The directory path to list (defaults to current directory)"
             }
-          },
-          required: []
+          }
         }
       end
 
