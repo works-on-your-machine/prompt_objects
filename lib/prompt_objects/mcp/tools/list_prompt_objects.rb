@@ -10,8 +10,7 @@ module PromptObjects
 
         input_schema(
           type: "object",
-          properties: {},
-          required: []
+          properties: {}
         )
 
         def self.call(server_context:, **_args)

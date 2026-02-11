@@ -176,8 +176,7 @@ module PromptObjects
 
           input_schema(
             type: "object",
-            properties: {},
-            required: []
+            properties: {}
           )
 
           def self.call(server_context:)
@@ -367,8 +366,7 @@ module PromptObjects
                 type: "string",
                 description: "Filter by source: tui, mcp, api, web (optional)"
               }
-            },
-            required: []
+            }
           )
 
           def self.call(po_name: nil, source: nil, server_context:)
@@ -413,8 +411,7 @@ module PromptObjects
 
           input_schema(
             type: "object",
-            properties: {},
-            required: []
+            properties: {}
           )
 
           def self.call(server_context:)
