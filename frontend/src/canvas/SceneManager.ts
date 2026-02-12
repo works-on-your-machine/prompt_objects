@@ -11,8 +11,8 @@ import { PONode } from './nodes/PONode'
 import { ToolCallNode } from './nodes/ToolCallNode'
 import { MessageArc } from './edges/MessageArc'
 import { useCanvasStore } from './canvasStore'
-import { COLORS, BLOOM } from './constants'
-import type { PromptObject, BusMessage, Notification } from '../types'
+import { COLORS, BLOOM, NODE } from './constants'
+import type { PromptObject, BusMessage, Notification, ToolCall } from '../types'
 
 export class SceneManager {
   private container: HTMLDivElement
@@ -36,6 +36,12 @@ export class SceneManager {
 
   // Track processed bus messages to avoid duplicates
   private processedArcIds = new Set<string>()
+
+  // Track PO status transitions and tool calls
+  private prevPOStatuses = new Map<string, string>()
+  private seenToolCallIds = new Set<string>()
+  // Map from PO name → set of tool call node IDs currently active for that PO
+  private poToolCallNodes = new Map<string, Set<string>>()
 
   constructor(container: HTMLDivElement) {
     this.container = container
@@ -115,6 +121,8 @@ export class SceneManager {
         node.dispose()
         this.poNodes.delete(id)
         this.forceLayout.removeNode(id)
+        this.fadeOutToolCallsForPO(id)
+        this.prevPOStatuses.delete(id)
       }
     }
 
@@ -128,6 +136,26 @@ export class SceneManager {
         this.forceLayout.addNode(name, 'po')
       }
       node.setStatus(po.status)
+
+      // Detect status transitions for tool call visualization
+      const prevStatus = this.prevPOStatuses.get(name)
+      this.prevPOStatuses.set(name, po.status)
+
+      if (po.status === 'calling_tool') {
+        // PO is calling tools — extract any new tool_calls from its messages
+        this.extractAndCreateToolCalls(name, po)
+      } else if (prevStatus === 'calling_tool') {
+        // PO just finished calling tools — fade out its tool call nodes
+        this.fadeOutToolCallsForPO(name)
+      }
+
+      // Even when 'thinking', scan for tool calls we haven't seen yet.
+      // The server often sends status back to 'thinking' between individual
+      // tool calls in a multi-tool sequence, so we'd miss them if we only
+      // check on the 'calling_tool' transition.
+      if (po.status === 'thinking') {
+        this.extractAndCreateToolCalls(name, po)
+      }
     }
   }
 
@@ -141,6 +169,7 @@ export class SceneManager {
       const toNode = this.poNodes.get(msg.to)
       if (!fromNode || !toNode) continue
 
+      // Create arc for all PO-to-PO bus messages
       const arc = new MessageArc(
         arcId,
         msg.from,
@@ -150,33 +179,19 @@ export class SceneManager {
       )
       this.messageArcs.set(arcId, arc)
       this.scene.add(arc.group)
-
-      // Check if this is a tool call message — create a ToolCallNode
-      if (typeof msg.content === 'object' && msg.content !== null) {
-        const content = msg.content as Record<string, unknown>
-        if (content.tool_name || content.capability) {
-          const toolId = `tc-${arcId}`
-          const toolName = (content.tool_name || content.capability || 'tool') as string
-          const tcNode = new ToolCallNode(toolId, toolName, msg.from)
-
-          // Position near the caller node
-          const callerPos = fromNode.getPosition()
-          const targetPos = toNode.getPosition()
-          const midX = (callerPos.x + targetPos.x) / 2
-          const midY = (callerPos.y + targetPos.y) / 2
-          tcNode.setPosition(midX, midY + 30)
-
-          this.toolCallNodes.set(toolId, tcNode)
-          this.scene.add(tcNode.group)
-        }
-      }
     }
 
-    // Keep processed set from growing unbounded
+    // Keep processed sets from growing unbounded
     if (this.processedArcIds.size > 500) {
       const ids = Array.from(this.processedArcIds)
       for (let i = 0; i < 200; i++) {
         this.processedArcIds.delete(ids[i])
+      }
+    }
+    if (this.seenToolCallIds.size > 200) {
+      const ids = Array.from(this.seenToolCallIds)
+      for (let i = 0; i < 100; i++) {
+        this.seenToolCallIds.delete(ids[i])
       }
     }
   }
@@ -208,6 +223,105 @@ export class SceneManager {
     bounds.max.add(padding)
 
     this.cameraControls.fitAll(bounds)
+  }
+
+  // --- Tool call extraction ---
+
+  private extractAndCreateToolCalls(poName: string, po: PromptObject): void {
+    const messages = po.current_session?.messages
+    if (!messages || messages.length === 0) return
+
+    // Scan recent messages for tool_calls we haven't visualized yet,
+    // and also for tool results to enrich existing tool call entries.
+    const newToolCalls: ToolCall[] = []
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i]
+      if (msg.role === 'assistant' && msg.tool_calls) {
+        for (const tc of msg.tool_calls) {
+          if (!this.seenToolCallIds.has(tc.id)) {
+            newToolCalls.push(tc)
+          }
+        }
+      }
+      // Enrich with results from tool messages
+      if (msg.role === 'tool' && msg.results) {
+        for (const result of msg.results) {
+          const tcNodeId = `tc-${result.tool_call_id}`
+          if (this.toolCallNodes.has(tcNodeId)) {
+            useCanvasStore.getState().updateToolCall(tcNodeId, {
+              result: result.content,
+              status: 'completed',
+              completedAt: Date.now(),
+            })
+          }
+        }
+      }
+      // Don't scan the entire history — last 10 messages is enough
+      // (a multi-tool call can generate several messages)
+      if (messages.length - 1 - i >= 10) break
+    }
+
+    if (newToolCalls.length === 0) return
+
+    const callerNode = this.poNodes.get(poName)
+    if (!callerNode) return
+    const callerPos = callerNode.getPosition()
+
+    // Get how many tool call nodes this PO already has (for offset positioning)
+    let poTcSet = this.poToolCallNodes.get(poName)
+    if (!poTcSet) {
+      poTcSet = new Set()
+      this.poToolCallNodes.set(poName, poTcSet)
+    }
+
+    for (const tc of newToolCalls) {
+      this.seenToolCallIds.add(tc.id)
+
+      // Position in a cluster around the caller PO
+      const existingCount = poTcSet.size
+      const angle = (existingCount * (2 * Math.PI / 6)) - Math.PI / 2 // spread in hex pattern
+      const offsetDist = NODE.poRadius + 40
+      const offsetX = Math.cos(angle) * offsetDist
+      const offsetY = Math.sin(angle) * offsetDist
+
+      const tcNodeId = `tc-${tc.id}`
+      const tcNode = new ToolCallNode(tcNodeId, tc.name, poName)
+      tcNode.setPosition(callerPos.x + offsetX, callerPos.y + offsetY)
+
+      this.toolCallNodes.set(tcNodeId, tcNode)
+      this.scene.add(tcNode.group)
+      poTcSet.add(tcNodeId)
+
+      // Also register in the canvas store so the inspector can display it
+      useCanvasStore.getState().addToolCall({
+        id: tcNodeId,
+        toolName: tc.name,
+        callerPO: poName,
+        params: tc.arguments,
+        status: 'active',
+        startedAt: Date.now(),
+      })
+    }
+  }
+
+  private fadeOutToolCallsForPO(poName: string): void {
+    const tcSet = this.poToolCallNodes.get(poName)
+    if (!tcSet) return
+
+    for (const tcNodeId of tcSet) {
+      const tcNode = this.toolCallNodes.get(tcNodeId)
+      if (tcNode) {
+        tcNode.triggerFadeOut()
+      }
+      // Mark as completed in canvas store
+      useCanvasStore.getState().updateToolCall(tcNodeId, {
+        status: 'completed',
+        completedAt: Date.now(),
+      })
+    }
+
+    // Clear the set — expired nodes will be removed by the animation loop
+    tcSet.clear()
   }
 
   // --- Lifecycle ---
@@ -284,7 +398,28 @@ export class SceneManager {
       node.update(delta, elapsed)
     }
 
-    // 3. Update arcs (recalculate endpoints, advance particles)
+    // 3. Update tool call node positions to follow their caller PO
+    for (const [poName, tcSet] of this.poToolCallNodes) {
+      const callerNode = this.poNodes.get(poName)
+      if (!callerNode) continue
+      const callerPos = callerNode.getPosition()
+
+      let i = 0
+      for (const tcNodeId of tcSet) {
+        const tcNode = this.toolCallNodes.get(tcNodeId)
+        if (!tcNode) continue
+        // Keep tool call nodes orbiting around caller
+        const angle = (i * (2 * Math.PI / Math.max(tcSet.size, 1))) - Math.PI / 2
+        const offsetDist = NODE.poRadius + 40
+        tcNode.setPosition(
+          callerPos.x + Math.cos(angle) * offsetDist,
+          callerPos.y + Math.sin(angle) * offsetDist
+        )
+        i++
+      }
+    }
+
+    // 4. Update arcs (recalculate endpoints, advance particles)
     for (const [id, arc] of this.messageArcs) {
       const fromNode = this.poNodes.get(arc.from)
       const toNode = this.poNodes.get(arc.to)
@@ -300,17 +435,19 @@ export class SceneManager {
       }
     }
 
-    // 4. Update tool call nodes (lifecycle)
+    // 5. Update tool call nodes (lifecycle)
     for (const [id, node] of this.toolCallNodes) {
       node.update(delta)
       if (node.isExpired()) {
         this.scene.remove(node.group)
         node.dispose()
         this.toolCallNodes.delete(id)
+        // Clean up from canvas store
+        useCanvasStore.getState().removeToolCall(id)
       }
     }
 
-    // 5. Render
+    // 6. Render
     this.composer.render()
     this.cssRenderer.render(this.scene, this.camera)
   }
@@ -330,7 +467,7 @@ export class SceneManager {
       if (type && id) {
         useCanvasStore.getState().selectNode({ type, id })
 
-        // Update visual selection
+        // Update visual selection on PO nodes
         for (const node of this.poNodes.values()) {
           node.setSelected(node.id === id)
         }
