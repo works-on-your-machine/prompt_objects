@@ -12,6 +12,11 @@ Prompt Objects applies this to AI. Instead of treating LLMs as external APIs you
 
 This is a new computing primitive: semantic late binding at runtime, where natural language becomes the interface between intelligent components.
 
+Blog Posts
+==========
+
+- [What if we took message passing seriously?](https://worksonmymachine.ai/p/what-if-we-took-message-passing-seriously) — The origin story and motivation behind Prompt Objects.
+
 Who
 ===
 
