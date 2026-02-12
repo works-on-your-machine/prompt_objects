@@ -7,7 +7,7 @@ interface Props {
 }
 
 export function Header({ switchLLM }: Props) {
-  const { connected, environment, selectedPO, selectPO, toggleBus, busOpen, notifications } =
+  const { connected, environment, selectedPO, selectPO, toggleBus, busOpen, notifications, currentView, setCurrentView } =
     useStore()
   const notificationCount = useNotificationCount()
   const [showNotifications, setShowNotifications] = useState(false)
@@ -124,6 +124,18 @@ export function Header({ switchLLM }: Props) {
           </div>
         )}
       </div>
+
+      {/* Canvas toggle */}
+      <button
+        onClick={() => setCurrentView(currentView === 'canvas' ? 'dashboard' : 'canvas')}
+        className={`px-3 py-1.5 text-sm rounded transition-colors ${
+          currentView === 'canvas'
+            ? 'bg-po-accent text-white'
+            : 'bg-po-border text-gray-300 hover:bg-po-accent/50'
+        }`}
+      >
+        Canvas
+      </button>
 
       {/* Message Bus toggle */}
       <button

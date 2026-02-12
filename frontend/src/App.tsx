@@ -8,11 +8,12 @@ import { MessageBus } from './components/MessageBus'
 import { NotificationPanel } from './components/NotificationPanel'
 import { ThreadsSidebar } from './components/ThreadsSidebar'
 import { UsagePanel } from './components/UsagePanel'
+import { CanvasView } from './canvas/CanvasView'
 
 export default function App() {
   const { sendMessage, respondToNotification, createSession, switchSession, switchLLM, createThread, updatePrompt, requestUsage, exportThread } =
     useWebSocket()
-  const { selectedPO, busOpen, notifications, usageData, clearUsageData } = useStore()
+  const { selectedPO, busOpen, notifications, usageData, clearUsageData, currentView } = useStore()
   const selectedPOData = useSelectedPO()
   const [splitView, setSplitView] = useState(true) // Default to split view
 
@@ -21,66 +22,72 @@ export default function App() {
       <Header switchLLM={switchLLM} />
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Split view: Dashboard sidebar on left when PO selected */}
-        {splitView && selectedPO && (
+        {currentView === 'canvas' ? (
+          <CanvasView />
+        ) : (
           <>
-            {/* PO List */}
-            <aside className="w-56 border-r border-po-border bg-po-surface overflow-hidden flex flex-col">
-              <div className="p-3 border-b border-po-border flex items-center justify-between">
-                <h2 className="text-sm font-medium text-gray-400">Prompt Objects</h2>
-                <button
-                  onClick={() => setSplitView(false)}
-                  className="text-xs text-gray-500 hover:text-white"
-                  title="Hide sidebar"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="flex-1 overflow-auto">
-                <Dashboard compact />
-              </div>
-            </aside>
+            {/* Split view: Dashboard sidebar on left when PO selected */}
+            {splitView && selectedPO && (
+              <>
+                {/* PO List */}
+                <aside className="w-56 border-r border-po-border bg-po-surface overflow-hidden flex flex-col">
+                  <div className="p-3 border-b border-po-border flex items-center justify-between">
+                    <h2 className="text-sm font-medium text-gray-400">Prompt Objects</h2>
+                    <button
+                      onClick={() => setSplitView(false)}
+                      className="text-xs text-gray-500 hover:text-white"
+                      title="Hide sidebar"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-auto">
+                    <Dashboard compact />
+                  </div>
+                </aside>
 
-            {/* Threads List for selected PO */}
-            {selectedPOData && (
-              <aside className="w-56 border-r border-po-border bg-po-bg overflow-hidden">
-                <ThreadsSidebar
-                  po={selectedPOData}
+                {/* Threads List for selected PO */}
+                {selectedPOData && (
+                  <aside className="w-56 border-r border-po-border bg-po-bg overflow-hidden">
+                    <ThreadsSidebar
+                      po={selectedPOData}
+                      switchSession={switchSession}
+                      createThread={createThread}
+                      requestUsage={requestUsage}
+                      exportThread={exportThread}
+                    />
+                  </aside>
+                )}
+              </>
+            )}
+
+            {/* Main content */}
+            <main className="flex-1 overflow-hidden flex flex-col">
+              {/* Show expand button when sidebar is hidden */}
+              {!splitView && selectedPO && (
+                <button
+                  onClick={() => setSplitView(true)}
+                  className="absolute left-2 top-16 z-10 bg-po-surface border border-po-border rounded px-2 py-1 text-xs text-gray-400 hover:text-white hover:border-po-accent transition-colors"
+                  title="Show dashboard sidebar"
+                >
+                  ☰ POs
+                </button>
+              )}
+
+              {selectedPO ? (
+                <PODetail
+                  sendMessage={sendMessage}
+                  createSession={createSession}
                   switchSession={switchSession}
                   createThread={createThread}
-                  requestUsage={requestUsage}
-                  exportThread={exportThread}
+                  updatePrompt={updatePrompt}
                 />
-              </aside>
-            )}
+              ) : (
+                <Dashboard />
+              )}
+            </main>
           </>
         )}
-
-        {/* Main content */}
-        <main className="flex-1 overflow-hidden flex flex-col">
-          {/* Show expand button when sidebar is hidden */}
-          {!splitView && selectedPO && (
-            <button
-              onClick={() => setSplitView(true)}
-              className="absolute left-2 top-16 z-10 bg-po-surface border border-po-border rounded px-2 py-1 text-xs text-gray-400 hover:text-white hover:border-po-accent transition-colors"
-              title="Show dashboard sidebar"
-            >
-              ☰ POs
-            </button>
-          )}
-
-          {selectedPO ? (
-            <PODetail
-              sendMessage={sendMessage}
-              createSession={createSession}
-              switchSession={switchSession}
-              createThread={createThread}
-              updatePrompt={updatePrompt}
-            />
-          ) : (
-            <Dashboard />
-          )}
-        </main>
 
         {/* Message Bus sidebar */}
         {busOpen && (

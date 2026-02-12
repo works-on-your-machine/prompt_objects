@@ -32,6 +32,8 @@ interface Store {
   selectPO: (name: string | null) => void
   activeTab: 'chat' | 'sessions' | 'capabilities' | 'prompt'
   setActiveTab: (tab: Store['activeTab']) => void
+  currentView: 'dashboard' | 'canvas'
+  setCurrentView: (view: Store['currentView']) => void
 
   // Message Bus
   busMessages: BusMessage[]
@@ -175,6 +177,8 @@ export const useStore = create<Store>((set) => ({
   selectPO: (name) => set({ selectedPO: name, activeTab: 'chat' }),
   activeTab: 'chat',
   setActiveTab: (activeTab) => set({ activeTab }),
+  currentView: 'dashboard',
+  setCurrentView: (currentView) => set({ currentView }),
 
   // Message Bus
   busMessages: [],
