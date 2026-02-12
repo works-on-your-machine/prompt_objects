@@ -19,6 +19,15 @@ module PromptObjects
         @public_path = File.expand_path("public", __dir__)
         @connections = []
         @connections_mutex = Mutex.new
+
+        # Broadcast PO-to-PO delegation events to all connected clients.
+        # This makes delegated POs visible in the UI (canvas + chat).
+        @runtime.on_delegation_event = ->(event_type, payload) {
+          broadcast(
+            type: "po_delegation_#{event_type}",
+            payload: payload
+          )
+        }
       end
 
       def call(env)

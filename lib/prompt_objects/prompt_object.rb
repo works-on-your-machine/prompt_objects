@@ -328,12 +328,30 @@ module PromptObjects
         parent_message_id: get_last_message_id
       )
 
-      if delegation_thread
-        # Execute in isolated thread
-        target_po.receive_in_thread(tool_call.arguments, context: context, thread_id: delegation_thread)
-      else
-        # Fallback: execute in target's current session (no session store)
-        target_po.receive(tool_call.arguments, context: context)
+      # Notify delegation start so WebSocket clients see the target PO activate
+      @env.notify_delegation(:started, {
+        target: target_po.name,
+        caller: name,
+        thread_id: delegation_thread,
+        tool_call_id: tool_call.id
+      })
+
+      begin
+        if delegation_thread
+          # Execute in isolated thread
+          target_po.receive_in_thread(tool_call.arguments, context: context, thread_id: delegation_thread)
+        else
+          # Fallback: execute in target's current session (no session store)
+          target_po.receive(tool_call.arguments, context: context)
+        end
+      ensure
+        # Notify delegation complete — target PO is done
+        @env.notify_delegation(:completed, {
+          target: target_po.name,
+          caller: name,
+          thread_id: delegation_thread,
+          tool_call_id: tool_call.id
+        })
       end
     end
 

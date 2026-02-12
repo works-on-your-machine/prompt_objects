@@ -41,6 +41,7 @@ module PromptObjects
                 :current_provider, :current_model
     attr_accessor :on_po_registered  # Callback for when a PO is registered
     attr_accessor :on_po_modified    # Callback for when a PO is modified (capabilities changed, etc.)
+    attr_accessor :on_delegation_event  # Callback for PO-to-PO delegation start/complete
 
     # Initialize from an environment path (with manifest) or objects directory.
     # @param env_path [String, nil] Path to environment directory (preferred)
@@ -213,6 +214,13 @@ module PromptObjects
     # @param po [PromptObject] The modified PO
     def notify_po_modified(po)
       @on_po_modified&.call(po)
+    end
+
+    # Notify that a PO-to-PO delegation has started or completed.
+    # @param event_type [Symbol] :started or :completed
+    # @param payload [Hash] { target:, caller:, thread_id:, tool_call_id: }
+    def notify_delegation(event_type, payload)
+      @on_delegation_event&.call(event_type, payload)
     end
 
     # Load a prompt object by name from the objects directory.
