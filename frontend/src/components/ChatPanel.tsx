@@ -12,11 +12,13 @@ export function ChatPanel({ po, sendMessage }: ChatPanelProps) {
   const [input, setInput] = useState('')
   const [continueThread, setContinueThread] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const { streamingContent } = useStore()
+  const { streamingContent, connected } = useStore()
 
   const messages = po.current_session?.messages || []
   const streaming = streamingContent[po.name]
   const hasMessages = messages.length > 0
+  const isBusy = po.status !== 'idle' && connected
+  const canSend = connected && !isBusy && !!input.trim()
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -72,18 +74,24 @@ export function ChatPanel({ po, sendMessage }: ChatPanelProps) {
 
       {/* Input */}
       <form onSubmit={handleSubmit} className="border-t border-po-border p-4">
+        {!connected && (
+          <div className="mb-2 text-xs text-po-warning flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-po-warning animate-pulse" />
+            Reconnecting...
+          </div>
+        )}
         <div className="flex gap-3">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={`Message ${po.name}...`}
-            className="flex-1 bg-po-surface border border-po-border rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-po-accent"
-            disabled={po.status !== 'idle'}
+            placeholder={!connected ? 'Disconnected — waiting to reconnect...' : isBusy ? `${po.name} is ${po.status.replace('_', ' ')}...` : `Message ${po.name}...`}
+            className="flex-1 bg-po-surface border border-po-border rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-po-accent disabled:opacity-50"
+            disabled={isBusy}
           />
           <button
             type="submit"
-            disabled={!input.trim() || po.status !== 'idle'}
+            disabled={!canSend}
             className="px-4 py-2 bg-po-accent text-white rounded-lg font-medium hover:bg-po-accent/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Send
