@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    prompt_objects (0.3.1)
+    prompt_objects (0.4.0)
       anthropic (~> 1.0)
       async-websocket (~> 0.28)
       falcon (~> 0.50)

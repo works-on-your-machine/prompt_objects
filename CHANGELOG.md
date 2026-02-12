@@ -2,6 +2,21 @@
 
 All notable changes to PromptObjects are documented in this file.
 
+## [0.4.0] - 2026-02-11
+
+### Added
+
+- **Spatial Canvas** — Three.js 2D visualization at `/canvas` showing POs as glowing hexagonal nodes with force-directed layout, tool call diamonds, animated message arcs with traveling particles, and click-to-inspect side panels. Real-time updates from the same WebSocket feed as the dashboard. Zoom, pan, and keyboard shortcuts (F to fit, Escape to deselect).
+- **PO-to-PO delegation broadcasting** — Server now broadcasts `po_delegation_started` and `po_delegation_completed` WebSocket events when one PO calls another. Delegated POs show as active in both the canvas (cyan glow, "called by X" status) and dashboard views. Replaces client-side inference from message history scanning.
+- **Ruby 4 support** — CI now tests against Ruby 4. Fixed empty required parameter handling for compatibility. Thanks to [@radanskoric](https://github.com/radanskoric) for the contribution! ([#2](https://github.com/works-on-your-machine/prompt_objects/pull/2))
+
+### Fixed
+
+- **WebSocket reconnection lifecycle** — Fixed duplicate connections on page refresh caused by zombie `onclose` handlers. Added socket identity guards, close-before-reconnect, and `handleMessageRef` pattern to prevent stale closures.
+- **Stale state on disconnect** — PO statuses now reset to idle when WebSocket disconnects, preventing stuck "thinking" indicators and stale streaming content.
+- **Chat input locked on disconnect** — Chat input is now only disabled when the PO is busy AND connected. Shows "Reconnecting..." indicator when disconnected instead of permanently locking.
+- **Tool calls not appearing on canvas** — Tool call visualization now extracts from PO message history instead of looking for a format bus messages don't use.
+
 ## [0.3.1] - 2025-02-08
 
 ### Added
