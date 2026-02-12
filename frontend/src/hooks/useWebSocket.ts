@@ -129,6 +129,30 @@ export function useWebSocket() {
         break
       }
 
+      case 'po_delegation_started': {
+        const { target, caller } = message.payload as {
+          target: string
+          caller: string
+          thread_id: string
+          tool_call_id: string
+        }
+        // Mark the target PO as delegated — it's now working on behalf of caller
+        setPromptObject(target, { status: 'thinking', delegated_by: caller })
+        break
+      }
+
+      case 'po_delegation_completed': {
+        const { target } = message.payload as {
+          target: string
+          caller: string
+          thread_id: string
+          tool_call_id: string
+        }
+        // Delegation finished — target PO returns to idle
+        setPromptObject(target, { status: 'idle', delegated_by: null })
+        break
+      }
+
       case 'session_updated': {
         const { target, session_id, messages } = message.payload as {
           target: string

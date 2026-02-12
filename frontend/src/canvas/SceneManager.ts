@@ -137,7 +137,41 @@ export class SceneManager {
         this.scene.add(node.group)
         this.forceLayout.addNode(name, 'po')
       }
-      node.setStatus(po.status)
+
+      // Handle delegation visuals (server-driven via po_delegation_started/completed)
+      if (po.delegated_by) {
+        // This PO is being called by another PO — show delegation state
+        if (!this.activeDelegations.has(name)) {
+          // New delegation — activate visual and create arc
+          node.setDelegatedBy(po.delegated_by)
+          this.activeDelegations.set(name, { callerPO: po.delegated_by, targetPO: name })
+
+          // Create a message arc from caller to target
+          const callerNode = this.poNodes.get(po.delegated_by)
+          if (callerNode) {
+            const arcId = `delegation-${name}`
+            if (!this.messageArcs.has(arcId)) {
+              const arc = new MessageArc(
+                arcId,
+                po.delegated_by,
+                name,
+                callerNode.getPosition(),
+                node.getPosition()
+              )
+              this.messageArcs.set(arcId, arc)
+              this.scene.add(arc.group)
+            }
+          }
+        }
+        // Skip normal setStatus when delegated — the delegation visual takes priority
+      } else {
+        // Not delegated — check if we need to clear a previous delegation
+        if (this.activeDelegations.has(name)) {
+          node.clearDelegated()
+          this.activeDelegations.delete(name)
+        }
+        node.setStatus(po.status)
+      }
 
       // Detect status transitions for tool call visualization
       const prevStatus = this.prevPOStatuses.get(name)
@@ -279,102 +313,54 @@ export class SceneManager {
     for (const tc of newToolCalls) {
       this.seenToolCallIds.add(tc.id)
 
-      // Check if this tool call targets another PO (delegation) vs a primitive
-      const targetPONode = this.poNodes.get(tc.name)
-      if (targetPONode) {
-        // PO-to-PO call: activate the target PO visually and create a connecting arc
-        targetPONode.setDelegatedBy(poName)
-        this.activeDelegations.set(tc.id, { callerPO: poName, targetPO: tc.name })
+      // Skip PO-to-PO calls — delegation visuals are handled by server events
+      // (po_delegation_started/completed → delegated_by in store → syncPromptObjects)
+      if (this.poNodes.has(tc.name)) continue
 
-        // Create a message arc from caller to target PO
-        const arcId = `delegation-${tc.id}`
-        if (!this.messageArcs.has(arcId)) {
-          const arc = new MessageArc(
-            arcId,
-            poName,
-            tc.name,
-            callerNode.getPosition(),
-            targetPONode.getPosition()
-          )
-          this.messageArcs.set(arcId, arc)
-          this.scene.add(arc.group)
-        }
+      // Primitive tool call: create a diamond ToolCallNode
+      const existingCount = poTcSet.size
+      const angle = (existingCount * (2 * Math.PI / 6)) - Math.PI / 2
+      const offsetDist = NODE.poRadius + 40
+      const offsetX = Math.cos(angle) * offsetDist
+      const offsetY = Math.sin(angle) * offsetDist
 
-        // Register in canvas store for inspector
-        useCanvasStore.getState().addToolCall({
-          id: `tc-${tc.id}`,
-          toolName: `delegate → ${tc.name}`,
-          callerPO: poName,
-          params: tc.arguments,
-          status: 'active',
-          startedAt: Date.now(),
-        })
-      } else {
-        // Primitive tool call: create a diamond ToolCallNode
-        const existingCount = poTcSet.size
-        const angle = (existingCount * (2 * Math.PI / 6)) - Math.PI / 2
-        const offsetDist = NODE.poRadius + 40
-        const offsetX = Math.cos(angle) * offsetDist
-        const offsetY = Math.sin(angle) * offsetDist
+      const tcNodeId = `tc-${tc.id}`
+      const tcNode = new ToolCallNode(tcNodeId, tc.name, poName)
+      tcNode.setPosition(callerPos.x + offsetX, callerPos.y + offsetY)
 
-        const tcNodeId = `tc-${tc.id}`
-        const tcNode = new ToolCallNode(tcNodeId, tc.name, poName)
-        tcNode.setPosition(callerPos.x + offsetX, callerPos.y + offsetY)
+      this.toolCallNodes.set(tcNodeId, tcNode)
+      this.scene.add(tcNode.group)
+      poTcSet.add(tcNodeId)
 
-        this.toolCallNodes.set(tcNodeId, tcNode)
-        this.scene.add(tcNode.group)
-        poTcSet.add(tcNodeId)
-
-        // Register in canvas store for inspector
-        useCanvasStore.getState().addToolCall({
-          id: tcNodeId,
-          toolName: tc.name,
-          callerPO: poName,
-          params: tc.arguments,
-          status: 'active',
-          startedAt: Date.now(),
-        })
-      }
+      // Register in canvas store for inspector
+      useCanvasStore.getState().addToolCall({
+        id: tcNodeId,
+        toolName: tc.name,
+        callerPO: poName,
+        params: tc.arguments,
+        status: 'active',
+        startedAt: Date.now(),
+      })
     }
   }
 
   private fadeOutToolCallsForPO(poName: string): void {
     const tcSet = this.poToolCallNodes.get(poName)
-    if (tcSet) {
-      for (const tcNodeId of tcSet) {
-        const tcNode = this.toolCallNodes.get(tcNodeId)
-        if (tcNode) {
-          tcNode.triggerFadeOut()
-        }
-        // Mark as completed in canvas store
-        useCanvasStore.getState().updateToolCall(tcNodeId, {
-          status: 'completed',
-          completedAt: Date.now(),
-        })
-      }
-      // Clear the set — expired nodes will be removed by the animation loop
-      tcSet.clear()
-    }
+    if (!tcSet) return
 
-    // Clear any PO-to-PO delegations where this PO was the caller
-    for (const [tcId, delegation] of this.activeDelegations) {
-      if (delegation.callerPO === poName) {
-        const targetNode = this.poNodes.get(delegation.targetPO)
-        if (targetNode) {
-          // Restore target PO's visual to its server status
-          targetNode.clearDelegated()
-          // Re-apply whatever status the server says it has
-          // (setStatus will be called again in the next syncPromptObjects cycle)
-        }
-        this.activeDelegations.delete(tcId)
-
-        // Mark delegation as completed in canvas store
-        useCanvasStore.getState().updateToolCall(`tc-${tcId}`, {
-          status: 'completed',
-          completedAt: Date.now(),
-        })
+    for (const tcNodeId of tcSet) {
+      const tcNode = this.toolCallNodes.get(tcNodeId)
+      if (tcNode) {
+        tcNode.triggerFadeOut()
       }
+      // Mark as completed in canvas store
+      useCanvasStore.getState().updateToolCall(tcNodeId, {
+        status: 'completed',
+        completedAt: Date.now(),
+      })
     }
+    // Clear the set — expired nodes will be removed by the animation loop
+    tcSet.clear()
   }
 
   // --- Lifecycle ---

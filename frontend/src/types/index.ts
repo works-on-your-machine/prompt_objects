@@ -62,6 +62,7 @@ export interface PromptObject {
   sessions: Session[]
   prompt?: string  // The markdown body/prompt
   config?: Record<string, unknown>  // The YAML frontmatter config
+  delegated_by?: string | null  // Name of the PO that called this one (set by delegation events)
 }
 
 export interface BusMessage {
@@ -109,6 +110,8 @@ export type WSMessageType =
   | 'po_added'
   | 'po_modified'
   | 'po_removed'
+  | 'po_delegation_started'
+  | 'po_delegation_completed'
   | 'stream'
   | 'stream_end'
   | 'bus_message'
