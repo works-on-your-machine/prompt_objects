@@ -13,6 +13,7 @@ interface Store {
   // Connection state
   connected: boolean
   setConnected: (connected: boolean) => void
+  resetOnDisconnect: () => void
 
   // Environment
   environment: Environment | null
@@ -71,6 +72,20 @@ export const useStore = create<Store>((set) => ({
   // Connection
   connected: false,
   setConnected: (connected) => set({ connected }),
+  resetOnDisconnect: () =>
+    set((s) => {
+      // Reset all PO statuses to idle (server will re-send correct status on reconnect)
+      const resetPOs: Record<string, PromptObject> = {}
+      for (const [name, po] of Object.entries(s.promptObjects)) {
+        resetPOs[name] = po.status !== 'idle' ? { ...po, status: 'idle' } : po
+      }
+      return {
+        connected: false,
+        promptObjects: resetPOs,
+        streamingContent: {},   // Clear broken streams
+        pendingResponse: {},    // Clear stale pending responses
+      }
+    }),
 
   // Environment
   environment: null,

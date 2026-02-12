@@ -19,9 +19,15 @@ import type {
 export function useWebSocket() {
   const ws = useRef<WebSocket | null>(null)
   const reconnectTimeout = useRef<number | null>(null)
+  const disposed = useRef(false)
+
+  // Use a ref for the message handler so the WS always calls the latest version,
+  // regardless of when `connect()` was created or how many reconnections happened.
+  const handleMessageRef = useRef<(message: WSMessage) => void>(() => {})
 
   const {
     setConnected,
+    resetOnDisconnect,
     setEnvironment,
     setPromptObject,
     removePromptObject,
@@ -39,7 +45,185 @@ export function useWebSocket() {
     setUsageData,
   } = useStore()
 
+  // Keep the handler ref up to date every render
+  handleMessageRef.current = (message: WSMessage) => {
+    switch (message.type) {
+      case 'environment':
+        setEnvironment(message.payload as Environment)
+        break
+
+      case 'po_state': {
+        const { name, state } = message.payload as {
+          name: string
+          state: Partial<PromptObject>
+        }
+        setPromptObject(name, state)
+        break
+      }
+
+      case 'po_response': {
+        const { target, content } = message.payload as {
+          target: string
+          content: string
+        }
+        setPendingResponse(target, content)
+        // Clear after a short delay to allow UI to update
+        setTimeout(() => clearPendingResponse(target), 100)
+        break
+      }
+
+      case 'stream': {
+        const { target, chunk } = message.payload as {
+          target: string
+          chunk: string
+        }
+        appendStreamChunk(target, chunk)
+        break
+      }
+
+      case 'stream_end': {
+        const { target } = message.payload as { target: string }
+        clearStream(target)
+        break
+      }
+
+      case 'bus_message':
+        addBusMessage(message.payload as BusMessage)
+        break
+
+      case 'notification':
+        addNotification(message.payload as Notification)
+        break
+
+      case 'notification_resolved': {
+        const { id } = message.payload as { id: string }
+        removeNotification(id)
+        break
+      }
+
+      // Live file updates
+      case 'po_added': {
+        const { name, state } = message.payload as {
+          name: string
+          state: Partial<PromptObject>
+        }
+        console.log('PO added:', name)
+        setPromptObject(name, state)
+        break
+      }
+
+      case 'po_modified': {
+        const { name, state } = message.payload as {
+          name: string
+          state: Partial<PromptObject>
+        }
+        console.log('PO modified:', name)
+        setPromptObject(name, state)
+        break
+      }
+
+      case 'po_removed': {
+        const { name } = message.payload as { name: string }
+        console.log('PO removed:', name)
+        removePromptObject(name)
+        break
+      }
+
+      case 'session_updated': {
+        const { target, session_id, messages } = message.payload as {
+          target: string
+          session_id: string
+          messages: Message[]
+        }
+        updateSessionMessages(target, session_id, messages)
+        break
+      }
+
+      case 'thread_created': {
+        const { target, thread_id, thread_type } = message.payload as {
+          target: string
+          thread_id: string
+          name: string | null
+          thread_type: ThreadType
+        }
+        console.log('Thread created:', target, thread_id, thread_type)
+        // IMMEDIATELY switch to the new thread so user sees their message
+        // This ensures session_updated messages for this thread are displayed
+        switchPOSession(target, thread_id)
+        break
+      }
+
+      case 'thread_tree': {
+        // Thread tree response - could be used for navigation
+        console.log('Thread tree received:', message.payload)
+        break
+      }
+
+      case 'llm_config':
+        setLLMConfig(message.payload as LLMConfig)
+        break
+
+      case 'llm_switched': {
+        const { provider, model } = message.payload as {
+          provider: string
+          model: string
+        }
+        updateCurrentLLM(provider, model)
+        break
+      }
+
+      case 'session_usage': {
+        setUsageData(message.payload as Record<string, unknown>)
+        break
+      }
+
+      case 'thread_export': {
+        const { content, format, session_id } = message.payload as { content: string; format: string; session_id: string }
+        const mimeType = format === 'json' ? 'application/json' : 'text/markdown'
+        const ext = format === 'json' ? 'json' : 'md'
+        const blob = new Blob([content], { type: mimeType })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${session_id}.${ext}`
+        a.click()
+        URL.revokeObjectURL(url)
+        break
+      }
+
+      case 'error': {
+        const { message: errorMsg } = message.payload as { message: string }
+        console.error('Server error:', errorMsg)
+        break
+      }
+
+      case 'pong':
+        // Heartbeat response, ignore
+        break
+
+      default:
+        console.log('Unknown message type:', message.type)
+    }
+  }
+
   const connect = useCallback(() => {
+    // Don't reconnect if we've been disposed (component unmounted)
+    if (disposed.current) return
+
+    // Close any existing connection before creating a new one
+    // to prevent duplicate connections racing each other
+    if (ws.current) {
+      // Remove handlers first so the close doesn't trigger another reconnect
+      ws.current.onclose = null
+      ws.current.onerror = null
+      ws.current.onmessage = null
+      ws.current.onopen = null
+      if (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING) {
+        ws.current.close()
+      }
+      ws.current = null
+    }
+
     // Determine WebSocket URL
     // In dev mode (Vite on 5173), connect directly to Ruby server on 3000
     // In production, connect to same host
@@ -49,9 +233,12 @@ export function useWebSocket() {
     const wsUrl = `${protocol}//${host}`
 
     console.log('Connecting to WebSocket:', wsUrl)
-    ws.current = new WebSocket(wsUrl)
+    const socket = new WebSocket(wsUrl)
+    ws.current = socket
 
-    ws.current.onopen = () => {
+    socket.onopen = () => {
+      // Guard against stale handler from a replaced socket
+      if (ws.current !== socket) return
       console.log('WebSocket connected')
       setConnected(true)
 
@@ -62,219 +249,65 @@ export function useWebSocket() {
       }
     }
 
-    ws.current.onclose = () => {
+    socket.onclose = () => {
+      // Guard: if this socket was already replaced, ignore its close event.
+      // This prevents zombie onclose handlers from triggering reconnects
+      // after a fresh connection has already been established.
+      if (ws.current !== socket) return
+      if (disposed.current) return
+
       console.log('WebSocket disconnected')
-      setConnected(false)
+      // Reset PO statuses to idle and clear broken streams —
+      // prevents locked chat input and stale streaming indicators
+      resetOnDisconnect()
 
       // Attempt to reconnect after 2 seconds
+      if (reconnectTimeout.current) {
+        clearTimeout(reconnectTimeout.current)
+      }
       reconnectTimeout.current = window.setTimeout(() => {
         console.log('Attempting to reconnect...')
         connect()
       }, 2000)
     }
 
-    ws.current.onerror = (error) => {
+    socket.onerror = (error) => {
+      if (ws.current !== socket) return
       console.error('WebSocket error:', error)
     }
 
-    ws.current.onmessage = (event) => {
+    socket.onmessage = (event) => {
+      if (ws.current !== socket) return
       try {
         const message: WSMessage = JSON.parse(event.data)
-        handleMessage(message)
+        // Always call the latest handler via ref — no stale closures
+        handleMessageRef.current(message)
       } catch (error) {
         console.error('Failed to parse WebSocket message:', error)
       }
     }
-  }, [setConnected])
+  }, [setConnected, resetOnDisconnect])
 
-  const handleMessage = useCallback(
-    (message: WSMessage) => {
-      switch (message.type) {
-        case 'environment':
-          setEnvironment(message.payload as Environment)
-          break
-
-        case 'po_state': {
-          const { name, state } = message.payload as {
-            name: string
-            state: Partial<PromptObject>
-          }
-          setPromptObject(name, state)
-          break
-        }
-
-        case 'po_response': {
-          const { target, content } = message.payload as {
-            target: string
-            content: string
-          }
-          setPendingResponse(target, content)
-          // Clear after a short delay to allow UI to update
-          setTimeout(() => clearPendingResponse(target), 100)
-          break
-        }
-
-        case 'stream': {
-          const { target, chunk } = message.payload as {
-            target: string
-            chunk: string
-          }
-          appendStreamChunk(target, chunk)
-          break
-        }
-
-        case 'stream_end': {
-          const { target } = message.payload as { target: string }
-          clearStream(target)
-          break
-        }
-
-        case 'bus_message':
-          addBusMessage(message.payload as BusMessage)
-          break
-
-        case 'notification':
-          addNotification(message.payload as Notification)
-          break
-
-        case 'notification_resolved': {
-          const { id } = message.payload as { id: string }
-          removeNotification(id)
-          break
-        }
-
-        // Live file updates
-        case 'po_added': {
-          const { name, state } = message.payload as {
-            name: string
-            state: Partial<PromptObject>
-          }
-          console.log('PO added:', name)
-          setPromptObject(name, state)
-          break
-        }
-
-        case 'po_modified': {
-          const { name, state } = message.payload as {
-            name: string
-            state: Partial<PromptObject>
-          }
-          console.log('PO modified:', name)
-          setPromptObject(name, state)
-          break
-        }
-
-        case 'po_removed': {
-          const { name } = message.payload as { name: string }
-          console.log('PO removed:', name)
-          removePromptObject(name)
-          break
-        }
-
-        case 'session_updated': {
-          const { target, session_id, messages } = message.payload as {
-            target: string
-            session_id: string
-            messages: Message[]
-          }
-          updateSessionMessages(target, session_id, messages)
-          break
-        }
-
-        case 'thread_created': {
-          const { target, thread_id, thread_type } = message.payload as {
-            target: string
-            thread_id: string
-            name: string | null
-            thread_type: ThreadType
-          }
-          console.log('Thread created:', target, thread_id, thread_type)
-          // IMMEDIATELY switch to the new thread so user sees their message
-          // This ensures session_updated messages for this thread are displayed
-          switchPOSession(target, thread_id)
-          break
-        }
-
-        case 'thread_tree': {
-          // Thread tree response - could be used for navigation
-          console.log('Thread tree received:', message.payload)
-          break
-        }
-
-        case 'llm_config':
-          setLLMConfig(message.payload as LLMConfig)
-          break
-
-        case 'llm_switched': {
-          const { provider, model } = message.payload as {
-            provider: string
-            model: string
-          }
-          updateCurrentLLM(provider, model)
-          break
-        }
-
-        case 'session_usage': {
-          setUsageData(message.payload as Record<string, unknown>)
-          break
-        }
-
-        case 'thread_export': {
-          const { content, format, session_id } = message.payload as { content: string; format: string; session_id: string }
-          const mimeType = format === 'json' ? 'application/json' : 'text/markdown'
-          const ext = format === 'json' ? 'json' : 'md'
-          const blob = new Blob([content], { type: mimeType })
-          const url = URL.createObjectURL(blob)
-          const a = document.createElement('a')
-          a.href = url
-          a.download = `${session_id}.${ext}`
-          a.click()
-          URL.revokeObjectURL(url)
-          break
-        }
-
-        case 'error': {
-          const { message: errorMsg } = message.payload as { message: string }
-          console.error('Server error:', errorMsg)
-          break
-        }
-
-        case 'pong':
-          // Heartbeat response, ignore
-          break
-
-        default:
-          console.log('Unknown message type:', message.type)
-      }
-    },
-    [
-      setEnvironment,
-      setPromptObject,
-      removePromptObject,
-      updateSessionMessages,
-      switchPOSession,
-      setPendingResponse,
-      clearPendingResponse,
-      appendStreamChunk,
-      clearStream,
-      addBusMessage,
-      addNotification,
-      removeNotification,
-      setLLMConfig,
-      updateCurrentLLM,
-      setUsageData,
-    ]
-  )
-
-  // Connect on mount
+  // Connect on mount, clean up on unmount
   useEffect(() => {
+    disposed.current = false
     connect()
 
     return () => {
+      disposed.current = true
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current)
+        reconnectTimeout.current = null
       }
-      ws.current?.close()
+      if (ws.current) {
+        // Remove handlers before closing to prevent zombie events
+        ws.current.onclose = null
+        ws.current.onerror = null
+        ws.current.onmessage = null
+        ws.current.onopen = null
+        ws.current.close()
+        ws.current = null
+      }
     }
   }, [connect])
 
