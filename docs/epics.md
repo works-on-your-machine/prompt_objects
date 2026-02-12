@@ -127,11 +127,28 @@ Environment template for ARC-AGI puzzle solving.
 
 ## In Progress
 
-*Nothing currently in progress.*
+### Spatial Canvas
+Three.js 2D visualization — live, zoomable view of POs working together as a spatial "operating theater."
+- Real-time animated scene: PO nodes, tool call blooms, message arcs with particles
+- Force-directed layout with activity-based gravity (active → center, idle → outward)
+- Click-to-inspect: PO capabilities/prompt editing, tool call params/results, ask_human responses
+- Peer route (`/canvas`) alongside existing dashboard — no backend changes needed
+- **Done**: Scene foundation, PO nodes, tool call diamonds, message arcs, inspector panels, delegation visuals
+- **Remaining**: Node pinning/dragging, zoom-level-dependent detail, background grid, activity gravity, polish
+- See: [epics/spatial-canvas.md](epics/spatial-canvas.md)
 
 ---
 
 ## Ready
+
+### Parallel Tool Calling
+Concurrent execution of tool calls within a single PO turn.
+- All tool calls in a turn run in parallel via Async::Barrier (results still collected together for LLM)
+- Server broadcasts po_delegation_started/completed events (done)
+- Frontend handles delegation events from server (done)
+- Remaining: context isolation refactor, Async::Barrier execution, batch events, canvas fan-out viz
+- See: [epics/parallel-tool-calling.md](epics/parallel-tool-calling.md)
+- Stories: [epics/parallel-tool-calling-stories.md](epics/parallel-tool-calling-stories.md)
 
 ### Web UI Complete
 Full web interface — dashboard, chat, and real-time panels are shipped; remaining tabs and event history still to build.
@@ -225,6 +242,8 @@ Speech interaction.
 
 | Epic | File | Status |
 |------|------|--------|
+| **Spatial Canvas** | [epics/spatial-canvas.md](epics/spatial-canvas.md) | In Progress |
+| **Parallel Tool Calling** | [epics/parallel-tool-calling.md](epics/parallel-tool-calling.md) | Ready |
 | **Web UI Complete** | [epics/web-ui-complete.md](epics/web-ui-complete.md) | Ready |
 | **Web Distribution** | [epics/web-distribution.md](epics/web-distribution.md) | Ready |
 | Environment Data (Stigmergy) | [epics/environment-data.md](epics/environment-data.md) | Ready |
