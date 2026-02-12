@@ -62,6 +62,10 @@ const STATUS_CSS_COLORS: Record<POStatus, string> = {
   calling_tool: CSS_COLORS.statusCallingTool,
 }
 
+// Color for when this PO is being called by another PO (delegation)
+const DELEGATED_COLOR = 0x06b6d4 // cyan-500
+const DELEGATED_CSS_COLOR = '#06b6d4'
+
 export class PONode {
   readonly id: string
   readonly group: THREE.Group
@@ -179,6 +183,24 @@ export class PONode {
 
     this.statusEl.textContent = status.replace('_', ' ')
     this.statusEl.style.color = STATUS_CSS_COLORS[status]
+  }
+
+  setDelegatedBy(callerName: string): void {
+    // Override visual to show this PO is working on behalf of another PO.
+    // The server doesn't send status updates for delegated POs, so we
+    // infer this from the caller's tool_calls.
+    this.statusRingMaterial.color.setHex(DELEGATED_COLOR)
+    this.statusRingMaterial.opacity = 1.0
+    this.material.uniforms.uGlowColor.value.setHex(DELEGATED_COLOR)
+    this.material.uniforms.uGlowIntensity.value = 0.7
+    this.statusEl.textContent = `called by ${callerName}`
+    this.statusEl.style.color = DELEGATED_CSS_COLOR
+  }
+
+  clearDelegated(): void {
+    // Restore to whatever the server status is — caller should
+    // call setStatus() after this to re-apply server state.
+    this.statusRingMaterial.opacity = 0.6
   }
 
   setNotificationCount(count: number): void {
