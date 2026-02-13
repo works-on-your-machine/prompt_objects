@@ -21,14 +21,17 @@ module PromptObjects
             },
             grid: {
               type: "array",
+              items: { type: "array", items: { type: "integer" } },
               description: "A grid to compare directly against expected output (for quick checks)"
             },
             expected: {
               type: "array",
+              items: { type: "array", items: { type: "integer" } },
               description: "Expected output grid (used with 'grid' parameter)"
             },
             train: {
               type: "array",
+              items: { type: "object" },
               description: "Training pairs array (used with 'primitive_name'). Each element has 'input' and 'output' grids."
             }
           },

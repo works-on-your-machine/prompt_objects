@@ -15,7 +15,7 @@ module PromptObjects
         {
           type: "object",
           properties: {
-            grid: { type: "array", description: "2D array of integers" },
+            grid: { type: "array", items: { type: "array", items: { type: "integer" } }, description: "2D array of integers" },
             operation: {
               type: "string",
               enum: %w[rotate_90 rotate_180 rotate_270 flip_h flip_v transpose],

@@ -15,8 +15,8 @@ module PromptObjects
         {
           type: "object",
           properties: {
-            grid_a: { type: "array", description: "First grid (2D array)" },
-            grid_b: { type: "array", description: "Second grid (2D array)" }
+            grid_a: { type: "array", items: { type: "array", items: { type: "integer" } }, description: "First grid (2D array)" },
+            grid_b: { type: "array", items: { type: "array", items: { type: "integer" } }, description: "Second grid (2D array)" }
           },
           required: ["grid_a", "grid_b"]
         }

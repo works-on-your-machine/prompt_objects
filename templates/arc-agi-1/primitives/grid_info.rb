@@ -15,7 +15,7 @@ module PromptObjects
         {
           type: "object",
           properties: {
-            grid: { type: "array", description: "2D array of integers" }
+            grid: { type: "array", items: { type: "array", items: { type: "integer" } }, description: "2D array of integers" }
           },
           required: ["grid"]
         }

@@ -27,6 +27,7 @@ module PromptObjects
           properties: {
             grid: {
               type: "array",
+              items: { type: "array", items: { type: "integer" } },
               description: "2D array of integers 0-9"
             },
             label: {
