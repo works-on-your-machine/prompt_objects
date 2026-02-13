@@ -355,6 +355,19 @@ module PromptObjects
             )
           rescue => e
             send_error("Error from #{po_name}: #{e.message}")
+
+            # Broadcast rich error context for diagnostics
+            llm_config = @runtime.llm_config
+            send_message(
+              type: "llm_error",
+              payload: {
+                po_name: po_name,
+                provider: llm_config[:provider],
+                model: llm_config[:model],
+                error: e.message,
+                error_class: e.class.name
+              }
+            )
           ensure
             # Clean up the callback
             po.on_history_updated = nil
@@ -501,7 +514,7 @@ module PromptObjects
           info = LLM::Factory.provider_info(provider)
           {
             name: provider,
-            models: info[:models],
+            models: LLM::Factory.models_for(provider),
             default_model: info[:default_model],
             available: LLM::Factory.available_providers[provider]
           }
