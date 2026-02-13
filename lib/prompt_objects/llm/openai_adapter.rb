@@ -37,7 +37,29 @@ module PromptObjects
         end
 
         raw_response = @client.chat(parameters: params)
+
+        # Check for error responses (Ollama and some providers return errors inline)
+        if raw_response.is_a?(Hash) && raw_response["error"]
+          error_msg = raw_response["error"]
+          error_msg = error_msg["message"] if error_msg.is_a?(Hash)
+          raise Error, "#{@provider_name} API error: #{error_msg}"
+        end
+
         parse_response(raw_response)
+      rescue Faraday::ClientError => e
+        # Extract error body from 4xx responses (ruby-openai wraps these)
+        body = e.response&.dig(:body) rescue nil
+        detail = if body.is_a?(String)
+                   begin
+                     parsed = JSON.parse(body)
+                     parsed.dig("error", "message") || parsed["error"] || body
+                   rescue JSON::ParserError
+                     body
+                   end
+                 elsif body.is_a?(Hash)
+                   body.dig("error", "message") || body["error"] || body.to_s
+                 end
+        raise Error, "#{@provider_name} API error (#{e.response&.dig(:status)}): #{detail || e.message}"
       end
 
       private
