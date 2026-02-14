@@ -58,11 +58,25 @@ export function Inspector({
     })
   }, [sessions, currentSessionId])
 
+  const isActive = po.status !== 'idle'
+
   const statusDot = {
     idle: 'bg-po-status-idle',
-    thinking: 'bg-po-status-active animate-pulse',
-    calling_tool: 'bg-po-status-calling animate-pulse',
+    thinking: 'bg-po-status-active',
+    calling_tool: 'bg-po-status-calling',
   }[po.status] || 'bg-po-status-idle'
+
+  const statusGlow = {
+    idle: '',
+    thinking: 'shadow-[0_0_6px_rgba(212,149,42,0.7)]',
+    calling_tool: 'shadow-[0_0_6px_rgba(59,154,110,0.7)]',
+  }[po.status] || ''
+
+  const statusLabelColor = {
+    idle: 'text-po-text-ghost',
+    thinking: 'text-po-status-active',
+    calling_tool: 'text-po-status-calling',
+  }[po.status] || 'text-po-text-ghost'
 
   const statusLabel = {
     idle: 'idle',
@@ -79,9 +93,11 @@ export function Inspector({
     <div className="h-full flex flex-col">
       {/* Inspector Header */}
       <div className="h-8 bg-po-surface-2 border-b border-po-border flex items-center px-3 gap-2 flex-shrink-0">
-        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDot}`} />
+        <div className="relative flex-shrink-0">
+          <div className={`w-2 h-2 rounded-full ${statusDot} ${statusGlow} ${isActive ? 'animate-pulse' : ''}`} />
+        </div>
         <span className="font-mono text-xs text-po-text-primary font-medium">{po.name}</span>
-        <span className="text-2xs text-po-text-tertiary truncate">{statusLabel}</span>
+        <span className={`text-2xs font-medium truncate ${statusLabelColor} ${isActive ? 'animate-pulse' : ''}`}>{statusLabel}</span>
         {po.description && (
           <span className="text-2xs text-po-text-ghost truncate hidden sm:inline">{po.description}</span>
         )}

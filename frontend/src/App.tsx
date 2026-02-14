@@ -35,11 +35,12 @@ export default function App() {
       <SystemBar switchLLM={switchLLM} />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        {currentView === 'canvas' ? (
-          <CanvasView />
-        ) : (
-          <>
-            <div className="flex-1 flex overflow-hidden">
+        {/* Main view area */}
+        <div className="flex-1 flex overflow-hidden">
+          {currentView === 'canvas' ? (
+            <CanvasView />
+          ) : (
+            <>
               {/* Object List - resizable */}
               <div style={{ width: objectListResize.size }} className="flex-shrink-0">
                 <ObjectList />
@@ -70,20 +71,20 @@ export default function App() {
                   </div>
                 )}
               </main>
-            </div>
+            </>
+          )}
+        </div>
 
-            {/* Transcript - resizable bottom pane */}
-            {busOpen && (
-              <>
-                <div
-                  className="resize-handle-h"
-                  onMouseDown={transcriptResize.onMouseDown}
-                />
-                <div style={{ height: transcriptResize.size }} className="flex-shrink-0">
-                  <Transcript />
-                </div>
-              </>
-            )}
+        {/* Transcript - resizable bottom pane, visible in both views */}
+        {busOpen && (
+          <>
+            <div
+              className="resize-handle-h"
+              onMouseDown={transcriptResize.onMouseDown}
+            />
+            <div style={{ height: transcriptResize.size }} className="flex-shrink-0">
+              <Transcript />
+            </div>
           </>
         )}
       </div>

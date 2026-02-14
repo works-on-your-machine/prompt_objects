@@ -34,11 +34,19 @@ function ObjectItem({ po }: { po: PromptObject }) {
   const notifications = usePONotifications(po.name)
   const isSelected = selectedPO === po.name
 
+  const isActive = po.status !== 'idle'
+
   const statusDot = {
     idle: 'bg-po-status-idle',
-    thinking: 'bg-po-status-active animate-pulse',
-    calling_tool: 'bg-po-status-calling animate-pulse',
+    thinking: 'bg-po-status-active',
+    calling_tool: 'bg-po-status-calling',
   }[po.status] || 'bg-po-status-idle'
+
+  const statusGlow = {
+    idle: '',
+    thinking: 'shadow-[0_0_5px_rgba(212,149,42,0.6)]',
+    calling_tool: 'shadow-[0_0_5px_rgba(59,154,110,0.6)]',
+  }[po.status] || ''
 
   return (
     <button
@@ -49,7 +57,7 @@ function ObjectItem({ po }: { po: PromptObject }) {
           : 'border-l-2 border-transparent hover:bg-po-surface-2'
       }`}
     >
-      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDot}`} />
+      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${statusDot} ${statusGlow} ${isActive ? 'animate-pulse' : ''}`} />
       <span className={`flex-1 truncate font-mono text-xs ${
         isSelected ? 'text-po-text-primary' : 'text-po-text-secondary'
       }`}>

@@ -46,9 +46,12 @@ export function POInspector({ poName }: Props) {
           Capabilities ({po.capabilities?.length || 0})
         </h4>
         <div className="space-y-1">
-          {(po.capabilities || []).map((cap) => (
-            <CapabilityItem key={cap.name} name={cap.name} description={cap.description} />
-          ))}
+          {(po.capabilities || []).map((cap) => {
+            // Handle both string (legacy broadcast) and object formats
+            const name = typeof cap === 'string' ? cap : cap.name
+            const description = typeof cap === 'string' ? cap : cap.description
+            return <CapabilityItem key={name} name={name} description={description} />
+          })}
         </div>
       </div>
 

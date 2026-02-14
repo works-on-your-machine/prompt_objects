@@ -6,9 +6,15 @@ interface MethodListProps {
   onSelectCapability: (cap: CapabilityInfo | null) => void
 }
 
+// Normalize a capability entry that may be a string (from legacy broadcast) or a full info object.
+function normalizeCap(cap: CapabilityInfo | string): CapabilityInfo {
+  if (typeof cap === 'string') return { name: cap, description: cap }
+  return cap
+}
+
 export function MethodList({ po, selectedCapability, onSelectCapability }: MethodListProps) {
-  const capabilities = po.capabilities || []
-  const universalCapabilities = po.universal_capabilities || []
+  const capabilities = (po.capabilities || []).map(normalizeCap)
+  const universalCapabilities = (po.universal_capabilities || []).map(normalizeCap)
 
   const handleClick = (cap: CapabilityInfo) => {
     if (selectedCapability?.name === cap.name) {
