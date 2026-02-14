@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react'
-import { usePONotifications } from '../store'
+import { useStore, usePONotifications } from '../store'
 import { useResize } from '../hooks/useResize'
 import { MethodList } from './MethodList'
 import { SourcePane } from './SourcePane'
 import { Workspace } from './Workspace'
 import { ContextMenu } from './ContextMenu'
+import { PaneSlot } from './PaneSlot'
 import type { PromptObject, CapabilityInfo } from '../types'
 
 interface InspectorProps {
@@ -31,6 +32,8 @@ export function Inspector({
   const [threadMenuOpen, setThreadMenuOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; sessionId: string } | null>(null)
   const notifications = usePONotifications(po.name)
+  const topPaneCollapsed = useStore((s) => s.topPaneCollapsed)
+  const toggleTopPane = useStore((s) => s.toggleTopPane)
 
   const topPaneResize = useResize({
     direction: 'vertical',
@@ -163,36 +166,43 @@ export function Inspector({
         </div>
       </div>
 
-      {/* Top: Methods + Source (resizable height) */}
-      <div className="flex overflow-hidden flex-shrink-0" style={{ height: topPaneResize.size }}>
-        {/* Method List (resizable width) */}
-        <div style={{ width: methodListResize.size }} className="flex-shrink-0">
-          <MethodList
+      {/* Top: Methods + Source (collapsible, resizable height) */}
+      <PaneSlot
+        label="Methods | Source"
+        collapsed={topPaneCollapsed}
+        onToggle={toggleTopPane}
+        height={topPaneResize.size}
+        resizeHandle={
+          <div
+            className="resize-handle-h"
+            onMouseDown={topPaneResize.onMouseDown}
+          />
+        }
+      >
+        <div className="flex h-full">
+          {/* Method List (resizable width) */}
+          <div style={{ width: methodListResize.size }} className="flex-shrink-0">
+            <MethodList
+              po={po}
+              selectedCapability={selectedCapability}
+              onSelectCapability={setSelectedCapability}
+            />
+          </div>
+
+          {/* Resize handle */}
+          <div
+            className="resize-handle"
+            onMouseDown={methodListResize.onMouseDown}
+          />
+
+          {/* Source Pane */}
+          <SourcePane
             po={po}
             selectedCapability={selectedCapability}
-            onSelectCapability={setSelectedCapability}
+            onSave={(prompt) => updatePrompt(po.name, prompt)}
           />
         </div>
-
-        {/* Resize handle */}
-        <div
-          className="resize-handle"
-          onMouseDown={methodListResize.onMouseDown}
-        />
-
-        {/* Source Pane */}
-        <SourcePane
-          po={po}
-          selectedCapability={selectedCapability}
-          onSave={(prompt) => updatePrompt(po.name, prompt)}
-        />
-      </div>
-
-      {/* Resize handle between top and workspace */}
-      <div
-        className="resize-handle-h"
-        onMouseDown={topPaneResize.onMouseDown}
-      />
+      </PaneSlot>
 
       {/* Bottom: Workspace */}
       <div className="flex-1 overflow-hidden">

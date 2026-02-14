@@ -41,6 +41,8 @@ interface Store {
   addBusMessage: (message: BusMessage) => void
   busOpen: boolean
   toggleBus: () => void
+  topPaneCollapsed: boolean
+  toggleTopPane: () => void
 
   // Notifications
   notifications: Notification[]
@@ -203,6 +205,8 @@ export const useStore = create<Store>((set) => ({
     })),
   busOpen: false,
   toggleBus: () => set((s) => ({ busOpen: !s.busOpen })),
+  topPaneCollapsed: false,
+  toggleTopPane: () => set((s) => ({ topPaneCollapsed: !s.topPaneCollapsed })),
 
   // Notifications
   notifications: [],

@@ -20,6 +20,18 @@ export function MethodList({ po, selectedCapability, onSelectCapability }: Metho
 
   return (
     <div className="h-full border-r border-po-border overflow-auto bg-po-surface">
+      {/* Source (prompt view) */}
+      <button
+        onClick={() => onSelectCapability(null)}
+        className={`w-full text-left px-2.5 py-1 text-xs font-mono border-b border-po-border transition-colors duration-150 ${
+          selectedCapability === null
+            ? 'bg-po-accent-wash text-po-accent'
+            : 'text-po-text-secondary hover:bg-po-surface-2'
+        }`}
+      >
+        Source
+      </button>
+
       {/* Declared capabilities */}
       {capabilities.length > 0 && (
         <div>
