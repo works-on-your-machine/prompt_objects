@@ -7,7 +7,7 @@ interface Props {
 const statusColors: Record<string, string> = {
   active: 'text-po-accent',
   completed: 'text-po-success',
-  error: 'text-red-400',
+  error: 'text-po-error',
 }
 
 export function ToolCallInspector({ toolCallId }: Props) {
@@ -15,7 +15,7 @@ export function ToolCallInspector({ toolCallId }: Props) {
 
   if (!toolCall) {
     return (
-      <div className="p-4 text-gray-500 text-sm">
+      <div className="p-4 text-po-text-ghost text-xs font-mono">
         Tool call not found or has expired.
       </div>
     )
@@ -29,23 +29,23 @@ export function ToolCallInspector({ toolCallId }: Props) {
     <div className="p-4 space-y-4">
       {/* Header */}
       <div>
-        <h3 className="text-lg font-medium text-white font-mono">{toolCall.toolName}</h3>
+        <h3 className="text-sm font-mono font-medium text-po-text-primary">{toolCall.toolName}</h3>
         <div className="flex items-center gap-2 mt-1">
-          <span className={`text-xs font-medium ${statusColors[toolCall.status] || ''}`}>
+          <span className={`text-xs font-mono font-medium ${statusColors[toolCall.status] || ''}`}>
             {toolCall.status}
           </span>
-          <span className="text-xs text-gray-500">{duration}</span>
+          <span className="text-2xs text-po-text-ghost font-mono">{duration}</span>
         </div>
-        <div className="text-xs text-gray-400 mt-1">
-          Called by: <span className="text-po-accent">{toolCall.callerPO}</span>
+        <div className="text-xs text-po-text-tertiary mt-1">
+          Called by: <span className="text-po-accent font-mono">{toolCall.callerPO}</span>
         </div>
       </div>
 
       {/* Parameters */}
       <div>
-        <h4 className="text-sm font-medium text-gray-400 mb-2">Parameters</h4>
-        <div className="bg-po-bg border border-po-border rounded p-3 overflow-auto max-h-48">
-          <pre className="text-xs text-gray-300 font-mono whitespace-pre-wrap">
+        <h4 className="text-2xs font-medium text-po-text-ghost uppercase tracking-wider mb-2">Parameters</h4>
+        <div className="bg-po-surface-2 border border-po-border rounded p-2.5 overflow-auto max-h-48">
+          <pre className="text-xs text-po-text-secondary font-mono whitespace-pre-wrap">
             {JSON.stringify(toolCall.params, null, 2)}
           </pre>
         </div>
@@ -54,9 +54,9 @@ export function ToolCallInspector({ toolCallId }: Props) {
       {/* Result */}
       {toolCall.result && (
         <div>
-          <h4 className="text-sm font-medium text-gray-400 mb-2">Result</h4>
-          <div className="bg-po-bg border border-po-border rounded p-3 overflow-auto max-h-64">
-            <pre className="text-xs text-gray-300 font-mono whitespace-pre-wrap">
+          <h4 className="text-2xs font-medium text-po-text-ghost uppercase tracking-wider mb-2">Result</h4>
+          <div className="bg-po-surface-2 border border-po-border rounded p-2.5 overflow-auto max-h-64">
+            <pre className="text-xs text-po-text-secondary font-mono whitespace-pre-wrap">
               {toolCall.result}
             </pre>
           </div>

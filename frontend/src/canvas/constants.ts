@@ -1,46 +1,46 @@
 // Canvas visualization constants
 
-// Colors (hex values matching po-* palette)
+// Colors (hex values matching warm po-* palette)
 export const COLORS = {
   // Node colors
-  background: 0x0f0f1a,
-  surface: 0x1a1a2e,
-  border: 0x2d2d44,
-  accent: 0x7c3aed,
-  accentHover: 0x9061f9,
-  success: 0x22c55e,
-  warning: 0xf59e0b,
-  error: 0xef4444,
+  background: 0x1a1918,
+  surface: 0x222120,
+  border: 0x3d3a37,
+  accent: 0xd4952a,
+  accentHover: 0xe0a940,
+  success: 0x3b9a6e,
+  warning: 0xd4952a,
+  error: 0xc45c4a,
 
   // Status colors
-  statusIdle: 0x6b7280,
-  statusThinking: 0x7c3aed,
-  statusCallingTool: 0xf59e0b,
+  statusIdle: 0x78726a,
+  statusThinking: 0xd4952a,
+  statusCallingTool: 0x3b9a6e,
 
   // Canvas-specific
-  nodeFill: 0x1a1a2e,
-  nodeGlow: 0x7c3aed,
-  toolCallFill: 0x3b82f6,
-  arcColor: 0x7c3aed,
-  particleColor: 0xc084fc,
-  gridColor: 0x1a1a2e,
+  nodeFill: 0x222120,
+  nodeGlow: 0xd4952a,
+  toolCallFill: 0x3b9a6e,
+  arcColor: 0xd4952a,
+  particleColor: 0xe0a940,
+  gridColor: 0x222120,
 } as const
 
 // CSS color strings (for CSS2DRenderer elements)
 export const CSS_COLORS = {
-  accent: '#7c3aed',
-  accentHover: '#9061f9',
-  warning: '#f59e0b',
-  success: '#22c55e',
-  error: '#ef4444',
-  textPrimary: '#ffffff',
-  textSecondary: '#9ca3af',
-  textMuted: '#6b7280',
-  surface: '#1a1a2e',
-  border: '#2d2d44',
-  statusIdle: '#6b7280',
-  statusThinking: '#7c3aed',
-  statusCallingTool: '#f59e0b',
+  accent: '#d4952a',
+  accentHover: '#e0a940',
+  warning: '#d4952a',
+  success: '#3b9a6e',
+  error: '#c45c4a',
+  textPrimary: '#e8e2da',
+  textSecondary: '#a8a29a',
+  textMuted: '#78726a',
+  surface: '#222120',
+  border: '#3d3a37',
+  statusIdle: '#78726a',
+  statusThinking: '#d4952a',
+  statusCallingTool: '#3b9a6e',
 } as const
 
 // Node dimensions

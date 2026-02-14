@@ -63,8 +63,8 @@ const STATUS_CSS_COLORS: Record<POStatus, string> = {
 }
 
 // Color for when this PO is being called by another PO (delegation)
-const DELEGATED_COLOR = 0x06b6d4 // cyan-500
-const DELEGATED_CSS_COLOR = '#06b6d4'
+const DELEGATED_COLOR = 0x5a8fc2 // steel blue (matches po-status-delegated)
+const DELEGATED_CSS_COLOR = '#5a8fc2'
 
 export class PONode {
   readonly id: string

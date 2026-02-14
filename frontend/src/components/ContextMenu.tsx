@@ -35,7 +35,6 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
     }
   }, [onClose])
 
-  // Adjust position to stay within viewport
   const adjustedStyle = {
     top: y,
     left: x,
@@ -44,7 +43,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 bg-po-surface border border-po-border rounded-lg shadow-xl py-1 min-w-[160px]"
+      className="fixed z-50 bg-po-surface-2 border border-po-border rounded shadow-xl py-0.5 min-w-[140px]"
       style={adjustedStyle}
     >
       {items.map((item, idx) => (
@@ -54,8 +53,10 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
             item.onClick()
             onClose()
           }}
-          className={`w-full text-left px-3 py-1.5 text-xs hover:bg-po-bg transition-colors flex items-center gap-2 ${
-            item.danger ? 'text-red-400 hover:text-red-300' : 'text-gray-300 hover:text-white'
+          className={`w-full text-left px-2.5 py-1.5 text-xs transition-colors duration-150 flex items-center gap-1.5 ${
+            item.danger
+              ? 'text-po-error hover:bg-po-surface-3'
+              : 'text-po-text-secondary hover:bg-po-surface-3 hover:text-po-text-primary'
           }`}
         >
           {item.icon && <span>{item.icon}</span>}

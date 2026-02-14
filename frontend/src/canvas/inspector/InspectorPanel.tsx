@@ -9,14 +9,14 @@ export function InspectorPanel() {
 
   return (
     <aside className="w-80 border-l border-po-border bg-po-surface overflow-hidden flex flex-col">
-      <div className="p-3 border-b border-po-border flex items-center justify-between">
-        <h2 className="text-sm font-medium text-gray-400">Inspector</h2>
+      <div className="h-8 bg-po-surface-2 border-b border-po-border flex items-center px-3">
+        <span className="text-2xs font-medium text-po-text-ghost uppercase tracking-wider flex-1">Inspector</span>
         <button
           onClick={() => useCanvasStore.getState().selectNode(null)}
-          className="text-xs text-gray-500 hover:text-white"
+          className="text-2xs text-po-text-ghost hover:text-po-text-secondary transition-colors duration-150"
           title="Close inspector"
         >
-          ✕
+          {'\u2715'}
         </button>
       </div>
       <div className="flex-1 overflow-auto">

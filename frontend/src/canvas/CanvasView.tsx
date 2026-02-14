@@ -83,17 +83,17 @@ export function CanvasView() {
       <div className="absolute top-3 left-3 flex gap-2 z-10">
         <button
           onClick={() => sceneRef.current?.fitAll()}
-          className="px-3 py-1.5 text-sm bg-po-surface/80 backdrop-blur border border-po-border rounded hover:border-po-accent transition-colors text-gray-300 hover:text-white"
+          className="px-2.5 py-1 text-xs bg-po-surface-2/80 backdrop-blur border border-po-border rounded hover:border-po-accent transition-colors duration-150 text-po-text-secondary hover:text-po-text-primary"
           title="Fit all nodes (F)"
         >
           Fit All
         </button>
         <button
           onClick={toggleLabels}
-          className={`px-3 py-1.5 text-sm backdrop-blur border rounded transition-colors ${
+          className={`px-2.5 py-1 text-xs backdrop-blur border rounded transition-colors duration-150 ${
             showLabels
-              ? 'bg-po-accent/20 border-po-accent text-white'
-              : 'bg-po-surface/80 border-po-border text-gray-300 hover:text-white'
+              ? 'bg-po-accent-wash border-po-accent text-po-accent'
+              : 'bg-po-surface-2/80 border-po-border text-po-text-secondary hover:text-po-text-primary'
           }`}
           title="Toggle labels"
         >
@@ -102,7 +102,7 @@ export function CanvasView() {
       </div>
 
       {/* Help hint */}
-      <div className="absolute bottom-3 left-3 text-xs text-gray-500 z-10">
+      <div className="absolute bottom-3 left-3 text-2xs text-po-text-ghost z-10 font-mono">
         Scroll to zoom · Shift+drag to pan · F to fit · Click node to inspect
       </div>
 

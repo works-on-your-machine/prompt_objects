@@ -5,6 +5,7 @@
 /* Base styles */
 html {
   color-scheme: dark;
+  font-size: 14px;
 }
 
 body {
@@ -13,8 +14,8 @@ body {
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -26,14 +27,29 @@ body {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-po-accent;
+  @apply bg-po-border-focus;
+}
+
+/* Selection */
+::selection {
+  background: rgba(212, 149, 42, 0.3);
 }
 
 /* Custom utilities */
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
+    scrollbar-color: #3d3a37 #1a1918;
   }
+}
+
+/* Resize handles */
+.resize-handle {
+  @apply w-1 cursor-col-resize hover:bg-po-accent/30 active:bg-po-accent/50 transition-colors;
+}
+
+.resize-handle-h {
+  @apply h-1 cursor-row-resize hover:bg-po-accent/30 active:bg-po-accent/50 transition-colors;
 }
 
 /* Canvas CSS2DRenderer labels */
@@ -45,16 +61,18 @@ body {
 
 .canvas-node-name {
   display: block;
-  color: #ffffff;
+  color: #e8e2da;
   font-size: 12px;
   font-weight: 500;
+  font-family: 'Geist Mono', 'IBM Plex Mono', monospace;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
 }
 
 .canvas-node-status {
   display: block;
-  color: #6b7280;
+  color: #78726a;
   font-size: 10px;
+  font-family: 'Geist Mono', 'IBM Plex Mono', monospace;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
 }
 
@@ -64,20 +82,20 @@ body {
   justify-content: center;
   width: 20px;
   height: 20px;
-  background: #f59e0b;
-  color: #000000;
+  background: #d4952a;
+  color: #1a1918;
   font-size: 10px;
   font-weight: 700;
   border-radius: 50%;
   pointer-events: none;
   user-select: none;
-  box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+  box-shadow: 0 0 8px rgba(212, 149, 42, 0.6);
 }
 
 .canvas-toolcall-label {
-  color: #93c5fd;
+  color: #3b9a6e;
   font-size: 10px;
-  font-family: monospace;
+  font-family: 'Geist Mono', 'IBM Plex Mono', monospace;
   text-align: center;
   pointer-events: none;
   user-select: none;

@@ -28,7 +28,6 @@ export function ModelSelector({ switchLLM }: Props) {
     setIsOpen(false)
   }
 
-  // Provider display names
   const providerNames: Record<string, string> = {
     openai: 'OpenAI',
     anthropic: 'Anthropic',
@@ -41,14 +40,14 @@ export function ModelSelector({ switchLLM }: Props) {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 text-sm bg-po-border rounded hover:bg-po-accent/50 transition-colors"
+        className="flex items-center gap-1.5 px-2 py-0.5 text-xs bg-po-surface-2 border border-po-border rounded hover:border-po-border-focus transition-colors duration-150"
       >
-        <span className="text-gray-400">
+        <span className="text-po-text-tertiary">
           {providerNames[llmConfig.current_provider] || llmConfig.current_provider}
         </span>
-        <span className="text-white font-medium">{llmConfig.current_model}</span>
+        <span className="font-mono text-po-text-primary">{llmConfig.current_model}</span>
         <svg
-          className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`w-3 h-3 text-po-text-ghost transition-transform ${isOpen ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -58,13 +57,13 @@ export function ModelSelector({ switchLLM }: Props) {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-64 bg-po-surface border border-po-border rounded-lg shadow-xl z-50 overflow-hidden">
+        <div className="absolute right-0 top-full mt-1 w-60 bg-po-surface-2 border border-po-border rounded shadow-xl z-50 overflow-hidden">
           {llmConfig.providers.map((provider) => (
             <div key={provider.name}>
-              <div className="px-3 py-2 bg-po-bg text-xs font-medium text-gray-400 uppercase tracking-wide flex items-center justify-between">
+              <div className="px-2.5 py-1.5 bg-po-surface text-2xs font-medium text-po-text-ghost uppercase tracking-wider flex items-center justify-between">
                 <span>{providerNames[provider.name] || provider.name}</span>
                 {!provider.available && (
-                  <span className="text-red-400 text-[10px] normal-case">
+                  <span className="text-po-error text-2xs normal-case">
                     {provider.name === 'ollama' ? 'Not Running' : 'No API Key'}
                   </span>
                 )}
@@ -81,22 +80,22 @@ export function ModelSelector({ switchLLM }: Props) {
                     key={`${provider.name}-${model}`}
                     onClick={() => isAvailable && handleSelectModel(provider.name, model)}
                     disabled={!isAvailable}
-                    className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between transition-colors ${
+                    className={`w-full px-2.5 py-1.5 text-left text-xs font-mono flex items-center justify-between transition-colors duration-150 ${
                       isSelected
-                        ? 'bg-po-accent/20 text-po-accent'
+                        ? 'bg-po-accent-wash text-po-accent'
                         : isAvailable
-                        ? 'text-gray-300 hover:bg-po-border'
-                        : 'text-gray-600 cursor-not-allowed'
+                        ? 'text-po-text-secondary hover:bg-po-surface-3'
+                        : 'text-po-text-ghost cursor-not-allowed'
                     }`}
                   >
                     <span className="flex items-center gap-2">
                       {model}
                       {isDefault && (
-                        <span className="text-[10px] text-gray-500">(default)</span>
+                        <span className="text-2xs text-po-text-ghost">(default)</span>
                       )}
                     </span>
                     {isSelected && (
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                         <path
                           fillRule="evenodd"
                           d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"

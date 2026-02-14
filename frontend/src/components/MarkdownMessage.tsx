@@ -30,7 +30,7 @@ export function MarkdownMessage({ content, className = '' }: MarkdownMessageProp
 
             return (
               <code
-                className="bg-po-bg px-1.5 py-0.5 rounded text-po-accent font-mono text-sm"
+                className="bg-po-surface-2 px-1 py-0.5 rounded text-po-accent font-mono text-[0.9em]"
                 {...props}
               >
                 {children}
@@ -52,29 +52,29 @@ export function MarkdownMessage({ content, className = '' }: MarkdownMessageProp
           },
           // Styled paragraphs
           p({ children }) {
-            return <p className="mb-3 last:mb-0">{children}</p>
+            return <p className="mb-2 last:mb-0">{children}</p>
           },
           // Styled lists
           ul({ children }) {
-            return <ul className="list-disc list-inside mb-3 space-y-1">{children}</ul>
+            return <ul className="list-disc list-inside mb-2 space-y-0.5">{children}</ul>
           },
           ol({ children }) {
-            return <ol className="list-decimal list-inside mb-3 space-y-1">{children}</ol>
+            return <ol className="list-decimal list-inside mb-2 space-y-0.5">{children}</ol>
           },
           // Styled headings
           h1({ children }) {
-            return <h1 className="text-xl font-bold mb-2 mt-4 first:mt-0">{children}</h1>
+            return <h1 className="text-base font-bold mb-1.5 mt-3 first:mt-0 text-po-text-primary">{children}</h1>
           },
           h2({ children }) {
-            return <h2 className="text-lg font-bold mb-2 mt-3 first:mt-0">{children}</h2>
+            return <h2 className="text-sm font-bold mb-1.5 mt-2 first:mt-0 text-po-text-primary">{children}</h2>
           },
           h3({ children }) {
-            return <h3 className="text-base font-bold mb-2 mt-2 first:mt-0">{children}</h3>
+            return <h3 className="text-xs font-bold mb-1 mt-1.5 first:mt-0 text-po-text-primary">{children}</h3>
           },
           // Styled blockquotes
           blockquote({ children }) {
             return (
-              <blockquote className="border-l-4 border-po-accent pl-4 my-3 text-gray-400 italic">
+              <blockquote className="border-l-2 border-po-accent pl-3 my-2 text-po-text-secondary italic">
                 {children}
               </blockquote>
             )
@@ -82,26 +82,26 @@ export function MarkdownMessage({ content, className = '' }: MarkdownMessageProp
           // Styled tables
           table({ children }) {
             return (
-              <div className="overflow-x-auto my-3">
-                <table className="min-w-full border border-po-border">{children}</table>
+              <div className="overflow-x-auto my-2">
+                <table className="min-w-full border border-po-border text-xs">{children}</table>
               </div>
             )
           },
           th({ children }) {
             return (
-              <th className="border border-po-border bg-po-bg px-3 py-2 text-left font-medium">
+              <th className="border border-po-border bg-po-surface-2 px-2 py-1 text-left font-medium text-po-text-primary">
                 {children}
               </th>
             )
           },
           td({ children }) {
             return (
-              <td className="border border-po-border px-3 py-2">{children}</td>
+              <td className="border border-po-border px-2 py-1 text-po-text-secondary">{children}</td>
             )
           },
           // Horizontal rule
           hr() {
-            return <hr className="border-po-border my-4" />
+            return <hr className="border-po-border my-3" />
           },
         }}
       >
@@ -121,17 +121,17 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
   }
 
   return (
-    <div className="relative group my-3">
+    <div className="relative group my-2">
       {/* Language label and copy button */}
-      <div className="flex items-center justify-between bg-po-bg/80 px-3 py-1 rounded-t border border-b-0 border-po-border">
-        <span className="text-xs text-gray-500 font-mono">
+      <div className="flex items-center justify-between bg-po-surface-2 px-2.5 py-1 rounded-t border border-b-0 border-po-border">
+        <span className="text-2xs text-po-text-ghost font-mono">
           {language || 'text'}
         </span>
         <button
           onClick={handleCopy}
-          className="text-xs text-gray-400 hover:text-white transition-colors"
+          className="text-2xs text-po-text-ghost hover:text-po-text-primary transition-colors duration-150"
         >
-          {copied ? 'Copied!' : 'Copy'}
+          {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
       {/* Code with syntax highlighting */}
@@ -141,9 +141,11 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
         PreTag="div"
         customStyle={{
           margin: 0,
-          borderRadius: '0 0 0.375rem 0.375rem',
-          border: '1px solid rgb(55, 65, 81)',
+          borderRadius: '0 0 0.25rem 0.25rem',
+          border: '1px solid #3d3a37',
           borderTop: 'none',
+          fontSize: '11px',
+          background: '#222120',
         }}
       >
         {code}

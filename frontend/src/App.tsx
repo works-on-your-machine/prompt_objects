@@ -1,12 +1,11 @@
-import { useState } from 'react'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useStore, useSelectedPO } from './store'
-import { Header } from './components/Header'
-import { Dashboard } from './components/Dashboard'
-import { PODetail } from './components/PODetail'
-import { MessageBus } from './components/MessageBus'
+import { useResize } from './hooks/useResize'
+import { SystemBar } from './components/SystemBar'
+import { ObjectList } from './components/ObjectList'
+import { Inspector } from './components/Inspector'
+import { Transcript } from './components/Transcript'
 import { NotificationPanel } from './components/NotificationPanel'
-import { ThreadsSidebar } from './components/ThreadsSidebar'
 import { UsagePanel } from './components/UsagePanel'
 import { CanvasView } from './canvas/CanvasView'
 
@@ -15,89 +14,81 @@ export default function App() {
     useWebSocket()
   const { selectedPO, busOpen, notifications, usageData, clearUsageData, currentView } = useStore()
   const selectedPOData = useSelectedPO()
-  const [splitView, setSplitView] = useState(true) // Default to split view
+
+  const objectListResize = useResize({
+    direction: 'horizontal',
+    initialSize: 192,
+    minSize: 120,
+    maxSize: 320,
+  })
+
+  const transcriptResize = useResize({
+    direction: 'vertical',
+    initialSize: 180,
+    minSize: 80,
+    maxSize: 400,
+    inverted: true,
+  })
 
   return (
     <div className="h-screen flex flex-col bg-po-bg">
-      <Header switchLLM={switchLLM} />
+      <SystemBar switchLLM={switchLLM} />
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {currentView === 'canvas' ? (
           <CanvasView />
         ) : (
           <>
-            {/* Split view: Dashboard sidebar on left when PO selected */}
-            {splitView && selectedPO && (
-              <>
-                {/* PO List */}
-                <aside className="w-56 border-r border-po-border bg-po-surface overflow-hidden flex flex-col">
-                  <div className="p-3 border-b border-po-border flex items-center justify-between">
-                    <h2 className="text-sm font-medium text-gray-400">Prompt Objects</h2>
-                    <button
-                      onClick={() => setSplitView(false)}
-                      className="text-xs text-gray-500 hover:text-white"
-                      title="Hide sidebar"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div className="flex-1 overflow-auto">
-                    <Dashboard compact />
-                  </div>
-                </aside>
+            <div className="flex-1 flex overflow-hidden">
+              {/* Object List - resizable */}
+              <div style={{ width: objectListResize.size }} className="flex-shrink-0">
+                <ObjectList />
+              </div>
 
-                {/* Threads List for selected PO */}
-                {selectedPOData && (
-                  <aside className="w-56 border-r border-po-border bg-po-bg overflow-hidden">
-                    <ThreadsSidebar
-                      po={selectedPOData}
-                      switchSession={switchSession}
-                      createThread={createThread}
-                      requestUsage={requestUsage}
-                      exportThread={exportThread}
-                    />
-                  </aside>
+              {/* Resize handle */}
+              <div
+                className="resize-handle"
+                onMouseDown={objectListResize.onMouseDown}
+              />
+
+              {/* Main content */}
+              <main className="flex-1 overflow-hidden flex flex-col">
+                {selectedPO && selectedPOData ? (
+                  <Inspector
+                    po={selectedPOData}
+                    sendMessage={sendMessage}
+                    createSession={createSession}
+                    switchSession={switchSession}
+                    createThread={createThread}
+                    updatePrompt={updatePrompt}
+                    requestUsage={requestUsage}
+                    exportThread={exportThread}
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-po-text-ghost">
+                    <span className="font-mono text-xs">Select an object</span>
+                  </div>
                 )}
+              </main>
+            </div>
+
+            {/* Transcript - resizable bottom pane */}
+            {busOpen && (
+              <>
+                <div
+                  className="resize-handle-h"
+                  onMouseDown={transcriptResize.onMouseDown}
+                />
+                <div style={{ height: transcriptResize.size }} className="flex-shrink-0">
+                  <Transcript />
+                </div>
               </>
             )}
-
-            {/* Main content */}
-            <main className="flex-1 overflow-hidden flex flex-col">
-              {/* Show expand button when sidebar is hidden */}
-              {!splitView && selectedPO && (
-                <button
-                  onClick={() => setSplitView(true)}
-                  className="absolute left-2 top-16 z-10 bg-po-surface border border-po-border rounded px-2 py-1 text-xs text-gray-400 hover:text-white hover:border-po-accent transition-colors"
-                  title="Show dashboard sidebar"
-                >
-                  ☰ POs
-                </button>
-              )}
-
-              {selectedPO ? (
-                <PODetail
-                  sendMessage={sendMessage}
-                  createSession={createSession}
-                  switchSession={switchSession}
-                  createThread={createThread}
-                  updatePrompt={updatePrompt}
-                />
-              ) : (
-                <Dashboard />
-              )}
-            </main>
           </>
-        )}
-
-        {/* Message Bus sidebar */}
-        {busOpen && (
-          <aside className="w-80 flex-shrink-0 border-l border-po-border bg-po-surface overflow-hidden">
-            <MessageBus />
-          </aside>
         )}
       </div>
 
-      {/* Notification panel */}
+      {/* Notification panel - floating */}
       {notifications.length > 0 && (
         <NotificationPanel respondToNotification={respondToNotification} />
       )}
