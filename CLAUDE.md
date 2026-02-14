@@ -159,3 +159,18 @@ prompt_objects env create <name> --template basic
 prompt_objects env list
 prompt_objects env info <name>
 ```
+
+## Releases
+
+Always tag releases. Pushing a version tag triggers the Discord notification workflow (`.github/workflows/discord-release.yml`), which extracts the matching section from `CHANGELOG.md` and posts it.
+
+```bash
+# 1. Update version in prompt_objects.gemspec
+# 2. Add changelog entry under ## [X.Y.Z] - YYYY-MM-DD
+# 3. Commit: "Release vX.Y.Z — short description"
+# 4. Tag and push:
+git tag vX.Y.Z
+git push && git push origin vX.Y.Z
+# 5. Publish gem:
+gem build prompt_objects.gemspec && gem push prompt_objects-X.Y.Z.gem
+```

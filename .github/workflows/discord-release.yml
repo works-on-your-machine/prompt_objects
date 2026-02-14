@@ -1,35 +1,57 @@
 name: Discord Release Notification
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          # Strip leading 'v' from tag to match changelog headers (v0.5.0 -> 0.5.0)
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          # Extract everything between ## [0.5.0] and the next ## [ header
+          BODY=$(sed -n "/^## \[${VERSION}\]/,/^## \[/{/^## \[${VERSION}\]/d;/^## \[/d;p}" CHANGELOG.md)
+
+          # Store as multiline output
+          {
+            echo "body<<CHANGELOG_EOF"
+            echo "$BODY"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Post to Discord
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
-          # Build the message from release data
-          TAG="${{ github.event.release.tag_name }}"
-          BODY="${{ github.event.release.body }}"
-          URL="${{ github.event.release.html_url }}"
+          TAG="${GITHUB_REF_NAME}"
+          REPO_URL="${{ github.server_url }}/${{ github.repository }}"
+          CHANGELOG_URL="${REPO_URL}/blob/main/CHANGELOG.md"
+          BODY=$(cat <<'BODY_EOF'
+          ${{ steps.changelog.outputs.body }}
+          BODY_EOF
+          )
 
-          # Truncate body to fit Discord's 2000 char limit
-          MAX_BODY=1800
-          if [ ${#BODY} -gt $MAX_BODY ]; then
-            BODY="${BODY:0:$MAX_BODY}..."
+          # Truncate to fit Discord's 2000 char embed description limit
+          if [ ${#BODY} -gt 1800 ]; then
+            BODY="${BODY:0:1800}... [full changelog](${CHANGELOG_URL})"
           fi
 
-          # Post via webhook
           jq -n \
-            --arg content "**PromptObjects ${TAG}** is out! ${URL}" \
+            --arg content "**PromptObjects ${TAG}** is out!" \
             --arg description "$BODY" \
             --arg title "PromptObjects ${TAG}" \
-            --arg url "$URL" \
+            --arg url "$CHANGELOG_URL" \
             '{
+              content: $content,
               embeds: [{
                 title: $title,
                 url: $url,
