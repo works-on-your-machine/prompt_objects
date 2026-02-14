@@ -74,6 +74,8 @@ prompt_objects env clone <src> <dst> # Clone an environment
 - `minimal` - Basic assistant with file reading
 - `developer` - Code review, debugging, testing specialists
 - `writer` - Editor, researcher for content creation
+- `empty` - Bootstrap assistant only
+- `arc-agi-1` - ARC-AGI challenge solver with grid primitives
 
 Extras
 ======

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **PromptObjects** is a Ruby framework where markdown files with LLM-backed behavior act as first-class autonomous entities. The core insight: **everything is a capability**—primitives (Ruby code) and Prompt-Objects (markdown files) share the same interface, differing only in interpretation complexity.
 
-**Current Status**: v0.5.0 — The core framework is fully implemented and functional. The original 6-phase implementation plan is complete. Active development is focused on visualization, developer experience, and exploring new primitives. See `CHANGELOG.md` for release history and `design-doc-v2.md` / `IMPLEMENTATION_PLAN.md` for original design context.
+**Current Status**: v0.5.0 — The core framework is fully implemented and functional. The original 6-phase implementation plan is complete. Active development is focused on visualization, developer experience, and exploring new primitives. See `CHANGELOG.md` for release history and `docs/archive/` for original design context.
 
 ## Architecture
 
@@ -19,7 +19,7 @@ RUNTIME (Environment)
 ├── MESSAGE BUS - routes messages, logs to SQLite for replay
 ├── SESSION STORE (SQLite) - persistent conversation threads, delegation tracking
 ├── HUMAN QUEUE - non-blocking ask_human requests
-├── WEB SERVER (Sinatra + WebSocket) - serves React frontend
+├── WEB SERVER (Falcon + async-websocket) - serves React frontend
 └── MCP SERVER - exposes POs as tools via Model Context Protocol
 ```
 
@@ -69,9 +69,9 @@ When a PO calls another PO, the system creates an isolated delegation thread in 
 
 - **Ruby** (>= 3.2, tested through Ruby 4) - core implementation
 - **LLM APIs** - OpenAI, Anthropic, Gemini, Ollama, OpenRouter (adapter pattern via `LLM::Factory`)
-- **Sinatra** - web server for REST API and static file serving
-- **faye-websocket** - real-time WebSocket communication
-- **React + TypeScript** - web frontend (dashboard, chat, capabilities panel)
+- **Falcon** - async HTTP server for REST API and static file serving
+- **async-websocket** - real-time WebSocket communication
+- **React + TypeScript** - web frontend (Smalltalk System Browser-inspired multi-pane UI)
 - **Three.js** - spatial canvas visualization (force-directed PO graph)
 - **SQLite** - session persistence and event log storage
 - **MCP** - Model Context Protocol server mode
@@ -121,7 +121,7 @@ prompt_objects/
 ├── frontend/                       # React + TypeScript web UI
 │   └── src/
 │       ├── App.tsx
-│       ├── components/             # Dashboard, chat, capabilities panel
+│       ├── components/             # SystemBar, ObjectList, Inspector, Workspace, Transcript
 │       ├── canvas/                 # Three.js spatial visualization
 │       ├── hooks/                  # WebSocket, state management hooks
 │       ├── store/                  # Frontend state
