@@ -192,13 +192,7 @@ module PromptObjects
           end
 
           sessions = po.list_sessions.map do |s|
-            {
-              id: s[:id],
-              name: s[:name],
-              message_count: s[:message_count] || 0,
-              created_at: s[:created_at]&.iso8601,
-              updated_at: s[:updated_at]&.iso8601
-            }
+            PromptObject.serialize_session(s)
           end
 
           { sessions: sessions }
@@ -372,31 +366,11 @@ module PromptObjects
         # === Helpers ===
 
         def po_summary(po)
-          {
-            name: po.name,
-            description: po.description,
-            capabilities: po.config["capabilities"] || [],
-            session_count: po.list_sessions.size
-          }
+          po.to_summary_hash(registry: @runtime.registry)
         end
 
         def po_full(po)
-          {
-            name: po.name,
-            description: po.description,
-            capabilities: po.config["capabilities"] || [],
-            body: po.body,
-            config: po.config,
-            sessions: po.list_sessions.map do |s|
-              {
-                id: s[:id],
-                name: s[:name],
-                message_count: s[:message_count] || 0
-              }
-            end,
-            current_session: po.session_id,
-            history: po.history.map { |m| format_history_message(m) }
-          }
+          po.to_inspect_hash(registry: @runtime.registry)
         end
 
         def format_message(msg)
@@ -408,25 +382,6 @@ module PromptObjects
             tool_results: msg[:tool_results],
             created_at: msg[:created_at]&.iso8601
           }.compact
-        end
-
-        def format_history_message(msg)
-          case msg[:role]
-          when :user
-            { role: "user", content: msg[:content], from: msg[:from] }
-          when :assistant
-            h = { role: "assistant", content: msg[:content] }
-            if msg[:tool_calls]
-              h[:tool_calls] = msg[:tool_calls].map do |tc|
-                { id: tc.id, name: tc.name, arguments: tc.arguments }
-              end
-            end
-            h
-          when :tool
-            { role: "tool", results: msg[:results] }
-          else
-            { role: msg[:role].to_s, content: msg[:content] }
-          end
         end
 
         def path_param(path, index)

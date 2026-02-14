@@ -30,37 +30,7 @@ module PromptObjects
             }])
           end
 
-          # Categorize capabilities
-          declared_caps = po.config["capabilities"] || []
-          universal_caps = PromptObjects::UNIVERSAL_CAPABILITIES
-
-          # Resolve which are POs vs primitives
-          delegates = []
-          primitives = []
-
-          declared_caps.each do |cap_name|
-            cap = env.registry.get(cap_name)
-            if cap.is_a?(PromptObjects::PromptObject)
-              delegates << cap_name
-            elsif cap.is_a?(PromptObjects::Primitive)
-              primitives << cap_name
-            end
-          end
-
-          info = {
-            name: po.name,
-            description: po.description,
-            state: po.state || :idle,
-            config: po.config,
-            capabilities: {
-              universal: universal_caps,
-              primitives: primitives,
-              delegates: delegates,
-              all_declared: declared_caps
-            },
-            prompt_body: po.body,
-            history_length: po.history.length
-          }
+          info = po.to_inspect_hash(registry: env.registry)
 
           ::MCP::Tool::Response.new([{
             type: "text",

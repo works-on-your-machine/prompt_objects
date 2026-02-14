@@ -183,12 +183,7 @@ module PromptObjects
             env = server_context[:env]
 
             pos = env.registry.prompt_objects.map do |po|
-              {
-                name: po.name,
-                description: po.description,
-                state: po.state.to_s,
-                capabilities: po.config["capabilities"] || []
-              }
+              po.to_summary_hash(registry: env.registry)
             end
 
             ::MCP::Tool::Response.new([{
@@ -499,16 +494,7 @@ module PromptObjects
               }])
             end
 
-            info = {
-              name: po.name,
-              description: po.description,
-              state: po.state.to_s,
-              prompt: po.body,
-              capabilities: po.config["capabilities"] || [],
-              config: po.config,
-              session_id: po.instance_variable_get(:@session_id),
-              history_length: po.history.length
-            }
+            info = po.to_inspect_hash(registry: env.registry)
 
             ::MCP::Tool::Response.new([{
               type: "text",

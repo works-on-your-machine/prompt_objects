@@ -17,12 +17,7 @@ module PromptObjects
           env = server_context[:env]
 
           pos = env.registry.prompt_objects.map do |po|
-            {
-              name: po.name,
-              description: po.description,
-              state: po.state || :idle,
-              capabilities: po.config["capabilities"] || []
-            }
+            po.to_summary_hash(registry: env.registry)
           end
 
           ::MCP::Tool::Response.new([{
