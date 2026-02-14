@@ -2,6 +2,23 @@
 
 All notable changes to PromptObjects are documented in this file.
 
+## [0.5.0] - 2026-02-13
+
+### Added
+
+- **Smalltalk System Browser redesign** — Complete frontend overhaul replacing the chat-app UI with a multi-pane object browser. POs are treated as live objects in a running image: permanent ObjectList (left pane), multi-pane Inspector with MethodList + SourcePane, REPL-style Workspace, and bottom Transcript. Warm charcoal + amber palette with Geist fonts. All panels resizable via drag handles.
+- **Collapsible inspector top pane** — The Methods + Source pane has a thin header bar with a collapse/expand toggle. When collapsed, the Workspace fills the full inspector height. Collapse state persists across PO switches.
+- **Source entry in method list** — A "Source" entry at the top of the method list provides a clear way to navigate back to the PO's prompt after inspecting a capability.
+- **Dynamic Ollama model discovery** — LLM config now queries the Ollama API for installed models instead of using a static list.
+
+### Fixed
+
+- **Capabilities disappearing on file save** — `po_modified` events were sending capabilities as plain string names instead of rich objects, overwriting the store. All serialization paths now emit consistent `{name, description, parameters}` objects.
+- **Centralized PO serialization** — Moved duplicated state/message/session serialization from WebSocketHandler and API routes into `PromptObject` (`to_state_hash`, `to_summary_hash`, `to_inspect_hash`). Eliminates inconsistent serialization as a class of bug.
+- **Missing items field in array tool schemas** — LLM APIs reject array parameters without an `items` field. Added a defensive sanitizer in `Capability#descriptor` as a fallback.
+- **OpenAI adapter error details** — 4xx errors from Ollama now surface the actual rejection reason instead of just "status 400".
+- **All WebSocket message types handled** — Added frontend handlers for `prompt_updated`, `llm_error`, `session_created`, and `session_switched`. Removed defensive normalization workarounds.
+
 ## [0.4.0] - 2026-02-11
 
 ### Added

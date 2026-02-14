@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **PromptObjects** is a Ruby framework where markdown files with LLM-backed behavior act as first-class autonomous entities. The core insight: **everything is a capability**—primitives (Ruby code) and Prompt-Objects (markdown files) share the same interface, differing only in interpretation complexity.
 
-**Current Status**: v0.4.0 — The core framework is fully implemented and functional. The original 6-phase implementation plan is complete. Active development is focused on visualization, developer experience, and exploring new primitives. See `CHANGELOG.md` for release history and `design-doc-v2.md` / `IMPLEMENTATION_PLAN.md` for original design context.
+**Current Status**: v0.5.0 — The core framework is fully implemented and functional. The original 6-phase implementation plan is complete. Active development is focused on visualization, developer experience, and exploring new primitives. See `CHANGELOG.md` for release history and `design-doc-v2.md` / `IMPLEMENTATION_PLAN.md` for original design context.
 
 ## Architecture
 

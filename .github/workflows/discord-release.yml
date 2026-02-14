@@ -1,0 +1,39 @@
+name: Discord Release Notification
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post to Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          # Build the message from release data
+          TAG="${{ github.event.release.tag_name }}"
+          BODY="${{ github.event.release.body }}"
+          URL="${{ github.event.release.html_url }}"
+
+          # Truncate body to fit Discord's 2000 char limit
+          MAX_BODY=1800
+          if [ ${#BODY} -gt $MAX_BODY ]; then
+            BODY="${BODY:0:$MAX_BODY}..."
+          fi
+
+          # Post via webhook
+          jq -n \
+            --arg content "**PromptObjects ${TAG}** is out! ${URL}" \
+            --arg description "$BODY" \
+            --arg title "PromptObjects ${TAG}" \
+            --arg url "$URL" \
+            '{
+              embeds: [{
+                title: $title,
+                url: $url,
+                description: $description,
+                color: 15105570
+              }]
+            }' | curl -sf -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK_URL"
