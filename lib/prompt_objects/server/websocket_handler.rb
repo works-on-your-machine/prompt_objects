@@ -156,7 +156,7 @@ module PromptObjects
             type: "po_state",
             payload: {
               name: po.name,
-              state: po_state_hash(po).merge(status: "idle")
+              state: po.to_state_hash(registry: @runtime.registry).merge(status: "idle")
             }
           )
         end
@@ -269,7 +269,7 @@ module PromptObjects
             type: "po_state",
             payload: {
               name: po_name,
-              state: { sessions: po.list_sessions.map { |s| session_summary(s) } }
+              state: { sessions: po.list_sessions.map { |s| PromptObject.serialize_session(s) } }
             }
           )
         end
@@ -311,7 +311,7 @@ module PromptObjects
               payload: {
                 target: po_obj.name,
                 session_id: session_id,
-                messages: history.map { |m| message_to_hash(m) }
+                messages: history.map { |m| PromptObject.serialize_message(m) }
               }
             )
           }
@@ -350,7 +350,7 @@ module PromptObjects
               type: "po_state",
               payload: {
                 name: po_name,
-                state: { sessions: po.list_sessions.map { |s| session_summary(s) } }
+                state: { sessions: po.list_sessions.map { |s| PromptObject.serialize_session(s) } }
               }
             )
           rescue => e
@@ -438,7 +438,7 @@ module PromptObjects
         # Also send updated PO state
         send_message(
           type: "po_state",
-          payload: { name: po_name, state: po_state_hash(po) }
+          payload: { name: po_name, state: po.to_state_hash(registry: @runtime.registry) }
         )
       end
 
@@ -458,7 +458,7 @@ module PromptObjects
           # Send updated PO state with new session's messages
           send_message(
             type: "po_state",
-            payload: { name: po_name, state: po_state_hash(po) }
+            payload: { name: po_name, state: po.to_state_hash(registry: @runtime.registry) }
           )
         else
           send_error("Could not switch to session: #{session_id}")
@@ -488,7 +488,7 @@ module PromptObjects
         # Also send updated PO state
         send_message(
           type: "po_state",
-          payload: { name: po_name, state: po_state_hash(po) }
+          payload: { name: po_name, state: po.to_state_hash(registry: @runtime.registry) }
         )
       end
 
@@ -645,71 +645,12 @@ module PromptObjects
         send_message(type: "error", payload: { message: message })
       end
 
-      def po_state_hash(po)
-        {
-          status: po.instance_variable_get(:@state) || "idle",
-          description: po.description,
-          capabilities: declared_capabilities_info(po),
-          universal_capabilities: universal_capabilities_info,
-          current_session: current_session_hash(po),
-          sessions: po.list_sessions.map { |s| session_summary(s) },
-          # Include full prompt for inspection
-          prompt: po.body,
-          config: po.config
-        }
-      end
-
-      def declared_capabilities_info(po)
-        declared = po.config["capabilities"] || []
-        declared.map do |name|
-          cap = @runtime.registry.get(name)
-          {
-            name: name,
-            description: cap&.description || "Capability not found",
-            parameters: cap&.parameters
-          }
-        end
-      end
-
-      def universal_capabilities_info
-        UNIVERSAL_CAPABILITIES.map do |name|
-          cap = @runtime.registry.get(name)
-          {
-            name: name,
-            description: cap&.description || "Universal capability",
-            parameters: cap&.parameters
-          }
-        end
-      end
-
-      def current_session_hash(po)
-        return nil unless po.session_id
-
-        {
-          id: po.session_id,
-          messages: po.history.map { |m| message_to_hash(m) }
-        }
-      end
-
       # Get messages for a specific session (may not be current session)
       def session_messages(po, session_id)
         return [] unless @runtime.session_store
 
         messages = @runtime.session_store.get_messages(session_id)
-        messages.map { |m| message_to_hash(m) }
-      end
-
-      def session_summary(session)
-        {
-          id: session[:id],
-          name: session[:name],
-          message_count: session[:message_count] || 0,
-          updated_at: session[:updated_at]&.iso8601,
-          # Thread fields
-          parent_session_id: session[:parent_session_id],
-          parent_po: session[:parent_po],
-          thread_type: session[:thread_type] || "root"
-        }
+        messages.map { |m| PromptObject.serialize_message(m) }
       end
 
       # Recursively serialize a thread tree for JSON
@@ -717,40 +658,9 @@ module PromptObjects
         return nil unless tree
 
         {
-          session: session_summary(tree[:session]),
+          session: PromptObject.serialize_session(tree[:session]),
           children: (tree[:children] || []).map { |child| serialize_thread_tree(child) }
         }
-      end
-
-      def message_to_hash(msg)
-        case msg[:role]
-        when :user
-          # In-memory messages use :from, SQLite-loaded messages use :from_po
-          from = msg[:from] || msg[:from_po]
-          { role: "user", content: msg[:content], from: from }
-        when :assistant
-          hash = { role: "assistant", content: msg[:content] }
-          if msg[:tool_calls]
-            hash[:tool_calls] = msg[:tool_calls].map do |tc|
-              # Handle both ToolCall objects and Hashes (from DB with symbol or string keys)
-              if tc.is_a?(LLM::ToolCall)
-                { id: tc.id, name: tc.name, arguments: tc.arguments }
-              else
-                tc_id = tc[:id] || tc["id"]
-                tc_name = tc[:name] || tc["name"]
-                tc_args = tc[:arguments] || tc["arguments"] || {}
-                { id: tc_id, name: tc_name, arguments: tc_args }
-              end
-            end
-          end
-          hash
-        when :tool
-          # In-memory messages use :results, SQLite-loaded messages use :tool_results
-          results = msg[:results] || msg[:tool_results]
-          { role: "tool", results: results }
-        else
-          { role: msg[:role].to_s, content: msg[:content] }
-        end
       end
 
       def request_to_hash(request)

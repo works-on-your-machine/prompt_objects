@@ -40,7 +40,7 @@ module PromptObjects
           type: "po_added",
           payload: {
             name: po.name,
-            state: po_state_hash(po, runtime: runtime)
+            state: po.to_state_hash(registry: runtime.registry)
           }
         )
         puts "Broadcast: PO registered - #{po.name}"
@@ -53,7 +53,7 @@ module PromptObjects
           type: "po_modified",
           payload: {
             name: po.name,
-            state: po_state_hash(po, runtime: runtime)
+            state: po.to_state_hash(registry: runtime.registry)
           }
         )
         puts "Broadcast: PO modified (programmatic) - #{po.name}"
@@ -148,7 +148,7 @@ module PromptObjects
           type: "po_added",
           payload: {
             name: po.name,
-            state: po_state_hash(po, runtime: runtime)
+            state: po.to_state_hash(registry: runtime&.registry)
           }
         )
         puts "Broadcast: PO added - #{po.name}"
@@ -159,7 +159,7 @@ module PromptObjects
           type: "po_modified",
           payload: {
             name: po.name,
-            state: po_state_hash(po, runtime: runtime)
+            state: po.to_state_hash(registry: runtime&.registry)
           }
         )
         puts "Broadcast: PO modified - #{po.name}"
@@ -173,93 +173,5 @@ module PromptObjects
       end
     end
 
-    # Helper to convert PO to state hash for broadcasting.
-    # When runtime is provided, includes full capability info (name, description, parameters)
-    # and universal capabilities — matching the WebSocket handler's po_state_hash format.
-    def self.po_state_hash(po, runtime: nil)
-      {
-        status: po.instance_variable_get(:@state) || "idle",
-        description: po.description,
-        capabilities: declared_capabilities_info(po, runtime: runtime),
-        universal_capabilities: universal_capabilities_info(runtime: runtime),
-        current_session: current_session_hash(po),
-        sessions: po.list_sessions.map do |s|
-          {
-            id: s[:id],
-            name: s[:name],
-            message_count: s[:message_count] || 0,
-            updated_at: s[:updated_at]&.iso8601,
-            # Thread fields
-            parent_session_id: s[:parent_session_id],
-            parent_po: s[:parent_po],
-            thread_type: s[:thread_type] || "root"
-          }
-        end,
-        prompt: po.body,
-        config: po.config
-      }
-    end
-
-    # Build full capability info objects for a PO's declared capabilities.
-    def self.declared_capabilities_info(po, runtime: nil)
-      declared = po.config["capabilities"] || []
-      return declared unless runtime # Fallback to string names if no runtime
-
-      declared.map do |name|
-        cap = runtime.registry.get(name)
-        {
-          name: name,
-          description: cap&.description || "Capability not found",
-          parameters: cap&.parameters
-        }
-      end
-    end
-
-    # Build full capability info objects for universal capabilities.
-    def self.universal_capabilities_info(runtime: nil)
-      return [] unless runtime
-
-      UNIVERSAL_CAPABILITIES.map do |name|
-        cap = runtime.registry.get(name)
-        {
-          name: name,
-          description: cap&.description || "Universal capability",
-          parameters: cap&.parameters
-        }
-      end
-    end
-
-    # Helper to get current session data for a PO.
-    def self.current_session_hash(po)
-      return nil unless po.session_id
-
-      {
-        id: po.session_id,
-        messages: po.history.map { |m| message_to_hash(m) }
-      }
-    end
-
-    # Helper to convert a message to JSON-serializable hash.
-    def self.message_to_hash(msg)
-      case msg[:role]
-      when :user
-        { role: "user", content: msg[:content], from: msg[:from] }
-      when :assistant
-        hash = { role: "assistant", content: msg[:content] }
-        if msg[:tool_calls]
-          hash[:tool_calls] = msg[:tool_calls].map do |tc|
-            tc_id = tc.respond_to?(:id) ? tc.id : (tc[:id] || tc["id"])
-            tc_name = tc.respond_to?(:name) ? tc.name : (tc[:name] || tc["name"])
-            tc_args = tc.respond_to?(:arguments) ? tc.arguments : (tc[:arguments] || tc["arguments"] || {})
-            { id: tc_id, name: tc_name, arguments: tc_args }
-          end
-        end
-        hash
-      when :tool
-        { role: "tool", results: msg[:results] }
-      else
-        { role: msg[:role].to_s, content: msg[:content] }
-      end
-    end
   end
 end

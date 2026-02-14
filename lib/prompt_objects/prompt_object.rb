@@ -232,7 +232,133 @@ module PromptObjects
       @session_id
     end
 
+    # --- Serialization ---
+    # Canonical methods for converting PO state to hashes for broadcasting,
+    # REST API responses, and MCP tool output. All consumers should use these
+    # to ensure consistent capability format across WebSocket, REST, and MCP.
+
+    # Full state hash for WebSocket/broadcast consumers.
+    # Matches the frontend's PromptObject TypeScript type.
+    # @param registry [Registry, nil] Registry for resolving capability descriptions
+    # @return [Hash]
+    def to_state_hash(registry: nil)
+      {
+        status: (@state || :idle).to_s,
+        description: description,
+        capabilities: resolve_capabilities(registry: registry),
+        universal_capabilities: resolve_universal_capabilities(registry: registry),
+        current_session: serialize_current_session,
+        sessions: list_sessions.map { |s| self.class.serialize_session(s) },
+        prompt: body,
+        config: config
+      }
+    end
+
+    # Summary hash for list endpoints (REST API, MCP list tools).
+    # Lightweight: no prompt, no session messages, no universal capabilities.
+    # @param registry [Registry, nil] Registry for resolving capability descriptions
+    # @return [Hash]
+    def to_summary_hash(registry: nil)
+      {
+        name: name,
+        description: description,
+        status: (@state || :idle).to_s,
+        capabilities: resolve_capabilities(registry: registry),
+        session_count: list_sessions.size
+      }
+    end
+
+    # Detailed inspection hash for single-PO endpoints (REST GET, MCP inspect).
+    # Everything in summary plus prompt, config, sessions, and universals.
+    # @param registry [Registry, nil] Registry for resolving capability descriptions
+    # @return [Hash]
+    def to_inspect_hash(registry: nil)
+      {
+        name: name,
+        description: description,
+        status: (@state || :idle).to_s,
+        capabilities: resolve_capabilities(registry: registry),
+        universal_capabilities: resolve_universal_capabilities(registry: registry),
+        prompt: body,
+        config: config,
+        session_id: session_id,
+        sessions: list_sessions.map { |s| self.class.serialize_session(s) },
+        history_length: history.length
+      }
+    end
+
+    # Serialize a message (in-memory or from DB) to a JSON-ready hash.
+    # Handles both ToolCall objects and plain Hashes (from SQLite).
+    # @param msg [Hash] The message to serialize
+    # @return [Hash]
+    def self.serialize_message(msg)
+      case msg[:role]
+      when :user
+        from = msg[:from] || msg[:from_po]
+        { role: "user", content: msg[:content], from: from }
+      when :assistant
+        hash = { role: "assistant", content: msg[:content] }
+        if msg[:tool_calls]
+          hash[:tool_calls] = msg[:tool_calls].map do |tc|
+            if tc.respond_to?(:id)
+              { id: tc.id, name: tc.name, arguments: tc.arguments }
+            else
+              { id: tc[:id] || tc["id"], name: tc[:name] || tc["name"], arguments: tc[:arguments] || tc["arguments"] || {} }
+            end
+          end
+        end
+        hash
+      when :tool
+        results = msg[:results] || msg[:tool_results]
+        { role: "tool", results: results }
+      else
+        { role: msg[:role].to_s, content: msg[:content] }
+      end
+    end
+
+    # Serialize a session record to a JSON-ready hash with thread fields.
+    # @param session [Hash] Session record from session store
+    # @return [Hash]
+    def self.serialize_session(session)
+      {
+        id: session[:id],
+        name: session[:name],
+        message_count: session[:message_count] || 0,
+        updated_at: session[:updated_at]&.iso8601,
+        parent_session_id: session[:parent_session_id],
+        parent_po: session[:parent_po],
+        thread_type: session[:thread_type] || "root"
+      }
+    end
+
     private
+
+    # Build capability info objects for this PO's declared capabilities.
+    def resolve_capabilities(registry: nil)
+      declared = @config["capabilities"] || []
+      return declared.map { |n| { name: n, description: n } } unless registry
+
+      declared.map do |cap_name|
+        cap = registry.get(cap_name)
+        { name: cap_name, description: cap&.description || "Capability not found", parameters: cap&.parameters }
+      end
+    end
+
+    # Build capability info objects for universal capabilities.
+    def resolve_universal_capabilities(registry: nil)
+      return [] unless registry
+
+      UNIVERSAL_CAPABILITIES.map do |cap_name|
+        cap = registry.get(cap_name)
+        { name: cap_name, description: cap&.description || "Universal capability", parameters: cap&.parameters }
+      end
+    end
+
+    # Serialize current session with messages for real-time state.
+    def serialize_current_session
+      return nil unless session_id
+      { id: session_id, messages: history.map { |m| self.class.serialize_message(m) } }
+    end
 
     def normalize_message(message)
       case message
