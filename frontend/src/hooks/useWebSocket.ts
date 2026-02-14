@@ -215,6 +215,34 @@ export function useWebSocket() {
         break
       }
 
+      case 'prompt_updated': {
+        const { target, success } = message.payload as { target: string; success: boolean }
+        if (!success) console.warn('Prompt update failed for:', target)
+        break
+      }
+
+      case 'llm_error': {
+        const { po_name, error, provider, model } = message.payload as {
+          po_name: string
+          provider: string
+          model: string
+          error: string
+          error_class: string
+        }
+        console.error(`LLM error for ${po_name} (${provider}/${model}):`, error)
+        // Reset PO to idle so UI isn't stuck in "thinking" state
+        setPromptObject(po_name, { status: 'idle' })
+        break
+      }
+
+      case 'session_created':
+        // Session creation confirmed — po_state update follows with full state
+        break
+
+      case 'session_switched':
+        // Session switch confirmed — po_state update follows with full state
+        break
+
       case 'error': {
         const { message: errorMsg } = message.payload as { message: string }
         console.error('Server error:', errorMsg)

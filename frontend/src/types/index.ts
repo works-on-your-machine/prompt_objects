@@ -126,6 +126,8 @@ export type WSMessageType =
   | 'llm_switched'
   | 'session_usage'
   | 'thread_export'
+  | 'prompt_updated'
+  | 'llm_error'
   | 'error'
   | 'pong'
 
