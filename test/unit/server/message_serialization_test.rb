@@ -1,9 +1,8 @@
 # frozen_string_literal: true
 
 require_relative "../../test_helper"
-require "prompt_objects/server/websocket_handler"
 
-# Tests that message_to_hash correctly handles messages from both
+# Tests that PromptObject.serialize_message correctly handles messages from both
 # in-memory history (ToolCall objects) and SQLite (plain Hashes).
 # These are the two paths that feed the WebSocket session_updated messages:
 #   1. on_history_updated callback → in-memory @history with ToolCall objects
@@ -12,17 +11,6 @@ require "prompt_objects/server/websocket_handler"
 # A mismatch between these paths caused tool call params to appear initially
 # (from callback) then disappear (when SQLite-loaded messages replaced them).
 class MessageSerializationTest < PromptObjectsTest
-  def setup
-    super
-    @env_dir = track_temp_dir(create_temp_env(name: "serial_test"))
-    create_test_po_file(@env_dir, name: "helper", capabilities: ["read_file"])
-    @runtime = PromptObjects::Runtime.new(env_path: @env_dir, llm: MockLLM.new)
-    @runtime.load_prompt_object(File.join(@env_dir, "objects", "helper.md"))
-
-    # Create a handler we can test message_to_hash on
-    @handler = create_test_handler(@runtime)
-  end
-
   # --- Assistant messages with tool calls ---
 
   def test_tool_calls_from_memory_with_tool_call_objects
@@ -31,7 +19,7 @@ class MessageSerializationTest < PromptObjectsTest
     )
     msg = { role: :assistant, content: nil, tool_calls: [tc] }
 
-    result = @handler.send(:message_to_hash, msg)
+    result = PromptObjects::PromptObject.serialize_message(msg)
 
     assert_equal "assistant", result[:role]
     assert_nil result[:content]
@@ -49,7 +37,7 @@ class MessageSerializationTest < PromptObjectsTest
       tool_calls: [{ id: "call_abc", name: "read_file", arguments: { path: "/tmp/test.txt" } }]
     }
 
-    result = @handler.send(:message_to_hash, msg)
+    result = PromptObjects::PromptObject.serialize_message(msg)
 
     assert_equal "assistant", result[:role]
     assert_equal 1, result[:tool_calls].length
@@ -66,7 +54,7 @@ class MessageSerializationTest < PromptObjectsTest
       tool_calls: [{ "id" => "call_abc", "name" => "read_file", "arguments" => { "path" => "/tmp" } }]
     }
 
-    result = @handler.send(:message_to_hash, msg)
+    result = PromptObjects::PromptObject.serialize_message(msg)
 
     assert_equal "call_abc", result[:tool_calls][0][:id]
     assert_equal "read_file", result[:tool_calls][0][:name]
@@ -76,7 +64,7 @@ class MessageSerializationTest < PromptObjectsTest
   def test_assistant_message_without_tool_calls
     msg = { role: :assistant, content: "Hello!" }
 
-    result = @handler.send(:message_to_hash, msg)
+    result = PromptObjects::PromptObject.serialize_message(msg)
 
     assert_equal "assistant", result[:role]
     assert_equal "Hello!", result[:content]
@@ -91,7 +79,7 @@ class MessageSerializationTest < PromptObjectsTest
       results: [{ tool_call_id: "call_abc", name: "read_file", content: "file contents" }]
     }
 
-    result = @handler.send(:message_to_hash, msg)
+    result = PromptObjects::PromptObject.serialize_message(msg)
 
     assert_equal "tool", result[:role]
     assert_equal 1, result[:results].length
@@ -105,7 +93,7 @@ class MessageSerializationTest < PromptObjectsTest
       tool_results: [{ tool_call_id: "call_abc", name: "read_file", content: "file contents" }]
     }
 
-    result = @handler.send(:message_to_hash, msg)
+    result = PromptObjects::PromptObject.serialize_message(msg)
 
     assert_equal "tool", result[:role]
     assert_equal 1, result[:results].length
@@ -115,7 +103,7 @@ class MessageSerializationTest < PromptObjectsTest
   def test_tool_results_nil_from_both_keys
     msg = { role: :tool }
 
-    result = @handler.send(:message_to_hash, msg)
+    result = PromptObjects::PromptObject.serialize_message(msg)
 
     assert_equal "tool", result[:role]
     assert_nil result[:results]
@@ -126,7 +114,7 @@ class MessageSerializationTest < PromptObjectsTest
   def test_user_message_from_memory
     msg = { role: :user, content: "Hello", from: "human" }
 
-    result = @handler.send(:message_to_hash, msg)
+    result = PromptObjects::PromptObject.serialize_message(msg)
 
     assert_equal "user", result[:role]
     assert_equal "Hello", result[:content]
@@ -137,7 +125,7 @@ class MessageSerializationTest < PromptObjectsTest
     # SQLite-loaded messages use :from_po key (from parse_message_row)
     msg = { role: :user, content: "Hello", from_po: "human" }
 
-    result = @handler.send(:message_to_hash, msg)
+    result = PromptObjects::PromptObject.serialize_message(msg)
 
     assert_equal "user", result[:role]
     assert_equal "Hello", result[:content]
@@ -156,7 +144,7 @@ class MessageSerializationTest < PromptObjectsTest
 
     # Load back (as session_messages does)
     messages = store.get_messages(session_id)
-    result = @handler.send(:message_to_hash, messages.first)
+    result = PromptObjects::PromptObject.serialize_message(messages.first)
 
     assert_equal "assistant", result[:role]
     assert_nil result[:content]
@@ -176,7 +164,7 @@ class MessageSerializationTest < PromptObjectsTest
 
     # Load back and serialize
     messages = store.get_messages(session_id)
-    result = @handler.send(:message_to_hash, messages.first)
+    result = PromptObjects::PromptObject.serialize_message(messages.first)
 
     assert_equal "tool", result[:role]
     assert_equal 1, result[:results].length
@@ -191,7 +179,7 @@ class MessageSerializationTest < PromptObjectsTest
     store.add_message(session_id: session_id, role: :user, content: "Hello", from_po: "human")
 
     messages = store.get_messages(session_id)
-    result = @handler.send(:message_to_hash, messages.first)
+    result = PromptObjects::PromptObject.serialize_message(messages.first)
 
     assert_equal "user", result[:role]
     assert_equal "Hello", result[:content]
@@ -214,9 +202,9 @@ class MessageSerializationTest < PromptObjectsTest
     )
     store.add_message(session_id: session_id, role: :assistant, content: "The file contains: Hello World")
 
-    # Load and serialize all messages (as the final session_updated does)
+    # Load and serialize all messages
     messages = store.get_messages(session_id)
-    serialized = messages.map { |m| @handler.send(:message_to_hash, m) }
+    serialized = messages.map { |m| PromptObjects::PromptObject.serialize_message(m) }
 
     assert_equal 4, serialized.length
 
@@ -243,20 +231,5 @@ class MessageSerializationTest < PromptObjectsTest
     assert_equal "assistant", serialized[3][:role]
     assert_equal "The file contains: Hello World", serialized[3][:content]
     assert_nil serialized[3][:tool_calls]
-  end
-
-  private
-
-  # Create a WebSocketHandler instance for testing private methods.
-  # We use a mock connection since we only call message_to_hash.
-  def create_test_handler(runtime)
-    mock_connection = Object.new
-    def mock_connection.write(_data); end
-    def mock_connection.flush; end
-
-    PromptObjects::Server::WebSocketHandler.new(
-      runtime: runtime,
-      connection: mock_connection
-    )
   end
 end
