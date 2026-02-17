@@ -64,8 +64,9 @@ Navigate to `/canvas` for a Three.js 2D visualization of your environment. POs a
 
 ### Demos
 
-- [**Intro walkthrough**](https://www.loom.com/share/32c17ccd07bf4b6e99f1ff06aab5bee0) -- creating an environment, interacting with POs, and exploring the web UI
-- [**ARC-AGI-1 template**](https://www.loom.com/share/3a04fa73efd8407eae2b122740082268) -- using the ARC-AGI-1 solver environment with multi-PO delegation
+| <a href="https://www.loom.com/share/32c17ccd07bf4b6e99f1ff06aab5bee0"><img src="docs/images/intro_walkthrough.png" alt="Intro walkthrough" width="600"></a> | <a href="https://www.loom.com/share/3a04fa73efd8407eae2b122740082268"><img src="docs/images/arc_agi_1_template.png" alt="ARC-AGI-1 template" width="600"></a> |
+|:---:|:---:|
+| **Intro walkthrough**: creating an environment, interacting with POs, and exploring the web UI | **ARC-AGI-1 template**: using the ARC-AGI-1 solver environment with multi-PO delegation |
 
 ### MCP Server mode
 
