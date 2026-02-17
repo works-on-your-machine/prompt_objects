@@ -11,7 +11,7 @@ module PromptObjects
   class Error < StandardError; end
 
   # Universal capabilities available to all prompt objects (don't need to be declared)
-  UNIVERSAL_CAPABILITIES = %w[ask_human think create_capability add_capability remove_capability list_capabilities list_primitives add_primitive create_primitive delete_primitive verify_primitive modify_primitive request_primitive modify_prompt].freeze
+  UNIVERSAL_CAPABILITIES = %w[ask_human think create_capability add_capability remove_capability list_capabilities list_primitives add_primitive create_primitive delete_primitive verify_primitive modify_primitive request_primitive modify_prompt store_env_data get_env_data list_env_data update_env_data delete_env_data].freeze
 end
 
 require_relative "prompt_objects/capability"
@@ -60,6 +60,11 @@ require_relative "prompt_objects/universal/verify_primitive"
 require_relative "prompt_objects/universal/modify_primitive"
 require_relative "prompt_objects/universal/request_primitive"
 require_relative "prompt_objects/universal/modify_prompt"
+require_relative "prompt_objects/universal/store_env_data"
+require_relative "prompt_objects/universal/get_env_data"
+require_relative "prompt_objects/universal/list_env_data"
+require_relative "prompt_objects/universal/update_env_data"
+require_relative "prompt_objects/universal/delete_env_data"
 
 # Connectors (different interfaces to environments)
 require_relative "prompt_objects/connectors/base"

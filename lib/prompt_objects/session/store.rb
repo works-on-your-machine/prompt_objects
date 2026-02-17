@@ -9,7 +9,7 @@ module PromptObjects
     # SQLite-based session storage for conversation history.
     # Each environment has its own sessions.db file (gitignored for privacy).
     class Store
-      SCHEMA_VERSION = 6
+      SCHEMA_VERSION = 7
 
       # Thread types for conversation branching
       THREAD_TYPES = %w[root continuation delegation fork].freeze
@@ -595,6 +595,116 @@ module PromptObjects
         row["count"]
       end
 
+      # --- Environment Data (Shared Key-Value Store) ---
+
+      # Resolve the root thread ID for a session by walking up the delegation chain.
+      # @param session_id [String] Any session ID in a delegation chain
+      # @return [String] The root thread's session ID
+      def resolve_root_thread(session_id)
+        lineage = get_thread_lineage(session_id)
+        return session_id if lineage.empty?
+
+        lineage.first[:id]
+      end
+
+      # Store a key-value pair scoped to a root thread.
+      # Uses INSERT OR REPLACE to create or overwrite.
+      # @param root_thread_id [String] Root thread scope
+      # @param key [String] Data key
+      # @param short_description [String] Brief description for discoverability
+      # @param value [Object] Data value (will be JSON-serialized)
+      # @param stored_by [String] PO name that stored this
+      def store_env_data(root_thread_id:, key:, short_description:, value:, stored_by:)
+        now = Time.now.utc.iso8601
+        json_value = JSON.generate(value)
+
+        @db.execute(<<~SQL, [root_thread_id, key, short_description, json_value, stored_by, now, now])
+          INSERT INTO env_data (root_thread_id, key, short_description, value, stored_by, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(root_thread_id, key) DO UPDATE SET
+            short_description = excluded.short_description,
+            value = excluded.value,
+            stored_by = excluded.stored_by,
+            updated_at = excluded.updated_at
+        SQL
+      end
+
+      # Get a single env data entry by key.
+      # @param root_thread_id [String] Root thread scope
+      # @param key [String] Data key
+      # @return [Hash, nil] Entry with parsed value, or nil if not found
+      def get_env_data(root_thread_id:, key:)
+        row = @db.get_first_row(<<~SQL, [root_thread_id, key])
+          SELECT key, short_description, value, stored_by, created_at, updated_at
+          FROM env_data
+          WHERE root_thread_id = ? AND key = ?
+        SQL
+
+        return nil unless row
+
+        {
+          key: row["key"],
+          short_description: row["short_description"],
+          value: JSON.parse(row["value"], symbolize_names: true),
+          stored_by: row["stored_by"],
+          created_at: row["created_at"],
+          updated_at: row["updated_at"]
+        }
+      end
+
+      # List all env data keys and descriptions for a root thread (no values).
+      # @param root_thread_id [String] Root thread scope
+      # @return [Array<Hash>] Entries with key and short_description only
+      def list_env_data(root_thread_id:)
+        rows = @db.execute(<<~SQL, [root_thread_id])
+          SELECT key, short_description FROM env_data
+          WHERE root_thread_id = ?
+          ORDER BY key ASC
+        SQL
+
+        rows.map { |row| { key: row["key"], short_description: row["short_description"] } }
+      end
+
+      # Update an existing env data entry.
+      # @param root_thread_id [String] Root thread scope
+      # @param key [String] Data key
+      # @param short_description [String, nil] New description (keeps existing if nil)
+      # @param value [Object, nil] New value (keeps existing if nil)
+      # @param stored_by [String] PO name performing the update
+      # @return [Boolean] True if updated, false if key not found
+      def update_env_data(root_thread_id:, key:, short_description: nil, value: nil, stored_by:)
+        existing = get_env_data(root_thread_id: root_thread_id, key: key)
+        return false unless existing
+
+        updates = ["updated_at = ?", "stored_by = ?"]
+        params = [Time.now.utc.iso8601, stored_by]
+
+        if short_description
+          updates << "short_description = ?"
+          params << short_description
+        end
+
+        if value
+          updates << "value = ?"
+          params << JSON.generate(value)
+        end
+
+        params << root_thread_id
+        params << key
+
+        @db.execute("UPDATE env_data SET #{updates.join(', ')} WHERE root_thread_id = ? AND key = ?", params)
+        true
+      end
+
+      # Delete an env data entry.
+      # @param root_thread_id [String] Root thread scope
+      # @param key [String] Data key
+      # @return [Boolean] True if deleted, false if key not found
+      def delete_env_data(root_thread_id:, key:)
+        @db.execute("DELETE FROM env_data WHERE root_thread_id = ? AND key = ?", [root_thread_id, key])
+        @db.changes > 0
+      end
+
       # --- Usage Aggregation ---
 
       # Get total token usage for a session.
@@ -1030,6 +1140,21 @@ module PromptObjects
 
           CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id);
           CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);
+
+          -- Shared environment data for delegation chains (v7)
+          CREATE TABLE IF NOT EXISTS env_data (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            root_thread_id TEXT NOT NULL,
+            key TEXT NOT NULL,
+            short_description TEXT NOT NULL,
+            value TEXT NOT NULL,
+            stored_by TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(root_thread_id, key)
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_env_data_root ON env_data(root_thread_id);
         SQL
       end
 
@@ -1106,6 +1231,25 @@ module PromptObjects
         if from_version < 6
           # Add usage column for token tracking
           @db.execute("ALTER TABLE messages ADD COLUMN usage TEXT")
+        end
+
+        if from_version < 7
+          # Add shared environment data table for delegation chains
+          @db.execute_batch(<<~SQL)
+            CREATE TABLE IF NOT EXISTS env_data (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              root_thread_id TEXT NOT NULL,
+              key TEXT NOT NULL,
+              short_description TEXT NOT NULL,
+              value TEXT NOT NULL,
+              stored_by TEXT NOT NULL,
+              created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+              updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+              UNIQUE(root_thread_id, key)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_env_data_root ON env_data(root_thread_id);
+          SQL
         end
       end
 

@@ -163,10 +163,6 @@ Complete web UI overhaul replacing chat-app style with multi-pane object browser
 Fixed FFI crashes by using charm-native as single Go runtime for all Charm gems.
 - See: [archive/drafts/charm-forks.md](archive/drafts/charm-forks.md)
 
----
-
-## Ready
-
 ### Shared Environment Data
 Thread-scoped key-value store for PO delegation chains to share working memory.
 - `store_env_data`, `get_env_data`, `list_env_data`, `update_env_data`, `delete_env_data`
@@ -174,6 +170,10 @@ Thread-scoped key-value store for PO delegation chains to share working memory.
 - Entries have `key`, `short_description`, `value` — lightweight manifest for LLM discoverability
 - SQLite storage in existing session database
 - See: [epics/shared-environment-data.md](epics/shared-environment-data.md)
+
+---
+
+## Ready
 
 ### Universal Capability Cleanup
 Consolidate 14 universal capabilities down to 9 by merging overlapping primitive management tools.
@@ -267,7 +267,7 @@ Speech interaction.
 
 | Epic | File | Status |
 |------|------|--------|
-| Shared Environment Data | [epics/shared-environment-data.md](epics/shared-environment-data.md) | Ready |
+| Shared Environment Data | [epics/shared-environment-data.md](epics/shared-environment-data.md) | Done |
 | Universal Capability Cleanup | [epics/universal-capability-cleanup.md](epics/universal-capability-cleanup.md) | Ready |
 | Parallel Tool Calling | [epics/parallel-tool-calling.md](epics/parallel-tool-calling.md) | Ready |
 | Message Provenance | [epics/message-provenance.md](epics/message-provenance.md) | Ready |

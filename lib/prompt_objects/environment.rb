@@ -316,6 +316,11 @@ module PromptObjects
       @registry.register(Universal::ModifyPrimitive.new)
       @registry.register(Universal::RequestPrimitive.new)
       @registry.register(Universal::ModifyPrompt.new)
+      @registry.register(Universal::StoreEnvData.new)
+      @registry.register(Universal::GetEnvData.new)
+      @registry.register(Universal::ListEnvData.new)
+      @registry.register(Universal::UpdateEnvData.new)
+      @registry.register(Universal::DeleteEnvData.new)
     end
   end
 

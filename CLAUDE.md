@@ -61,6 +61,7 @@ Available to all Prompt-Objects automatically (no frontmatter declaration needed
 - `list_capabilities` / `list_primitives` - introspection
 - `create_primitive` / `add_primitive` / `delete_primitive` / `verify_primitive` / `modify_primitive` / `request_primitive` - primitive management
 - `modify_prompt` - rewrite own system prompt at runtime
+- `store_env_data` / `get_env_data` / `list_env_data` / `update_env_data` / `delete_env_data` - thread-scoped shared key-value store for delegation chains
 
 ### PO-to-PO Delegation
 When a PO calls another PO, the system creates an isolated delegation thread in the target PO. The caller's context is tracked so messages show correct provenance. Delegation start/complete events are broadcast via WebSocket for real-time UI updates.
