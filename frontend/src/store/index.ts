@@ -7,6 +7,7 @@ import type {
   Environment,
   Message,
   LLMConfig,
+  EnvDataEntry,
 } from '../types'
 
 interface Store {
@@ -68,6 +69,15 @@ interface Store {
   usageData: Record<string, unknown> | null
   setUsageData: (data: Record<string, unknown>) => void
   clearUsageData: () => void
+
+  // Env Data
+  envData: Record<string, EnvDataEntry[]>
+  setEnvData: (rootThreadId: string, entries: EnvDataEntry[]) => void
+  clearEnvData: (rootThreadId: string) => void
+  sessionRootMap: Record<string, string>
+  setSessionRoot: (sessionId: string, rootThreadId: string) => void
+  envDataPaneCollapsed: boolean
+  toggleEnvDataPane: () => void
 }
 
 export const useStore = create<Store>((set) => ({
@@ -263,6 +273,25 @@ export const useStore = create<Store>((set) => ({
   usageData: null,
   setUsageData: (data) => set({ usageData: data }),
   clearUsageData: () => set({ usageData: null }),
+
+  // Env Data
+  envData: {},
+  setEnvData: (rootThreadId, entries) =>
+    set((s) => ({
+      envData: { ...s.envData, [rootThreadId]: entries },
+    })),
+  clearEnvData: (rootThreadId) =>
+    set((s) => {
+      const { [rootThreadId]: _, ...rest } = s.envData
+      return { envData: rest }
+    }),
+  sessionRootMap: {},
+  setSessionRoot: (sessionId, rootThreadId) =>
+    set((s) => ({
+      sessionRootMap: { ...s.sessionRootMap, [sessionId]: rootThreadId },
+    })),
+  envDataPaneCollapsed: true,
+  toggleEnvDataPane: () => set((s) => ({ envDataPaneCollapsed: !s.envDataPaneCollapsed })),
 }))
 
 // Selectors - use useShallow to prevent infinite re-renders with derived arrays
@@ -277,3 +306,6 @@ export const useNotificationCount = () =>
 
 export const usePONotifications = (poName: string) =>
   useStore(useShallow((s) => s.notifications.filter((n) => n.po_name === poName)))
+
+export const useEnvData = (rootThreadId: string | undefined) =>
+  useStore(useShallow((s) => (rootThreadId ? s.envData[rootThreadId] || [] : [])))

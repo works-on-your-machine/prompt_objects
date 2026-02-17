@@ -42,6 +42,7 @@ module PromptObjects
     attr_accessor :on_po_registered  # Callback for when a PO is registered
     attr_accessor :on_po_modified    # Callback for when a PO is modified (capabilities changed, etc.)
     attr_accessor :on_delegation_event  # Callback for PO-to-PO delegation start/complete
+    attr_accessor :on_env_data_changed  # Callback for env data store/update/delete
 
     # Initialize from an environment path (with manifest) or objects directory.
     # @param env_path [String, nil] Path to environment directory (preferred)
@@ -221,6 +222,15 @@ module PromptObjects
     # @param payload [Hash] { target:, caller:, thread_id:, tool_call_id: }
     def notify_delegation(event_type, payload)
       @on_delegation_event&.call(event_type, payload)
+    end
+
+    # Notify that environment data has changed (stored, updated, or deleted).
+    # @param action [String] "store", "update", or "delete"
+    # @param root_thread_id [String] Root thread scope
+    # @param key [String] The data key that changed
+    # @param stored_by [String] PO name that made the change
+    def notify_env_data_changed(action:, root_thread_id:, key:, stored_by:)
+      @on_env_data_changed&.call(action: action, root_thread_id: root_thread_id, key: key, stored_by: stored_by)
     end
 
     # Load a prompt object by name from the objects directory.

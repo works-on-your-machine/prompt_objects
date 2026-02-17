@@ -49,6 +49,8 @@ module PromptObjects
           message: { action: "delete", key: key }
         )
 
+        context.env.notify_env_data_changed(action: "delete", root_thread_id: root_thread_id, key: key, stored_by: stored_by)
+
         "Deleted '#{key}' from environment data."
       end
 

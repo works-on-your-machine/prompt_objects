@@ -8,6 +8,7 @@ import type {
   Environment,
   Message,
   LLMConfig,
+  EnvDataEntry,
   SendMessagePayload,
   RespondToNotificationPayload,
   CreateSessionPayload,
@@ -43,6 +44,8 @@ export function useWebSocket() {
     setLLMConfig,
     updateCurrentLLM,
     setUsageData,
+    setEnvData,
+    setSessionRoot,
   } = useStore()
 
   // Keep the handler ref up to date every render
@@ -242,6 +245,29 @@ export function useWebSocket() {
       case 'session_switched':
         // Session switch confirmed — po_state update follows with full state
         break
+
+      case 'env_data_changed': {
+        const { root_thread_id, entries } = message.payload as {
+          action: string
+          root_thread_id: string
+          key: string
+          stored_by: string
+          entries: EnvDataEntry[]
+        }
+        setEnvData(root_thread_id, entries)
+        break
+      }
+
+      case 'env_data_list': {
+        const { session_id, root_thread_id, entries } = message.payload as {
+          session_id: string
+          root_thread_id: string
+          entries: EnvDataEntry[]
+        }
+        setEnvData(root_thread_id, entries)
+        setSessionRoot(session_id, root_thread_id)
+        break
+      }
 
       case 'error': {
         const { message: errorMsg } = message.payload as { message: string }
@@ -488,6 +514,21 @@ export function useWebSocket() {
     )
   }, [])
 
+  // Request env data for a session
+  const requestEnvData = useCallback((sessionId: string) => {
+    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket not connected')
+      return
+    }
+
+    ws.current.send(
+      JSON.stringify({
+        type: 'get_env_data_list',
+        payload: { session_id: sessionId },
+      })
+    )
+  }, [])
+
   // Update a PO's prompt (markdown body)
   const updatePrompt = useCallback((target: string, prompt: string) => {
     if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
@@ -513,5 +554,6 @@ export function useWebSocket() {
     updatePrompt,
     requestUsage,
     exportThread,
+    requestEnvData,
   }
 }

@@ -102,6 +102,15 @@ export interface LLMConfig {
   providers: LLMProvider[]
 }
 
+export interface EnvDataEntry {
+  key: string
+  short_description: string
+  value: unknown
+  stored_by: string
+  created_at: string
+  updated_at: string
+}
+
 // WebSocket message types
 export type WSMessageType =
   | 'environment'
@@ -128,6 +137,8 @@ export type WSMessageType =
   | 'thread_export'
   | 'prompt_updated'
   | 'llm_error'
+  | 'env_data_changed'
+  | 'env_data_list'
   | 'error'
   | 'pong'
 

@@ -665,6 +665,27 @@ module PromptObjects
         rows.map { |row| { key: row["key"], short_description: row["short_description"] } }
       end
 
+      # List all env data entries with full values for a root thread.
+      # @param root_thread_id [String] Root thread scope
+      # @return [Array<Hash>] Full entries with parsed values
+      def list_env_data_full(root_thread_id:)
+        rows = @db.execute(<<~SQL, [root_thread_id])
+          SELECT key, short_description, value, stored_by, created_at, updated_at
+          FROM env_data WHERE root_thread_id = ? ORDER BY key ASC
+        SQL
+
+        rows.map do |row|
+          {
+            key: row["key"],
+            short_description: row["short_description"],
+            value: JSON.parse(row["value"]),
+            stored_by: row["stored_by"],
+            created_at: row["created_at"],
+            updated_at: row["updated_at"]
+          }
+        end
+      end
+
       # Update an existing env data entry.
       # @param root_thread_id [String] Root thread scope
       # @param key [String] Data key
@@ -873,7 +894,7 @@ module PromptObjects
         tree = get_thread_tree(session_id)
         return nil unless tree
 
-        serialize_tree_for_export(tree)
+        serialize_tree_for_export(tree, is_root: true)
       end
 
       # --- Import ---
@@ -1018,11 +1039,11 @@ module PromptObjects
         end
       end
 
-      def serialize_tree_for_export(node)
+      def serialize_tree_for_export(node, is_root: false)
         session = node[:session]
         messages = get_messages(session[:id])
 
-        {
+        result = {
           session: {
             id: session[:id],
             po_name: session[:po_name],
@@ -1044,6 +1065,13 @@ module PromptObjects
           },
           children: (node[:children] || []).map { |c| serialize_tree_for_export(c) }
         }
+
+        if is_root
+          env_data = list_env_data_full(root_thread_id: session[:id])
+          result[:env_data] = env_data unless env_data.empty?
+        end
+
+        result
       end
 
       def setup_schema

@@ -227,6 +227,8 @@ module PromptObjects
           handle_get_session_usage(message["payload"])
         when "export_thread"
           handle_export_thread(message["payload"])
+        when "get_env_data_list"
+          handle_get_env_data_list(message["payload"])
         when "ping"
           send_message(type: "pong", payload: {})
         else
@@ -635,6 +637,24 @@ module PromptObjects
             session_id: session_id,
             format: format,
             content: content
+          }
+        )
+      end
+
+      def handle_get_env_data_list(payload)
+        session_id = payload["session_id"]
+        return send_error("Session ID required") unless session_id
+        return send_error("No session store available") unless @runtime.session_store
+
+        root_thread_id = @runtime.session_store.resolve_root_thread(session_id)
+        entries = @runtime.session_store.list_env_data_full(root_thread_id: root_thread_id)
+
+        send_message(
+          type: "env_data_list",
+          payload: {
+            session_id: session_id,
+            root_thread_id: root_thread_id,
+            entries: entries
           }
         )
       end

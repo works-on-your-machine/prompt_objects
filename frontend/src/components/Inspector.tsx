@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react'
-import { useStore, usePONotifications } from '../store'
+import { useStore, usePONotifications, useEnvData } from '../store'
 import { useResize } from '../hooks/useResize'
 import { MethodList } from './MethodList'
 import { SourcePane } from './SourcePane'
+import { EnvDataPane } from './EnvDataPane'
 import { Workspace } from './Workspace'
 import { ContextMenu } from './ContextMenu'
 import { PaneSlot } from './PaneSlot'
@@ -17,6 +18,7 @@ interface InspectorProps {
   updatePrompt: (target: string, prompt: string) => void
   requestUsage?: (sessionId: string, includeTree?: boolean) => void
   exportThread?: (sessionId: string, format?: string) => void
+  requestEnvData: (sessionId: string) => void
 }
 
 export function Inspector({
@@ -27,6 +29,7 @@ export function Inspector({
   updatePrompt,
   requestUsage,
   exportThread,
+  requestEnvData,
 }: InspectorProps) {
   const [selectedCapability, setSelectedCapability] = useState<CapabilityInfo | null>(null)
   const [threadMenuOpen, setThreadMenuOpen] = useState(false)
@@ -34,12 +37,21 @@ export function Inspector({
   const notifications = usePONotifications(po.name)
   const topPaneCollapsed = useStore((s) => s.topPaneCollapsed)
   const toggleTopPane = useStore((s) => s.toggleTopPane)
+  const envDataPaneCollapsed = useStore((s) => s.envDataPaneCollapsed)
+  const toggleEnvDataPane = useStore((s) => s.toggleEnvDataPane)
 
   const topPaneResize = useResize({
     direction: 'vertical',
     initialSize: 260,
     minSize: 120,
     maxSize: 600,
+  })
+
+  const envDataResize = useResize({
+    direction: 'vertical',
+    initialSize: 160,
+    minSize: 80,
+    maxSize: 400,
   })
 
   const methodListResize = useResize({
@@ -51,6 +63,9 @@ export function Inspector({
 
   const sessions = po.sessions || []
   const currentSessionId = po.current_session?.id
+  const sessionRootMap = useStore((s) => s.sessionRootMap)
+  const rootThreadId = currentSessionId ? sessionRootMap[currentSessionId] : undefined
+  const envDataEntries = useEnvData(rootThreadId)
 
   // Sort sessions: current first, then by updated_at desc
   const sortedSessions = useMemo(() => {
@@ -202,6 +217,22 @@ export function Inspector({
             onSave={(prompt) => updatePrompt(po.name, prompt)}
           />
         </div>
+      </PaneSlot>
+
+      {/* Middle: Env Data (collapsible, resizable height) */}
+      <PaneSlot
+        label={`Env Data${envDataEntries.length > 0 ? ` (${envDataEntries.length})` : ''}`}
+        collapsed={envDataPaneCollapsed}
+        onToggle={toggleEnvDataPane}
+        height={envDataResize.size}
+        resizeHandle={
+          <div
+            className="resize-handle-h"
+            onMouseDown={envDataResize.onMouseDown}
+          />
+        }
+      >
+        <EnvDataPane sessionId={currentSessionId} requestEnvData={requestEnvData} />
       </PaneSlot>
 
       {/* Bottom: Workspace */}

@@ -58,6 +58,8 @@ module PromptObjects
             get_prompt_object($1)
           when %r{^/events/session/([^/]+)$}
             get_session_events($1)
+          when %r{^/sessions/([^/]+)/env_data$}
+            get_session_env_data($1)
           when %r{^/sessions/([^/]+)/usage$}
             get_session_usage($1, _request)
           when %r{^/sessions/([^/]+)/export$}
@@ -312,6 +314,17 @@ module PromptObjects
             message: event[:message],
             timestamp: event[:timestamp]&.iso8601
           }
+        end
+
+        # === Env Data ===
+
+        def get_session_env_data(session_id)
+          return { error: "No session store" } unless @runtime.session_store
+
+          root_thread_id = @runtime.session_store.resolve_root_thread(session_id)
+          entries = @runtime.session_store.list_env_data_full(root_thread_id: root_thread_id)
+
+          { root_thread_id: root_thread_id, entries: entries }
         end
 
         # === Usage ===

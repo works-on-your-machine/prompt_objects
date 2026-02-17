@@ -10,7 +10,7 @@ import { UsagePanel } from './components/UsagePanel'
 import { CanvasView } from './canvas/CanvasView'
 
 export default function App() {
-  const { sendMessage, respondToNotification, createSession, switchSession, switchLLM, createThread, updatePrompt, requestUsage, exportThread } =
+  const { sendMessage, respondToNotification, createSession, switchSession, switchLLM, createThread, updatePrompt, requestUsage, exportThread, requestEnvData } =
     useWebSocket()
   const { selectedPO, busOpen, notifications, usageData, clearUsageData, currentView } = useStore()
   const selectedPOData = useSelectedPO()
@@ -64,6 +64,7 @@ export default function App() {
                     updatePrompt={updatePrompt}
                     requestUsage={requestUsage}
                     exportThread={exportThread}
+                    requestEnvData={requestEnvData}
                   />
                 ) : (
                   <div className="h-full flex items-center justify-center text-po-text-ghost">

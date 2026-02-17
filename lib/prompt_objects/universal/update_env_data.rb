@@ -67,6 +67,8 @@ module PromptObjects
           message: { action: "update", key: key }
         )
 
+        context.env.notify_env_data_changed(action: "update", root_thread_id: root_thread_id, key: key, stored_by: stored_by)
+
         "Updated '#{key}' in environment data."
       end
 

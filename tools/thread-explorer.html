@@ -298,6 +298,7 @@ button { font-family:var(--mono); cursor:pointer; }
 
 // --- State ---
 let treeData = null;
+let envData = [];       // root-level env data entries
 let events = [];        // flattened event sequence
 let actors = [];        // ordered actor names
 let poNames = new Set();
@@ -335,6 +336,7 @@ function loadFile(file) {
 
 function loadData(data) {
   treeData = data;
+  envData = data.env_data || [];
   allNodes = {};
   indexNodes(data);
   poNames = extractPONames(data);
@@ -503,9 +505,11 @@ function renderHeader() {
   const usage = sumUsageTree(treeData);
   const nEvents = events.length;
   const nSessions = Object.keys(allNodes).length;
+  const envCount = envData.length;
   document.getElementById('h-stats').innerHTML =
     `<span><span class="v">${nSessions}</span> sessions</span>`+
     `<span><span class="v">${nEvents}</span> events</span>`+
+    (envCount > 0 ? `<span style="color:var(--amber)"><span class="v">${envCount}</span> env data</span>` : '')+
     `<span><span class="v">${fmtNum(usage.input)}</span> in</span>`+
     `<span><span class="v">${fmtNum(usage.output)}</span> out</span>`;
 }
@@ -816,6 +820,29 @@ function renderDetail() {
   html += `</div>`;
   html += `<div class="stats"><span><span class="v">${fmtNum(usage.input)}</span> in</span><span><span class="v">${fmtNum(usage.output)}</span> out</span></div>`;
   html += `</div>`;
+
+  // Env Data section (only on root session when env_data exists)
+  if (type === 'root' && envData.length > 0) {
+    html += '<div style="padding:8px 16px 0">';
+    html += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--amber);margin-bottom:6px;font-weight:600">Env Data</div>';
+    envData.forEach(entry => {
+      const eKey = esc(entry.key);
+      const eDesc = esc(entry.short_description||'');
+      const eBy = esc(entry.stored_by||'');
+      const eVal = typeof entry.value === 'string' ? esc(entry.value) : esc(JSON.stringify(entry.value,null,2));
+      html += `<div class="tc">`;
+      html += `<div class="tc-head" onclick="toggleTc(this)" style="border-left:2px solid var(--amber)">`;
+      html += `<span class="chv">&#9654;</span>`;
+      html += `<span class="tc-name" style="color:var(--amber)">${eKey}</span>`;
+      html += `<span class="tc-label">${eDesc}</span>`;
+      html += `<span class="tc-label" style="margin-left:auto">by ${eBy}</span>`;
+      html += `</div>`;
+      html += `<div class="tc-body">`;
+      html += `<div class="tc-section"><div class="tc-section-label">Value</div><pre style="color:var(--amber)">${eVal}</pre></div>`;
+      html += `</div></div>`;
+    });
+    html += '</div>';
+  }
 
   // Messages
   html += '<div class="messages">';

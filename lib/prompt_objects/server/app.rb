@@ -28,6 +28,20 @@ module PromptObjects
             payload: payload
           )
         }
+
+        @runtime.on_env_data_changed = ->(action:, root_thread_id:, key:, stored_by:) {
+          entries = @runtime.session_store&.list_env_data_full(root_thread_id: root_thread_id) || []
+          broadcast(
+            type: "env_data_changed",
+            payload: {
+              action: action,
+              root_thread_id: root_thread_id,
+              key: key,
+              stored_by: stored_by,
+              entries: entries
+            }
+          )
+        }
       end
 
       def call(env)
