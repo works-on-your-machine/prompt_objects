@@ -5,7 +5,6 @@
 /* Base styles */
 html {
   color-scheme: dark;
-  font-size: 14px;
 }
 
 body {
@@ -45,11 +44,11 @@ body {
 
 /* Resize handles */
 .resize-handle {
-  @apply w-1 cursor-col-resize hover:bg-po-accent/30 active:bg-po-accent/50 transition-colors;
+  @apply w-1 cursor-col-resize hover:bg-po-accent/30 active:bg-po-accent/50 transition-colors border-l border-po-border;
 }
 
 .resize-handle-h {
-  @apply h-1 cursor-row-resize hover:bg-po-accent/30 active:bg-po-accent/50 transition-colors;
+  @apply h-1 cursor-row-resize hover:bg-po-accent/30 active:bg-po-accent/50 transition-colors border-t border-po-border;
 }
 
 /* Canvas CSS2DRenderer labels */
