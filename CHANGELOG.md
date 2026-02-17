@@ -2,6 +2,22 @@
 
 All notable changes to PromptObjects are documented in this file.
 
+## [0.6.0] - 2026-02-17
+
+### Added
+
+- **Shared environment data** — 5 new universal capabilities (`store_env_data`, `get_env_data`, `list_env_data`, `update_env_data`, `delete_env_data`) provide a thread-scoped key-value store for delegation chains. Data is scoped to the root thread so separate conversations stay isolated. Entries include a `short_description` for lightweight LLM discovery without fetching full values.
+- **Live environment data pane** — New collapsible pane in the Inspector shows shared env data updating in real-time as POs store and modify entries during delegation chains. WebSocket broadcasting (`env_data_changed`, `env_data_list`), a REST endpoint (`GET /api/sessions/:id/env_data`), and env data rendering in the Thread Explorer.
+- **Delegation context** — POs now receive context about their delegation chain. An expanded system prompt teaches POs about their nature, a delegation preamble prepends caller context to delegated messages, and the full delegation chain is built from thread lineage.
+- **Capability guard** — `execute_tool_calls` now rejects tools not in a PO's allowed set (declared capabilities + universals). Previously the LLM could hallucinate calls to any registered tool and they would execute. Now it receives an error directing it to use `add_capability` first.
+- **Env data in thread exports** — `serialize_tree_for_export` includes env data entries at the root level of exported thread trees. Thread Explorer renders these in an amber-colored section.
+
+### Fixed
+
+- **Root font-size causing undersized text** — Removed a `font-size: 14px` on the root `html` element that made all rem-based Tailwind sizes ~12% smaller than intended (e.g. `text-xs` computed to 10.5px instead of 12px).
+- **Invisible resize handle boundaries** — Added border styling to horizontal and vertical resize handles so pane boundaries are visible without hovering.
+- **Stale MCP tools tests** — Fixed test expectations broken by PO serialization centralization in 0.5.0.
+
 ## [0.5.0] - 2026-02-13
 
 ### Added

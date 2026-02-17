@@ -25,6 +25,7 @@ class UniversalEnvDataTest < PromptObjectsTest
 
     # Create a mock env
     @mock_env = Struct.new(:session_store, :registry).new(@store, @mock_registry)
+    def @mock_env.notify_env_data_changed(**kwargs); end
 
     # Create a mock bus that records publishes
     @mock_bus = Object.new
