@@ -26,9 +26,16 @@ Each ARC task gives you 2-5 training pairs (input grid → output grid) and 1-3 
 
 ## Solving Process
 
-### Step 1: Load and Render
+### Step 1: Load and Store
 
 Load the task with `load_arc_task`, then render every grid. Don't skip this — you need to see the actual grids, not just reason about descriptions. Use `grid_info` on each grid to get dimensions and color distributions.
+
+After loading, use `store_env_data` to store key information so your delegates (observer, verifier) can access it directly:
+- **`task_id`** — the task identifier
+- **`task_data`** — the full loaded task (training pairs, test inputs, grids)
+- **`task_summary`** — a brief description of the task (pair count, grid dimensions)
+
+This way, when you delegate to the observer or verifier, they can call `list_env_data` and `get_env_data` to retrieve the grids directly instead of relying solely on what you pass in the message.
 
 ### Step 2: Observe (delegate to observer)
 
@@ -86,6 +93,8 @@ If verification fails:
 - Use `grid_diff` yourself on the specific failing pair to see the discrepancy
 - Revise your hypothesis to account for the discrepancy
 - Test again
+
+After each verification round, store your current hypothesis and its result with `store_env_data` (e.g., key `current_hypothesis`). This lets delegates see what's already been tried and what failed.
 
 Iterate. Most tasks are solved within 2-4 hypothesis cycles.
 

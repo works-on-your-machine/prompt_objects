@@ -385,21 +385,116 @@ module PromptObjects
     end
 
     def build_system_prompt
-      # Build context about this PO's identity
       declared_caps = @config["capabilities"] || []
-      all_caps = declared_caps + UNIVERSAL_CAPABILITIES
 
       context_block = <<~CONTEXT
         ## System Context
 
-        You are a prompt object named "#{name}".
-        When using tools that target a PO (like add_capability), you can use "self" or "#{name}" to target yourself.
+        You are a prompt object named "#{name}" running in a PromptObjects environment.
 
-        Your declared capabilities: #{declared_caps.empty? ? '(none)' : declared_caps.join(', ')}
-        Universal capabilities (always available): #{UNIVERSAL_CAPABILITIES.join(', ')}
+        ### What is a Prompt Object?
+        You are an autonomous entity defined by a markdown file. You have an identity (your prompt),
+        capabilities (tools you can use), and you communicate by receiving messages and responding.
+        You exist alongside other prompt objects and primitive tools in a shared environment.
+
+        ### How you get called
+        You may receive messages from:
+        - **A human** interacting with you directly through the UI
+        - **Another prompt object** that has delegated a task to you as part of a larger workflow
+
+        When called by another PO, you'll see a delegation context block in the message with details
+        about who called you and why. You can also check shared environment data (via `list_env_data`)
+        for context that other POs in the same workflow have stored.
+
+        ### Your capabilities
+        When using tools that target a PO (like add_capability), you can use "self" or "#{name}" to target yourself.
+        - Declared capabilities: #{declared_caps.empty? ? '(none)' : declared_caps.join(', ')}
+        - Universal capabilities (always available): #{UNIVERSAL_CAPABILITIES.join(', ')}
+
+        You can create new tools (`create_primitive`) and new prompt objects (`create_capability`) at runtime if needed. Use `list_capabilities` to see everything available.
       CONTEXT
 
       "#{@body}\n\n#{context_block}"
+    end
+
+    # Build a delegation preamble for a PO-to-PO call.
+    # @param target_po [PromptObject] The PO being called
+    # @param delegation_thread [String, nil] The delegation thread ID
+    # @param context [Context] Execution context
+    # @return [String, nil] Preamble text or nil if caller isn't a PO
+    def build_delegation_preamble(target_po, delegation_thread, context)
+      return nil unless context.calling_po
+
+      caller_po = context.env.registry.get(context.calling_po)
+      return nil unless caller_po.is_a?(PromptObject)
+
+      parts = []
+      parts << "---"
+      parts << "[Delegation Context]"
+      parts << "Called by: #{caller_po.name}"
+      parts << "#{caller_po.name} is: \"#{caller_po.description}\""
+
+      chain = build_delegation_chain(delegation_thread)
+      parts << "Delegation chain: #{chain}" if chain
+
+      if delegation_thread && env_data_available?(delegation_thread)
+        parts << "Shared environment data is available — call list_env_data() to see what context has been stored."
+      end
+
+      parts << "---"
+      parts.join("\n")
+    end
+
+    # Build a human-readable delegation chain from thread lineage.
+    # @param delegation_thread [String, nil] The delegation thread ID
+    # @return [String, nil] Chain like "human → coordinator → solver → you (observer)"
+    def build_delegation_chain(delegation_thread)
+      return nil unless delegation_thread && session_store
+
+      lineage = session_store.get_thread_lineage(delegation_thread)
+      return nil if lineage.empty?
+
+      chain = ["human"]
+      lineage[0..-2].each do |session|
+        chain << session[:po_name] if session[:po_name]
+      end
+      chain << "you (#{lineage.last[:po_name]})"
+
+      chain.join(" → ")
+    end
+
+    # Check if any shared environment data exists for a delegation thread.
+    # @param delegation_thread [String] The delegation thread ID
+    # @return [Boolean]
+    def env_data_available?(delegation_thread)
+      return false unless session_store
+
+      root_thread = session_store.resolve_root_thread(delegation_thread)
+      entries = session_store.list_env_data(root_thread_id: root_thread)
+      !entries.empty?
+    end
+
+    # Build enriched arguments with delegation preamble prepended to the message.
+    # Returns a NEW hash — does not mutate the original arguments.
+    # @param target_po [PromptObject] The PO being called
+    # @param arguments [Hash, String] Original tool call arguments
+    # @param delegation_thread [String, nil] The delegation thread ID
+    # @param context [Context] Execution context
+    # @return [Hash, String] Enriched arguments with preamble, or original if no preamble
+    def enrich_delegation_message(target_po, arguments, delegation_thread, context)
+      preamble = build_delegation_preamble(target_po, delegation_thread, context)
+      return arguments unless preamble
+
+      original_message = normalize_message(arguments)
+      enriched_message = "#{preamble}\n\n#{original_message}"
+
+      if arguments.is_a?(Hash)
+        # Create a new hash with the enriched message
+        key = arguments.key?(:message) ? :message : "message"
+        arguments.merge(key => enriched_message)
+      else
+        enriched_message
+      end
     end
 
     def execute_tool_calls(tool_calls, context)
@@ -409,6 +504,13 @@ module PromptObjects
 
       tool_calls.map do |tc|
         capability = @env.registry&.get(tc.name)
+
+        # Guard: only execute tools the PO is allowed to use (declared + universal).
+        # Without this, the LLM can hallucinate calls to tools it shouldn't have access to.
+        allowed = (@config["capabilities"] || []) + UNIVERSAL_CAPABILITIES
+        unless allowed.include?(tc.name)
+          next { tool_call_id: tc.id, name: tc.name, content: "Capability '#{tc.name}' is not available. Your declared capabilities are: #{(@config["capabilities"] || []).join(', ')}. Use add_capability to add it first, or use list_primitives / list_capabilities to discover what's available." }
+        end
 
         if capability
           # Log the outgoing message
@@ -454,6 +556,10 @@ module PromptObjects
         parent_message_id: get_last_message_id
       )
 
+      # Enrich the message with delegation context (must happen after thread creation
+      # so build_delegation_chain can walk the lineage)
+      enriched_args = enrich_delegation_message(target_po, tool_call.arguments, delegation_thread, context)
+
       # Notify delegation start so WebSocket clients see the target PO activate
       @env.notify_delegation(:started, {
         target: target_po.name,
@@ -465,10 +571,10 @@ module PromptObjects
       begin
         if delegation_thread
           # Execute in isolated thread
-          target_po.receive_in_thread(tool_call.arguments, context: context, thread_id: delegation_thread)
+          target_po.receive_in_thread(enriched_args, context: context, thread_id: delegation_thread)
         else
           # Fallback: execute in target's current session (no session store)
-          target_po.receive(tool_call.arguments, context: context)
+          target_po.receive(enriched_args, context: context)
         end
       ensure
         # Notify delegation complete — target PO is done

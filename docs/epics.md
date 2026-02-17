@@ -171,6 +171,12 @@ Thread-scoped key-value store for PO delegation chains to share working memory.
 - SQLite storage in existing session database
 - See: [epics/shared-environment-data.md](epics/shared-environment-data.md)
 
+### Message Provenance
+Delegation context — informing delegated POs about who called them and why.
+- Layer 1: Expanded system prompt teaches every PO what it is, that other POs exist, that it may be called by humans or other POs, and that env data is available
+- Layer 2: Delegation preamble prepended to messages with caller name, description, chain, and env data hint
+- See: [epics/message-provenance.md](epics/message-provenance.md)
+
 ---
 
 ## Ready
@@ -189,12 +195,6 @@ Concurrent execution of tool calls within a single PO turn.
 - Remaining: context isolation refactor, Async::Barrier execution, batch events
 - See: [epics/parallel-tool-calling.md](epics/parallel-tool-calling.md)
 - Stories: [epics/parallel-tool-calling-stories.md](epics/parallel-tool-calling-stories.md)
-
-### Message Provenance
-Delegation context — informing delegated POs about who called them and why.
-- Base system prompt expansion
-- Delegation preamble with caller context
-- See: [epics/message-provenance.md](epics/message-provenance.md)
 
 ---
 
@@ -270,7 +270,7 @@ Speech interaction.
 | Shared Environment Data | [epics/shared-environment-data.md](epics/shared-environment-data.md) | Done |
 | Universal Capability Cleanup | [epics/universal-capability-cleanup.md](epics/universal-capability-cleanup.md) | Ready |
 | Parallel Tool Calling | [epics/parallel-tool-calling.md](epics/parallel-tool-calling.md) | Ready |
-| Message Provenance | [epics/message-provenance.md](epics/message-provenance.md) | Ready |
+| Message Provenance | [epics/message-provenance.md](epics/message-provenance.md) | Done |
 
 ### Completed Epics
 
