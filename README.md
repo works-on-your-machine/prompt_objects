@@ -62,6 +62,11 @@ All panels are resizable. The inspector's top pane collapses so the Workspace ca
 
 Navigate to `/canvas` for a Three.js 2D visualization of your environment. POs appear as glowing hexagonal nodes in a force-directed layout. Tool calls show as diamonds. Message arcs animate with traveling particles. Delegation lights up the target PO with a cyan glow. Click any node to inspect it. Keyboard shortcuts: F to fit, Escape to deselect.
 
+### Demos
+
+- [**Intro walkthrough**](https://www.loom.com/share/32c17ccd07bf4b6e99f1ff06aab5bee0) -- creating an environment, interacting with POs, and exploring the web UI
+- [**ARC-AGI-1 template**](https://www.loom.com/share/3a04fa73efd8407eae2b122740082268) -- using the ARC-AGI-1 solver environment with multi-PO delegation
+
 ### MCP Server mode
 
 Run any environment as an MCP (Model Context Protocol) server for integration with Claude Desktop, Cursor, or any MCP-compatible client:
