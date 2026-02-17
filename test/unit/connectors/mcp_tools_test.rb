@@ -43,7 +43,7 @@ class MCPToolsTest < PromptObjectsTest
     po = data["prompt_objects"].first
     assert po.key?("name"), "Should include name"
     assert po.key?("description"), "Should include description"
-    assert po.key?("state"), "Should include state"
+    assert po.key?("status"), "Should include status"
     assert po.key?("capabilities"), "Should include capabilities"
   end
 
@@ -53,7 +53,8 @@ class MCPToolsTest < PromptObjectsTest
 
     greeter = data["prompt_objects"].find { |po| po["name"] == "greeter" }
     assert_kind_of Array, greeter["capabilities"]
-    assert_includes greeter["capabilities"], "read_file"
+    cap_names = greeter["capabilities"].map { |c| c["name"] }
+    assert_includes cap_names, "read_file"
   end
 
   # --- SendMessage ---
